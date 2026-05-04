@@ -5,8 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 
 /**
- * Tiny stylized Vanmoof S3 — easter egg avatar with a permanently
- * floating tooltip. Two torus wheels + colored frame + saddle/handlebars.
+ * Stylized Vanmoof S3 with glowing headlight and tooltip.
  */
 function Bike() {
   return (
@@ -31,16 +30,22 @@ function Bike() {
         <meshStandardMaterial color="#d4d4d8" metalness={0.85} roughness={0.25} />
       </mesh>
 
-      {/* Top tube — signature Vanmoof straight beam */}
+      {/* Top tube */}
       <mesh castShadow position={[0, 0.36, 0]}>
         <boxGeometry args={[0.78, 0.075, 0.07]} />
-        <meshStandardMaterial color="#3b82f6" metalness={0.55} roughness={0.35} emissive="#1d4ed8" emissiveIntensity={0.15} />
+        <meshStandardMaterial
+          color="#3b82f6"
+          metalness={0.55}
+          roughness={0.35}
+          emissive="#1d4ed8"
+          emissiveIntensity={0.4}
+        />
       </mesh>
 
       {/* Down tube */}
       <mesh castShadow position={[0, 0.27, 0]} rotation={[0, 0, -0.18]}>
         <boxGeometry args={[0.7, 0.05, 0.06]} />
-        <meshStandardMaterial color="#1d4ed8" metalness={0.5} roughness={0.4} />
+        <meshStandardMaterial color="#1d4ed8" metalness={0.5} roughness={0.4} emissive="#1d4ed8" emissiveIntensity={0.2} />
       </mesh>
 
       {/* Saddle */}
@@ -63,16 +68,24 @@ function Bike() {
         <meshStandardMaterial color="#27272a" metalness={0.6} roughness={0.45} />
       </mesh>
 
-      {/* Front headlight */}
+      {/* Front headlight — glowing */}
       <mesh position={[0.46, 0.36, 0]}>
-        <sphereGeometry args={[0.04, 12, 12]} />
+        <sphereGeometry args={[0.045, 12, 12]} />
         <meshStandardMaterial
           color="#fde68a"
           emissive="#fbbf24"
-          emissiveIntensity={1.6}
+          emissiveIntensity={3.5}
           toneMapped={false}
         />
       </mesh>
+      {/* Headlight point light */}
+      <pointLight
+        position={[0.58, 0.36, 0]}
+        color="#fbbf24"
+        intensity={1.8}
+        distance={2.5}
+        decay={2}
+      />
     </group>
   );
 }
@@ -80,10 +93,10 @@ function Bike() {
 export default function Avatar({ position = [0, 0, 0] }) {
   const groupRef = useRef();
 
-  useFrame((state) => {
+  useFrame(({ clock }) => {
     const g = groupRef.current;
     if (!g) return;
-    const t = state.clock.getElapsedTime();
+    const t = clock.getElapsedTime();
     g.position.y = Math.sin(t * 1.8) * 0.04;
     g.rotation.y = Math.sin(t * 0.6) * 0.05;
   });
@@ -94,7 +107,6 @@ export default function Avatar({ position = [0, 0, 0] }) {
         <Bike />
       </group>
 
-      {/* Tooltip — always visible, fully passive */}
       <Html
         position={[0, 1.05, 0]}
         center
@@ -107,18 +119,18 @@ export default function Avatar({ position = [0, 0, 0] }) {
             className="pointer-events-none absolute -inset-[6px] rounded-full opacity-70 blur-md"
             style={{
               background:
-                "radial-gradient(50% 50% at 50% 50%, rgba(59,130,246,0.35), transparent 70%)",
+                "radial-gradient(50% 50% at 50% 50%, rgba(59,130,246,0.4), transparent 70%)",
             }}
           />
           <div className="relative rounded-full border border-white/10 bg-zinc-900/70 px-3 py-1.5 text-[11px] font-medium tracking-wide text-zinc-100 backdrop-blur-md shadow-lg">
             <span className="mr-1.5 inline-block h-1.5 w-1.5 -translate-y-px rounded-full bg-amber-400 align-middle shadow-[0_0_8px_rgba(251,191,36,0.9)]" />
             Riding a Vanmoof S3{" "}
-            <span className="text-zinc-400">
-              (Error 44 / Single-Speed Mode)
-            </span>
+            <span className="text-zinc-400">(Error 44 / Single-Speed Mode)</span>
           </div>
         </div>
       </Html>
     </group>
   );
 }
+
+

@@ -1,10 +1,9 @@
 import "./globals.css";
 
 export const metadata = {
-  title: "Numan — 3D Portfolio Roadmap",
+  title: "Numan Yesil — 3D Portfolio",
   description:
-    "An interactive isometric journey through my path: Wirtschaftsinformatik, Gastro-Wurzeln und Quality Engineering.",
-  themeColor: "#05060a",
+    "Interactive 3D portfolio of Numan Yesil — Software Engineer, QA, and Builder. Business Informatics at HAW Kiel.",
 };
 
 export const viewport = {
@@ -12,12 +11,13 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: "#03040a",
 };
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="de" className="dark">
-      <body className="bg-zinc-950 text-zinc-100 antialiased font-sans">
+    <html lang="en" className="dark">
+      <body className="bg-[#03040a] text-zinc-100 antialiased font-sans">
         {children}
       </body>
     </html>
