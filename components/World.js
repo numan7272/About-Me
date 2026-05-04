@@ -6,9 +6,11 @@ import {
   SoftShadows,
   Sky,
   ContactShadows,
+  Stars,
 } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
-import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
+import { EffectComposer, Bloom, Vignette, ChromaticAberration } from "@react-three/postprocessing";
+import { Vector2 } from "three";
 
 import Ground from "./Ground";
 import Player from "./Player";
@@ -16,186 +18,224 @@ import Landmark from "./Landmark";
 import FollowCamera from "./FollowCamera";
 import Decorations from "./Decorations";
 
-/**
- * Props:
- *   onEnter / onExit — sensor callbacks forwarded to each Landmark.
- *   followModeRef    — mutable ref that controls FollowCamera follow behaviour.
- *   orbitRef         — ref to the OrbitControls instance inside FollowCamera.
- */
+// ─────────────────────────────────────────────────────────────────────────────
+// Landmark world positions — spread across a 120×120 unit island so the
+// player genuinely has to drive between them.
+// ─────────────────────────────────────────────────────────────────────────────
+const LM = {
+  haw:        { x: -38, z: -35 },
+  designa:    { x:  42, z: -22 },
+  kebab:      { x:   8, z:  40 },
+  highschool: { x: -36, z:  32 },
+  homebase:   { x:   0, z:   0 },
+};
+
 export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
   const playerRef = useRef(null);
 
   return (
     <Suspense fallback={null}>
-      {/* ── Atmosphere ─────────────────────────────────────────────────── */}
-      <color attach="background" args={["#87ceeb"]} />
-      <fog attach="fog" args={["#c8e8f0", 60, 150]} />
+
+      {/* ── Atmosphere ─────────────────────────────────────────────────────── */}
+      <color attach="background" args={["#8ec8e8"]} />
+      <fog attach="fog" args={["#b8dff0", 80, 200]} />
+
       <Sky
         distance={4500}
-        sunPosition={[50, 35, -10]}
-        inclination={0.48}
-        azimuth={0.22}
-        turbidity={4}
-        rayleigh={0.8}
-        mieCoefficient={0.004}
-        mieDirectionalG={0.88}
+        sunPosition={[60, 40, -15]}
+        inclination={0.47}
+        azimuth={0.21}
+        turbidity={3.5}
+        rayleigh={0.6}
+        mieCoefficient={0.003}
+        mieDirectionalG={0.9}
       />
 
-      {/* ── Lighting ─────────────────────────────────────────────────────── */}
-      <ambientLight intensity={0.55} color="#e8f4ff" />
-      <hemisphereLight args={["#d4eeff", "#4a7c59", 0.5]} />
+      {/* ── Lighting ───────────────────────────────────────────────────────── */}
 
-      {/* Main sun — high-res shadow map */}
+      {/* Soft sky ambient */}
+      <ambientLight intensity={0.45} color="#ddeeff" />
+
+      {/* Sky/ground hemisphere — blends sky blue into grass green */}
+      <hemisphereLight
+        args={["#c8e8ff", "#3d6b44", 0.55]}
+        position={[0, 50, 0]}
+      />
+
+      {/*
+        Primary sun — positioned high and to the right.
+        2048 × 2048 shadow map covers the full 120-unit island.
+      */}
       <directionalLight
-        position={[30, 45, 20]}
-        intensity={2.2}
-        color="#fff6e0"
+        position={[45, 65, 30]}
+        intensity={2.6}
+        color="#fff4d6"
         castShadow
-        shadow-mapSize={[2048, 2048]}
+        shadow-mapSize-width={2048}
+        shadow-mapSize-height={2048}
         shadow-camera-near={0.5}
-        shadow-camera-far={180}
-        shadow-camera-left={-60}
-        shadow-camera-right={60}
-        shadow-camera-top={60}
-        shadow-camera-bottom={-60}
-        shadow-bias={-0.0004}
-        shadow-normalBias={0.05}
+        shadow-camera-far={250}
+        shadow-camera-left={-70}
+        shadow-camera-right={70}
+        shadow-camera-top={70}
+        shadow-camera-bottom={-70}
+        shadow-bias={-0.0003}
+        shadow-normalBias={0.06}
       />
 
-      {/* Fill light from opposite side */}
+      {/* Cool fill light from the opposite side — prevents completely flat shadows */}
       <directionalLight
-        position={[-20, 20, -20]}
-        intensity={0.4}
-        color="#b0d4ff"
+        position={[-30, 25, -25]}
+        intensity={0.5}
+        color="#a8c8ff"
+        castShadow={false}
       />
 
-      {/* Soft shadows overlay */}
-      <SoftShadows size={24} samples={10} focus={0.5} />
+      {/* Warm bounce off the ground */}
+      <directionalLight
+        position={[0, -8, 0]}
+        intensity={0.18}
+        color="#a8d8a0"
+        castShadow={false}
+      />
 
-      {/* Contact shadows for grounded feel near the bike */}
+      {/* Soft shadow edges via PCF kernel blur */}
+      <SoftShadows size={28} samples={12} focus={0.55} />
+
+      {/* Contact shadows baked under the bike, stays with scene origin */}
       <ContactShadows
-        position={[0, 0.01, 0]}
-        opacity={0.35}
-        width={80}
-        height={80}
-        blur={2.5}
-        far={10}
-        color="#2d4a30"
+        position={[0, 0.015, 0]}
+        opacity={0.28}
+        width={120}
+        height={120}
+        blur={3}
+        far={12}
+        color="#1a3a22"
+        frames={1}
       />
 
-      {/* HDRI for PBR reflections on logos */}
+      {/* City HDRI for PBR reflections on the chrome logos */}
       <Environment preset="city" background={false} />
 
-      {/* ── Hybrid camera ─────────────────────────────────────────────────── */}
+      {/* ── Camera ─────────────────────────────────────────────────────────── */}
       <FollowCamera
         targetRef={playerRef}
         followModeRef={followModeRef}
         orbitRef={orbitRef}
       />
 
-      {/* ── Physics world ─────────────────────────────────────────────────── */}
-      <Physics gravity={[0, -16, 0]}>
-        <Ground />
+      {/* ── Physics ────────────────────────────────────────────────────────── */}
+      <Physics gravity={[0, -18, 0]}>
+        <Ground landmarkPositions={LM} />
         <Decorations />
 
-        {/* ── Landmark 1: HAW Kiel ───────────────────────────────────────── */}
+        {/* ── 1 · HAW Kiel — top-left ──────────────────────────────────────── */}
         <Landmark
           id="haw"
           model="/haw-logo-transformed.glb"
-          position={[-22, 0, -20]}
-          rotation={[0, Math.PI * 0.18, 0]}
-          colliderHalfExtents={[2.0, 2.0, 0.8]}
-          sensorHalfExtents={[4.5, 3.0, 4.5]}
+          position={[LM.haw.x, 0, LM.haw.z]}
+          rotation={[0, Math.PI * 0.15, 0]}
+          colliderHalfExtents={[3.0, 3.5, 1.0]}
+          sensorHalfExtents={[6.0, 4.0, 6.0]}
           color="#22d3ee"
           glow="#06b6d4"
           label="HAW Kiel"
-          modelScale={8}
+          modelScale={10}
           glossy
           floating
           onEnter={onEnter}
           onExit={onExit}
         />
 
-        {/* ── Landmark 2: Designa ────────────────────────────────────────── */}
+        {/* ── 2 · Designa — top-right ──────────────────────────────────────── */}
         <Landmark
           id="designa"
           model="/designa-logo-transformed.glb"
-          position={[26, 0, -14]}
-          rotation={[0, -Math.PI * 0.22, 0]}
-          colliderHalfExtents={[2.2, 1.8, 0.8]}
-          sensorHalfExtents={[4.5, 3.0, 4.5]}
+          position={[LM.designa.x, 0, LM.designa.z]}
+          rotation={[0, -Math.PI * 0.2, 0]}
+          colliderHalfExtents={[3.2, 2.8, 1.0]}
+          sensorHalfExtents={[6.0, 4.0, 6.0]}
           color="#34d399"
           glow="#10b981"
           label="Designa"
-          modelScale={8}
+          modelScale={10}
           glossy
           floating
           onEnter={onEnter}
           onExit={onExit}
         />
 
-        {/* ── Landmark 3: Kebab Shop ─────────────────────────────────────── */}
+        {/* ── 3 · Kebab Shop — bottom-center ───────────────────────────────── */}
         <Landmark
           id="kebab"
           model="/yekdoener-transformed.glb"
           glossy={false}
           floating={false}
-          position={[4, 0, 26]}
-          rotation={[0, -Math.PI * 0.12, 0]}
-          colliderHalfExtents={[1.8, 1.6, 1.8]}
-          sensorHalfExtents={[4.5, 3.0, 4.5]}
+          position={[LM.kebab.x, 0, LM.kebab.z]}
+          rotation={[0, -Math.PI * 0.1, 0]}
+          colliderHalfExtents={[2.5, 2.2, 2.5]}
+          sensorHalfExtents={[6.0, 4.0, 6.0]}
           color="#fb923c"
           glow="#ef4444"
           label="Yek Döner"
-          modelScale={8}
+          modelScale={10}
           onEnter={onEnter}
           onExit={onExit}
         />
 
-        {/* ── Landmark 4: Thor Heyerdahl Gymnasium (procedural) ─────────── */}
+        {/* ── 4 · High School — bottom-left ────────────────────────────────── */}
         <Landmark
           id="highschool"
           proceduralShape="diamond"
-          position={[-20, 0, 22]}
-          rotation={[0, Math.PI * 0.1, 0]}
-          colliderHalfExtents={[1.6, 1.6, 1.6]}
-          sensorHalfExtents={[4.5, 3.0, 4.5]}
+          position={[LM.highschool.x, 0, LM.highschool.z]}
+          rotation={[0, Math.PI * 0.08, 0]}
+          colliderHalfExtents={[2.2, 2.2, 2.2]}
+          sensorHalfExtents={[6.0, 4.0, 6.0]}
           color="#a78bfa"
           glow="#7c3aed"
           label="Thor Heyerdahl"
+          modelYOffset={2.0}
+          onEnter={onEnter}
+          onExit={onExit}
+        />
+
+        {/* ── 5 · Homebase HQ — dead center ────────────────────────────────── */}
+        <Landmark
+          id="homebase"
+          proceduralShape="sphere"
+          position={[LM.homebase.x, 0, LM.homebase.z]}
+          colliderHalfExtents={[1.8, 1.8, 1.8]}
+          sensorHalfExtents={[6.0, 4.0, 6.0]}
+          color="#f472b6"
+          glow="#ec4899"
+          label="HQ"
           modelYOffset={1.5}
           onEnter={onEnter}
           onExit={onExit}
         />
 
-        {/* ── Landmark 5: Homebase HQ (procedural sphere) ───────────────── */}
-        <Landmark
-          id="homebase"
-          proceduralShape="sphere"
-          position={[0, 0, 0]}
-          colliderHalfExtents={[1.4, 1.4, 1.4]}
-          sensorHalfExtents={[4.5, 3.0, 4.5]}
-          color="#f472b6"
-          glow="#ec4899"
-          label="HQ"
-          modelYOffset={1.2}
-          onEnter={onEnter}
-          onExit={onExit}
-        />
-
+        {/* Player spawns slightly north of HQ */}
         <Player playerRef={playerRef} />
       </Physics>
 
-      {/* ── Post-processing ───────────────────────────────────────────────── */}
+      {/* ── Post-processing ────────────────────────────────────────────────── */}
       <EffectComposer multisampling={0} disableNormalPass>
+        {/* Gentle bloom on emissive elements / beacon lights */}
         <Bloom
-          intensity={0.5}
-          luminanceThreshold={0.88}
-          luminanceSmoothing={0.4}
+          intensity={0.65}
+          luminanceThreshold={0.82}
+          luminanceSmoothing={0.5}
           mipmapBlur
         />
-        <Vignette eskil={false} offset={0.22} darkness={0.5} />
+        {/* Subtle lens distortion at screen edges */}
+        <ChromaticAberration
+          offset={new Vector2(0.0005, 0.0005)}
+          radialModulation={false}
+          modulationOffset={0}
+        />
+        <Vignette eskil={false} offset={0.2} darkness={0.55} />
       </EffectComposer>
+
     </Suspense>
   );
 }
