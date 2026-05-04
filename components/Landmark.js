@@ -6,9 +6,9 @@ import { useGLTF, Float } from "@react-three/drei";
 import { RigidBody, CuboidCollider } from "@react-three/rapier";
 import * as THREE from "three";
 
-/* -------------------- Model loaders (one per landmark type) ------------------- */
+/* -------------------- Model loader (works for any landmark) ------------------ */
 
-function GltfLandmark({ url, scale = 1 }) {
+function GltfLandmark({ url, scale = 1, glossy = true }) {
   const { scene } = useGLTF(url);
 
   useEffect(() => {
@@ -17,75 +17,33 @@ function GltfLandmark({ url, scale = 1 }) {
         o.castShadow = true;
         o.receiveShadow = true;
         if (o.material) {
-          // Awwwards polish — low roughness + crisp env reflections
-          o.material.roughness = 0.12;
-          o.material.metalness = 0.85;
-          o.material.envMapIntensity = 1.5;
+          if (glossy) {
+            // Awwwards polish — chrome-y logos that catch the HDRI
+            o.material.roughness = 0.12;
+            o.material.metalness = 0.85;
+            o.material.envMapIntensity = 1.5;
+          } else {
+            // Natural materials (e.g. the kebab shop) — don't override
+            // baked roughness/metalness, just bump env response a touch.
+            o.material.envMapIntensity = 1.0;
+          }
         }
       }
     });
-  }, [scene]);
+  }, [scene, glossy]);
 
   return <primitive object={scene} scale={scale} />;
 }
 
 useGLTF.preload("/haw-logo-transformed.glb");
 useGLTF.preload("/designa-logo-transformed.glb");
-
-/* ----------------------------- Kebab placeholder ----------------------------- */
-
-function KebabShop({ color = "#fb923c", glow = "#ef4444" }) {
-  return (
-    <group>
-      {/* Cylindrical kebab spit on a warm pedestal */}
-      <mesh castShadow receiveShadow position={[0, 0.45, 0]}>
-        <cylinderGeometry args={[0.95, 1.05, 0.9, 24]} />
-        <meshStandardMaterial
-          color="#3b2718"
-          roughness={0.7}
-          metalness={0.25}
-        />
-      </mesh>
-      <mesh castShadow position={[0, 1.45, 0]}>
-        <cylinderGeometry args={[0.55, 0.7, 1.1, 24]} />
-        <meshStandardMaterial
-          color={color}
-          roughness={0.45}
-          metalness={0.15}
-          emissive={glow}
-          emissiveIntensity={0.18}
-        />
-      </mesh>
-      <mesh castShadow position={[0, 2.05, 0]}>
-        <cylinderGeometry args={[0.18, 0.4, 0.4, 24]} />
-        <meshStandardMaterial
-          color="#fde68a"
-          roughness={0.4}
-          metalness={0.2}
-          emissive="#fbbf24"
-          emissiveIntensity={0.45}
-        />
-      </mesh>
-      {/* spit rod */}
-      <mesh castShadow position={[0, 1.5, 0]}>
-        <cylinderGeometry args={[0.05, 0.05, 1.7, 12]} />
-        <meshStandardMaterial color="#a3a3a3" metalness={0.85} roughness={0.25} />
-      </mesh>
-      {/* warm window glow */}
-      <mesh position={[0, 0.6, 1.06]}>
-        <planeGeometry args={[1.2, 0.5]} />
-        <meshBasicMaterial color="#fde68a" transparent opacity={0.85} />
-      </mesh>
-    </group>
-  );
-}
+useGLTF.preload("/yekdoener-transformed.glb");
 
 /* --------------------------------- Landmark ---------------------------------- */
 
 export default function Landmark({
   id,
   model,
-  variant,
   position = [0, 0, 0],
   rotation = [0, 0, 0],
   colliderHalfExtents = [1.5, 1.5, 1.5],
@@ -93,6 +51,14 @@ export default function Landmark({
   color = "#22d3ee",
   glow = "#06b6d4",
   label,
+  /** Apply chrome-y PBR override (true) or keep the model's baked materials (false). */
+  glossy = true,
+  /** Floating + bobbing model (logos) vs. grounded building (kebab shop). */
+  floating = true,
+  /** Visual scale for the GLB. */
+  modelScale = 1,
+  /** Extra Y offset for the visual model relative to the body. */
+  modelYOffset = 0,
   onEnter,
   onExit,
 }) {
@@ -172,21 +138,25 @@ export default function Landmark({
           }}
         />
 
-        {/* Visual model — gentle float for life */}
-        <Float
-          speed={1.4}
-          rotationIntensity={0.1}
-          floatIntensity={0.45}
-          floatingRange={[0, 0.18]}
-        >
-          <group position={[0, colliderHalfExtents[1] + 0.5, 0]}>
-            {variant === "kebab" ? (
-              <KebabShop color={color} glow={glow} />
-            ) : (
-              <GltfLandmark url={model} />
-            )}
+        {/* Visual model — float for floating logos, grounded for buildings */}
+        {floating ? (
+          <Float
+            speed={1.4}
+            rotationIntensity={0.1}
+            floatIntensity={0.45}
+            floatingRange={[0, 0.18]}
+          >
+            <group
+              position={[0, colliderHalfExtents[1] + 0.5 + modelYOffset, 0]}
+            >
+              <GltfLandmark url={model} scale={modelScale} glossy={glossy} />
+            </group>
+          </Float>
+        ) : (
+          <group position={[0, modelYOffset, 0]}>
+            <GltfLandmark url={model} scale={modelScale} glossy={glossy} />
           </group>
-        </Float>
+        )}
       </RigidBody>
 
       {/* Optional 3D label baseplate (subtle) */}

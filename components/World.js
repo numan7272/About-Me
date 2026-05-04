@@ -113,7 +113,9 @@ export default function World({ onEnter, onExit }) {
 
         <Landmark
           id="kebab"
-          variant="kebab"
+          model="/yekdoener-transformed.glb"
+          glossy={false}
+          floating={false}
           position={[2, 0, 14]}
           rotation={[0, -Math.PI * 0.12, 0]}
           colliderHalfExtents={[1.4, 1.2, 1.4]}
