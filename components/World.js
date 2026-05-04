@@ -1,12 +1,11 @@
 "use client";
 
-import { Suspense, useRef } from "react";
+import { Suspense, useRef, useMemo } from "react";
 import {
   Environment,
   SoftShadows,
   Sky,
   ContactShadows,
-  Stars,
 } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import { EffectComposer, Bloom, Vignette, ChromaticAberration } from "@react-three/postprocessing";
@@ -19,8 +18,7 @@ import FollowCamera from "./FollowCamera";
 import Decorations from "./Decorations";
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Landmark world positions — spread across a 120×120 unit island so the
-// player genuinely has to drive between them.
+// Landmark world positions — spread across a 120×120 unit island
 // ─────────────────────────────────────────────────────────────────────────────
 const LM = {
   haw:        { x: -38, z: -35 },
@@ -33,12 +31,15 @@ const LM = {
 export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
   const playerRef = useRef(null);
 
+  // Stable Vector2 for ChromaticAberration — must NOT be re-created each render
+  // or postprocessing will throw a uniform lookup error.
+  const caOffset = useMemo(() => new Vector2(0.0005, 0.0005), []);
+
   return (
     <Suspense fallback={null}>
 
-      {/* ── Atmosphere ─────────────────────────────────────────────────────── */}
+      {/* ── Background colour — NO <fog> (incompatible with postprocessing RenderPass) */}
       <color attach="background" args={["#8ec8e8"]} />
-      <fog attach="fog" args={["#b8dff0", 80, 200]} />
 
       <Sky
         distance={4500}
@@ -51,21 +52,14 @@ export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
         mieDirectionalG={0.9}
       />
 
-      {/* ── Lighting ───────────────────────────────────────────────────────── */}
-
-      {/* Soft sky ambient */}
+      {/* ── Lighting ─────────────────────────────────────────────────────── */}
       <ambientLight intensity={0.45} color="#ddeeff" />
 
-      {/* Sky/ground hemisphere — blends sky blue into grass green */}
       <hemisphereLight
         args={["#c8e8ff", "#3d6b44", 0.55]}
         position={[0, 50, 0]}
       />
 
-      {/*
-        Primary sun — positioned high and to the right.
-        2048 × 2048 shadow map covers the full 120-unit island.
-      */}
       <directionalLight
         position={[45, 65, 30]}
         intensity={2.6}
@@ -83,7 +77,6 @@ export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
         shadow-normalBias={0.06}
       />
 
-      {/* Cool fill light from the opposite side — prevents completely flat shadows */}
       <directionalLight
         position={[-30, 25, -25]}
         intensity={0.5}
@@ -91,7 +84,6 @@ export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
         castShadow={false}
       />
 
-      {/* Warm bounce off the ground */}
       <directionalLight
         position={[0, -8, 0]}
         intensity={0.18}
@@ -99,10 +91,8 @@ export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
         castShadow={false}
       />
 
-      {/* Soft shadow edges via PCF kernel blur */}
       <SoftShadows size={28} samples={12} focus={0.55} />
 
-      {/* Contact shadows baked under the bike, stays with scene origin */}
       <ContactShadows
         position={[0, 0.015, 0]}
         opacity={0.28}
@@ -114,7 +104,6 @@ export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
         frames={1}
       />
 
-      {/* City HDRI for PBR reflections on the chrome logos */}
       <Environment preset="city" background={false} />
 
       {/* ── Camera ─────────────────────────────────────────────────────────── */}
@@ -124,12 +113,12 @@ export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
         orbitRef={orbitRef}
       />
 
-      {/* ── Physics ────────────────────────────────────────────────────────── */}
+      {/* ── Physics world ────────────────────────────────────────────────────── */}
       <Physics gravity={[0, -18, 0]}>
         <Ground landmarkPositions={LM} />
         <Decorations />
 
-        {/* ── 1 · HAW Kiel — top-left ──────────────────────────────────────── */}
+        {/* 1 · HAW Kiel */}
         <Landmark
           id="haw"
           model="/haw-logo-transformed.glb"
@@ -147,7 +136,7 @@ export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
           onExit={onExit}
         />
 
-        {/* ── 2 · Designa — top-right ──────────────────────────────────────── */}
+        {/* 2 · Designa */}
         <Landmark
           id="designa"
           model="/designa-logo-transformed.glb"
@@ -165,7 +154,7 @@ export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
           onExit={onExit}
         />
 
-        {/* ── 3 · Kebab Shop — bottom-center ───────────────────────────────── */}
+        {/* 3 · Kebab Shop */}
         <Landmark
           id="kebab"
           model="/yekdoener-transformed.glb"
@@ -183,7 +172,7 @@ export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
           onExit={onExit}
         />
 
-        {/* ── 4 · High School — bottom-left ────────────────────────────────── */}
+        {/* 4 · High School */}
         <Landmark
           id="highschool"
           proceduralShape="diamond"
@@ -199,7 +188,7 @@ export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
           onExit={onExit}
         />
 
-        {/* ── 5 · Homebase HQ — dead center ────────────────────────────────── */}
+        {/* 5 · Homebase HQ */}
         <Landmark
           id="homebase"
           proceduralShape="sphere"
@@ -214,22 +203,24 @@ export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
           onExit={onExit}
         />
 
-        {/* Player spawns slightly north of HQ */}
-        <Player playerRef={playerRef} />
+        <Player playerRef={playerRef} followModeRef={followModeRef} />
       </Physics>
 
-      {/* ── Post-processing ────────────────────────────────────────────────── */}
+      {/* ── Post-processing ───────────────────────────────────────────────────
+        NOTE: <fog> must NOT be used alongside this EffectComposer.
+        Three.js refreshFogUniforms() dereferences a uniform that the
+        postprocessing RenderPass does not initialise, causing a crash.
+        Atmospheric depth is handled by the Sky component instead.
+      */}
       <EffectComposer multisampling={0} disableNormalPass>
-        {/* Gentle bloom on emissive elements / beacon lights */}
         <Bloom
           intensity={0.65}
           luminanceThreshold={0.82}
           luminanceSmoothing={0.5}
           mipmapBlur
         />
-        {/* Subtle lens distortion at screen edges */}
         <ChromaticAberration
-          offset={new Vector2(0.0005, 0.0005)}
+          offset={caOffset}
           radialModulation={false}
           modulationOffset={0}
         />
