@@ -2,85 +2,26 @@
 
 import { useRef } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Html } from "@react-three/drei";
+import { Html, useGLTF } from "@react-three/drei";
 
 /**
- * Stylized Vanmoof S3 with glowing headlight and tooltip.
+ * Loads the Vanmoof S3 GLB model and adds a glowing headlight effect.
  */
 function Bike() {
+  const { scene } = useGLTF("/dark.glb");
+
   return (
     <group rotation={[0, Math.PI * 0.18, 0]}>
-      {/* Wheels */}
-      <mesh castShadow position={[-0.36, 0.18, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <torusGeometry args={[0.18, 0.035, 12, 28]} />
-        <meshStandardMaterial color="#0a0a0a" metalness={0.4} roughness={0.6} />
-      </mesh>
-      <mesh castShadow position={[0.36, 0.18, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <torusGeometry args={[0.18, 0.035, 12, 28]} />
-        <meshStandardMaterial color="#0a0a0a" metalness={0.4} roughness={0.6} />
-      </mesh>
-
-      {/* Hubs */}
-      <mesh position={[-0.36, 0.18, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.04, 0.04, 0.04, 12]} />
-        <meshStandardMaterial color="#d4d4d8" metalness={0.85} roughness={0.25} />
-      </mesh>
-      <mesh position={[0.36, 0.18, 0]} rotation={[0, 0, Math.PI / 2]}>
-        <cylinderGeometry args={[0.04, 0.04, 0.04, 12]} />
-        <meshStandardMaterial color="#d4d4d8" metalness={0.85} roughness={0.25} />
-      </mesh>
-
-      {/* Top tube */}
-      <mesh castShadow position={[0, 0.36, 0]}>
-        <boxGeometry args={[0.78, 0.075, 0.07]} />
-        <meshStandardMaterial
-          color="#3b82f6"
-          metalness={0.55}
-          roughness={0.35}
-          emissive="#1d4ed8"
-          emissiveIntensity={0.4}
-        />
-      </mesh>
-
-      {/* Down tube */}
-      <mesh castShadow position={[0, 0.27, 0]} rotation={[0, 0, -0.18]}>
-        <boxGeometry args={[0.7, 0.05, 0.06]} />
-        <meshStandardMaterial color="#1d4ed8" metalness={0.5} roughness={0.4} emissive="#1d4ed8" emissiveIntensity={0.2} />
-      </mesh>
-
-      {/* Saddle */}
-      <mesh castShadow position={[-0.32, 0.46, 0]}>
-        <boxGeometry args={[0.18, 0.04, 0.07]} />
-        <meshStandardMaterial color="#0a0a0a" roughness={0.85} />
-      </mesh>
-      <mesh castShadow position={[-0.32, 0.4, 0]}>
-        <cylinderGeometry args={[0.018, 0.018, 0.16, 8]} />
-        <meshStandardMaterial color="#27272a" metalness={0.6} roughness={0.4} />
-      </mesh>
-
-      {/* Handlebars */}
-      <mesh castShadow position={[0.34, 0.45, 0]}>
-        <cylinderGeometry args={[0.022, 0.022, 0.22, 10]} />
-        <meshStandardMaterial color="#18181b" metalness={0.6} roughness={0.45} />
-      </mesh>
-      <mesh castShadow position={[0.34, 0.34, 0]}>
-        <cylinderGeometry args={[0.022, 0.022, 0.22, 10]} />
-        <meshStandardMaterial color="#27272a" metalness={0.6} roughness={0.45} />
-      </mesh>
-
-      {/* Front headlight — glowing */}
-      <mesh position={[0.46, 0.36, 0]}>
-        <sphereGeometry args={[0.045, 12, 12]} />
-        <meshStandardMaterial
-          color="#fde68a"
-          emissive="#fbbf24"
-          emissiveIntensity={3.5}
-          toneMapped={false}
-        />
-      </mesh>
-      {/* Headlight point light */}
+      {/* The actual 3D GLB model */}
+      <primitive
+        object={scene}
+        scale={[0.48, 0.48, 0.48]}
+        castShadow
+        receiveShadow
+      />
+      {/* Headlight glow */}
       <pointLight
-        position={[0.58, 0.36, 0]}
+        position={[0.6, 0.36, 0]}
         color="#fbbf24"
         intensity={1.8}
         distance={2.5}
@@ -133,4 +74,4 @@ export default function Avatar({ position = [0, 0, 0] }) {
   );
 }
 
-
+useGLTF.preload("/dark.glb");
