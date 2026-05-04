@@ -10,10 +10,10 @@ import SocialDock from "./SocialDock";
 import MobileControls from "./MobileControls";
 
 const KEY_MAP = [
-  { name: "forward",  keys: ["ArrowUp",    "KeyW", "KeyZ"] },
-  { name: "backward", keys: ["ArrowDown",   "KeyS"] },
-  { name: "left",     keys: ["ArrowLeft",   "KeyA", "KeyQ"] },
-  { name: "right",    keys: ["ArrowRight",  "KeyD"] },
+  { name: "forward",  keys: ["ArrowUp",   "KeyW", "KeyZ"] },
+  { name: "backward", keys: ["ArrowDown",  "KeyS"] },
+  { name: "left",     keys: ["ArrowLeft",  "KeyA", "KeyQ"] },
+  { name: "right",    keys: ["ArrowRight", "KeyD"] },
   { name: "brake",    keys: ["Space"] },
 ];
 
@@ -74,30 +74,29 @@ export const LANDMARKS = {
 export default function Experience() {
   const [activeId, setActiveId] = useState(null);
 
-  // Hybrid camera state — shared between Experience (HTML button) and World/FollowCamera
+  // followModeRef is a plain mutable ref — intentionally NOT useState so
+  // toggling it never triggers a React re-render (zero overhead).
   const followModeRef = useRef(true);
-  const orbitRef = useRef(null);
+  const orbitRef      = useRef(null);
 
   const handleEnter = useCallback((id) => setActiveId(id), []);
-  const handleExit = useCallback((id) => {
-    setActiveId((cur) => (cur === id ? null : cur));
-  }, []);
+  const handleExit  = useCallback(
+    (id) => setActiveId((cur) => (cur === id ? null : cur)),
+    [],
+  );
 
   const activeCard = useMemo(
     () => (activeId ? LANDMARKS[activeId] : null),
     [activeId],
   );
 
-  const handleRecenter = useCallback(() => {
-    followModeRef.current = true;
-  }, []);
-
   return (
     <main className="relative h-[100dvh] w-screen overflow-hidden bg-black select-none">
-      {/* Top hint */}
+
+      {/* Top hint — keyboard / touch instructions */}
       <div className="pointer-events-none absolute left-1/2 top-5 z-30 -translate-x-1/2 text-center">
         <div className="text-[10px] uppercase tracking-[0.32em] text-zinc-400/80">
-          Numan&apos;s Roadmap
+          Numan’s Roadmap
         </div>
         <div className="mt-1 text-[12px] text-zinc-300/80">
           <span className="hidden md:inline">
@@ -117,11 +116,11 @@ export default function Experience() {
           shadows
           dpr={[1, 2]}
           gl={{
-            antialias: true,
-            powerPreference: "high-performance",
-            stencil: false,
+            antialias:        true,
+            powerPreference:  "high-performance",
+            stencil:          false,
           }}
-          camera={{ fov: 42, position: [0, 22, 30], near: 0.5, far: 300 }}
+          camera={{ fov: 42, position: [14, 18, 14], near: 0.5, far: 300 }}
           className="absolute inset-0"
         >
           <World
@@ -137,19 +136,11 @@ export default function Experience() {
       <MobileControls />
       <SocialDock />
 
-      {/* ── "Zentrieren" re-center button ────────────────────────────────── */}
-      <div className="pointer-events-auto absolute bottom-8 left-1/2 z-40 -translate-x-1/2">
-        <button
-          onClick={handleRecenter}
-          className="flex items-center gap-2 rounded-full border border-white/15 bg-black/40 px-5 py-2.5 text-[12px] font-medium uppercase tracking-[0.2em] text-white/80 shadow-lg backdrop-blur-md transition-all hover:bg-white/10 hover:text-white active:scale-95"
-        >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="12" cy="12" r="3" />
-            <path d="M3 12h3M18 12h3M12 3v3M12 18v3" />
-          </svg>
-          Zentrieren
-        </button>
-      </div>
+      {/*
+        “Zentrieren” button intentionally removed.
+        Pressing any drive key (WASD / arrows) re-engages follow mode
+        automatically — Bruno Simon style.
+      */}
     </main>
   );
 }
