@@ -17,7 +17,7 @@ const KEY_MAP = [
   { name: "brake",    keys: ["Space"] },
 ];
 
-/** ── Landmark data with full English Cybersecurity / BIS content ── */
+/** ── Landmark data ── */
 export const LANDMARKS = {
   haw: {
     id: "haw",
@@ -42,8 +42,8 @@ export const LANDMARKS = {
   kebab: {
     id: "kebab",
     title: "Gastronomy & IT Security",
-    subtitle: "Family Business (Yek Döner & Pizzeria)",
-    timeframe: "01/2022 – 03/2025",
+    subtitle: "Family Business (Yek D\u00f6ner & Pizzeria)",
+    timeframe: "01/2022 \u2013 03/2025",
     text: "Managed day-to-day operations and cash handling. Proactively conducted a practical security review, identifying weaknesses and improving network isolation, Wi-Fi security, and port filtering.",
     skills: ["Network Isolation", "Vulnerability Awareness", "Operations"],
     color: "#fb923c",
@@ -74,8 +74,7 @@ export const LANDMARKS = {
 export default function Experience() {
   const [activeId, setActiveId] = useState(null);
 
-  // followModeRef is a plain mutable ref — intentionally NOT useState so
-  // toggling it never triggers a React re-render (zero overhead).
+  // Mutable refs — never cause re-renders
   const followModeRef = useRef(true);
   const orbitRef      = useRef(null);
 
@@ -93,20 +92,20 @@ export default function Experience() {
   return (
     <main className="relative h-[100dvh] w-screen overflow-hidden bg-black select-none">
 
-      {/* Top hint — keyboard / touch instructions */}
+      {/* Hint bar */}
       <div className="pointer-events-none absolute left-1/2 top-5 z-30 -translate-x-1/2 text-center">
         <div className="text-[10px] uppercase tracking-[0.32em] text-zinc-400/80">
-          Numan’s Roadmap
+          Numan\u2019s Roadmap
         </div>
         <div className="mt-1 text-[12px] text-zinc-300/80">
           <span className="hidden md:inline">
             Drive with{" "}
             <kbd className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px]">W A S D</kbd>
             {" / "}
-            <kbd className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px]">↑ ← ↓ →</kbd>
+            <kbd className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px]">{"\u2191 \u2190 \u2193 \u2192"}</kbd>
           </span>
           <span className="md:hidden">Tap the pads to drive</span>
-          {" — "}
+          {" \u2014 "}
           <span className="text-zinc-400/70">visit each landmark to explore</span>
         </div>
       </div>
@@ -116,10 +115,11 @@ export default function Experience() {
           shadows
           dpr={[1, 2]}
           gl={{
-            antialias:        true,
-            powerPreference:  "high-performance",
-            stencil:          false,
+            antialias:       true,
+            powerPreference: "high-performance",
+            stencil:         false,
           }}
+          {/* Initial camera position matches CAM_OFFSET so no snap on load */}
           camera={{ fov: 42, position: [14, 18, 14], near: 0.5, far: 300 }}
           className="absolute inset-0"
         >
@@ -137,9 +137,9 @@ export default function Experience() {
       <SocialDock />
 
       {/*
-        “Zentrieren” button intentionally removed.
+        "Zentrieren" button removed.
         Pressing any drive key (WASD / arrows) re-engages follow mode
-        automatically — Bruno Simon style.
+        automatically — Bruno Simon style. No button needed.
       */}
     </main>
   );
