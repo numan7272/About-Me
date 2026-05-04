@@ -1,67 +1,77 @@
 "use client";
 
-import { RoundedBox } from "@react-three/drei";
+import { useRef } from "react";
+import { useFrame } from "@react-three/fiber";
+import { Grid, MeshReflectorMaterial } from "@react-three/drei";
 
 /**
- * Floating, chamfered island that anchors the scene.
- * Slightly inset top deck on a darker base for depth.
+ * Cyberpunk infinite grid floor with subtle reflection.
  */
 export default function Platform() {
+  const rimRef = useRef();
+
+  useFrame(({ clock }) => {
+    if (rimRef.current) {
+      rimRef.current.material.opacity =
+        0.18 + Math.sin(clock.getElapsedTime() * 1.4) * 0.06;
+    }
+  });
+
   return (
     <group>
-      {/* Base — darker chamfered slab */}
-      <RoundedBox
-        args={[10, 0.8, 10]}
-        radius={0.18}
-        smoothness={6}
-        position={[0, -0.8, 0]}
-        castShadow
-        receiveShadow
-      >
-        <meshStandardMaterial
-          color="#1f2937"
-          metalness={0.25}
-          roughness={0.85}
+      {/* Dark reflective base plane */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.01, 0]} receiveShadow>
+        <planeGeometry args={[60, 60]} />
+        <MeshReflectorMaterial
+          blur={[400, 80]}
+          resolution={512}
+          mixBlur={0.9}
+          mixStrength={30}
+          roughness={1}
+          depthScale={1.1}
+          minDepthThreshold={0.45}
+          maxDepthThreshold={1.35}
+          color="#060810"
+          metalness={0.6}
         />
-      </RoundedBox>
+      </mesh>
 
-      {/* Top deck — main walkable surface */}
-      <RoundedBox
-        args={[9.4, 0.4, 9.4]}
-        radius={0.14}
-        smoothness={6}
-        position={[0, -0.2, 0]}
-        castShadow
-        receiveShadow
-      >
-        <meshStandardMaterial
-          color="#27313f"
-          metalness={0.15}
-          roughness={0.75}
+      {/* Cyan grid overlay */}
+      <Grid
+        position={[0, 0.001, 0]}
+        args={[60, 60]}
+        cellSize={1}
+        cellThickness={0.4}
+        cellColor="#0c2a38"
+        sectionSize={5}
+        sectionThickness={0.8}
+        sectionColor="#0e4056"
+        fadeDistance={28}
+        fadeStrength={1.4}
+        followCamera={false}
+        infiniteGrid={false}
+      />
+
+      {/* Subtle central glow disc */}
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]}>
+        <circleGeometry args={[7, 64]} />
+        <meshBasicMaterial
+          color="#22d3ee"
+          transparent
+          opacity={0.025}
+          toneMapped={false}
         />
-      </RoundedBox>
+      </mesh>
 
-      {/* Inner detail tile — subtle accent panel */}
-      <RoundedBox
-        args={[7.2, 0.04, 7.2]}
-        radius={0.06}
-        smoothness={4}
-        position={[0, 0.005, 0]}
-        receiveShadow
-      >
-        <meshStandardMaterial
-          color="#334155"
-          metalness={0.2}
-          roughness={0.6}
-          emissive="#0ea5e9"
-          emissiveIntensity={0.04}
+      {/* Animated pulsing outer ring */}
+      <mesh ref={rimRef} rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.003, 0]}>
+        <ringGeometry args={[6.8, 7.0, 96]} />
+        <meshBasicMaterial
+          color="#22d3ee"
+          transparent
+          opacity={0.18}
+          toneMapped={false}
         />
-      </RoundedBox>
-
-      {/* Glow rim — subtle line of light around the deck */}
-      <mesh position={[0, 0.005, 0]}>
-        <ringGeometry args={[3.5, 3.55, 64]} />
-        <meshBasicMaterial color="#38bdf8" transparent opacity={0.22} />
       </mesh>
     </group>
   );
