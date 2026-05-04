@@ -1,0 +1,42 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html,
+body,
+#__next {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  overflow: hidden;
+  background-color: #05060a;
+  color: #f4f4f5;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Hide native cursor when interacting with canvas-driven hover state is set via JS */
+canvas {
+  display: block;
+  outline: none;
+  touch-action: none;
+}
+
+/* Custom thin scrollbar for any overflow inside cards */
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+}
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background-color: rgba(244, 244, 245, 0.18);
+  border-radius: 9999px;
+}
+
+/* Selection color */
+::selection {
+  background: rgba(56, 189, 248, 0.35);
+  color: #f4f4f5;
+}
