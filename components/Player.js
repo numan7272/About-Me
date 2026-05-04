@@ -14,10 +14,6 @@ const MAX_SPEED = 7.5;
 const ACCEL = 6;
 const TURN_SPEED = 2.6;
 
-const Y_AXIS = new THREE.Vector3(0, 1, 0);
-
-/* ------------------------------ Bike model ------------------------------- */
-
 function VanMoofModel({ scale = 1 }) {
   const { scene } = useGLTF(BIKE_URL);
 
@@ -40,15 +36,12 @@ function VanMoofModel({ scale = 1 }) {
 
 useGLTF.preload(BIKE_URL);
 
-/* --------------------------------- Player -------------------------------- */
-
 export default function Player({ playerRef }) {
   const [, getKeys] = useKeyboardControls();
 
-  // Reusable scratch values to avoid GC churn in the hot path
+  // Reusable scratch values — no GC churn in the hot path
   const tmpForward = useMemo(() => new THREE.Vector3(), []);
   const tmpQuat = useMemo(() => new THREE.Quaternion(), []);
-  const tmpEuler = useMemo(() => new THREE.Euler(0, 0, 0, "YXZ"), []);
 
   useFrame((_, delta) => {
     const body = playerRef.current;
@@ -64,24 +57,20 @@ export default function Player({ playerRef }) {
     const fwdIn = (forwardDown ? 1 : 0) - (backwardDown ? 1 : 0);
     const turnIn = (leftDown ? 1 : 0) - (rightDown ? 1 : 0);
 
-    // Derive yaw from current rotation
+    // ── LOCAL-SPACE movement fix ──────────────────────────────────────────────
+    // Get the rigid body's current quaternion and rotate the local forward
+    // vector (+Z in Three.js) into world space. This ensures W always moves
+    // in the direction the bike is currently facing, not global Z.
     const r = body.rotation();
     tmpQuat.set(r.x, r.y, r.z, r.w);
-    tmpEuler.setFromQuaternion(tmpQuat);
-    const yaw = tmpEuler.y;
+    tmpForward.set(0, 0, 1).applyQuaternion(tmpQuat);
 
-    // Forward in world space (Three's "front" is -Z)
-    tmpForward.set(0, 0, -1).applyAxisAngle(Y_AXIS, yaw);
-
-    // Compute target XZ velocity
     const targetSpeed = fwdIn * MAX_SPEED * (brakeDown ? 0 : 1);
     const targetVx = tmpForward.x * targetSpeed;
     const targetVz = tmpForward.z * targetSpeed;
 
     const cur = body.linvel();
     const lerp = Math.min(1, ACCEL * delta);
-
-    // Brake decelerates harder
     const brakeFactor = brakeDown ? Math.min(1, 10 * delta) : lerp;
 
     body.setLinvel(
@@ -89,7 +78,7 @@ export default function Player({ playerRef }) {
         x: brakeDown
           ? THREE.MathUtils.lerp(cur.x, 0, brakeFactor)
           : THREE.MathUtils.lerp(cur.x, targetVx, lerp),
-        y: cur.y, // preserve gravity
+        y: cur.y,
         z: brakeDown
           ? THREE.MathUtils.lerp(cur.z, 0, brakeFactor)
           : THREE.MathUtils.lerp(cur.z, targetVz, lerp),
@@ -97,14 +86,17 @@ export default function Player({ playerRef }) {
       true,
     );
 
-    // Turning. Slightly damped while stationary so the bike doesn't spin in place too fast.
-    const speedFactor = THREE.MathUtils.clamp(
-      Math.hypot(cur.x, cur.z) / MAX_SPEED,
-      0.55,
-      1,
-    );
+    // Only turn if there is actual input — no idle drift
+    const speedFactor =
+      turnIn !== 0
+        ? THREE.MathUtils.clamp(
+            Math.hypot(cur.x, cur.z) / MAX_SPEED,
+            0.55,
+            1,
+          )
+        : 0;
     body.setAngvel(
-      { x: 0, y: turnIn * TURN_SPEED * speedFactor, z: 0 },
+      { x: 0, y: turnIn !== 0 ? turnIn * TURN_SPEED * speedFactor : 0, z: 0 },
       true,
     );
   });
@@ -122,7 +114,6 @@ export default function Player({ playerRef }) {
       mass={1.2}
       position={[0, 1.2, 6]}
     >
-      {/* Body collider — matches the bike's footprint */}
       <CuboidCollider args={[0.32, 0.45, 0.85]} position={[0, 0.45, 0]} />
       <VanMoofModel scale={1} />
     </RigidBody>
