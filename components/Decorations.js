@@ -118,8 +118,14 @@ function GrassField() {
       attempts++;
       const x = (rng() - 0.5) * (ISLAND_HALF * 2 - 4);
       const z = (rng() - 0.5) * (ISLAND_HALF * 2 - 4);
-      // Skip near landmark plazas and near map edges
+      // Skip plazas, roads, the perimeter beach ring, and the corner-cut
+      // sandbars. Road & plaza helpers (isOnRoad / isInPlaza) are declared
+      // later in this file but are valid at render time because the module
+      // body has already finished evaluating by the time GrassField mounts.
       if (isTooCloseToLandmark(x, z)) continue;
+      if (isOnRoad(x, z))             continue;
+      if (isInPlaza(x, z))            continue;
+      if (isOnBeachRing(x, z))        continue;
       // Wider scale spread + a subtle clumping factor — blades nearer the
       // edges grow taller, so the field looks layered rather than uniform.
       const edgeFactor = Math.min(
@@ -517,6 +523,72 @@ function Rock({ position, seed = 1 }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// GRASS MOUND — low elliptical hill of grass that breaks up the flat
+// ground plane.  Visual-only (no collider) — the bike rolls right over
+// shallow mounds without noticing, but the eye reads them as terrain.
+// ─────────────────────────────────────────────────────────────────────────────
+function GrassMound({ position, scale = 1, hueShift = 0, ry = 0 }) {
+  const baseColor = useMemo(
+    () => new THREE.Color(`hsl(${108 + hueShift}, 42%, ${28 + (hueShift % 7)}%)`).getStyle(),
+    [hueShift],
+  );
+  return (
+    <group position={[position[0], 0, position[2]]} rotation={[0, ry, 0]}>
+      {/* Main dome — low, wide, flat-shaded so the silhouette reads as a hill */}
+      <mesh
+        position={[0, -0.12, 0]}
+        scale={[scale * 1.4, scale * 0.42, scale * 1.0]}
+        receiveShadow
+        castShadow
+      >
+        <sphereGeometry args={[2.4, 18, 10]} />
+        <meshStandardMaterial color={baseColor} roughness={0.9} flatShading />
+      </mesh>
+      {/* Smaller secondary bump for irregularity */}
+      <mesh
+        position={[scale * 0.9, -0.05, scale * 0.4]}
+        scale={[scale * 0.9, scale * 0.34, scale * 0.7]}
+        receiveShadow
+        castShadow
+      >
+        <sphereGeometry args={[1.5, 14, 8]} />
+        <meshStandardMaterial color={baseColor} roughness={0.92} flatShading />
+      </mesh>
+    </group>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// DIRT PATCH — flat exposed-earth circle. A simple way to break up the
+// uniformly-green meadow and suggest worn tracks between landmarks.
+// ─────────────────────────────────────────────────────────────────────────────
+function DirtPatch({ position, radius = 1.2, seed = 1 }) {
+  const rng = useMemo(() => seededRng(seed), [seed]);
+  const ry = rng() * Math.PI * 2;
+  const tint = useMemo(
+    () => new THREE.Color(`hsl(${28 + Math.floor(rng() * 12)}, 38%, ${30 + Math.floor(rng() * 8)}%)`).getStyle(),
+    [rng],
+  );
+  return (
+    <mesh
+      position={[position[0], 0.014, position[2]]}
+      rotation={[-Math.PI / 2, 0, ry]}
+      receiveShadow
+      renderOrder={0}
+    >
+      <circleGeometry args={[radius, 24]} />
+      <meshStandardMaterial
+        color={tint}
+        roughness={0.95}
+        polygonOffset
+        polygonOffsetFactor={-1}
+        polygonOffsetUnits={-1}
+      />
+    </mesh>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // FLOWER PATCH — small clump of bright icosahedral "blossoms" on stems.
 // Adds a pop of saturated colour at ground level so the meadow doesn't feel
 // like one flat green carpet.
@@ -604,13 +676,16 @@ function isInPlaza(x, z) {
   return PLAZAS.some(([px, pz, r]) => Math.hypot(x - px, z - pz) < r);
 }
 
-// River runs north→south at world x = 25, full island length, ~3 m half-width.
-// Add a small buffer so trees/lamps never spawn at the bank either.
-const RIVER_X = 25;
-const RIVER_HALF_WIDTH = 4.5;
-const isInRiver = (x) => Math.abs(x - RIVER_X) < RIVER_HALF_WIDTH;
+// Beach ring perimeter — kept in sync with Ground.js BEACH_INNER. Anything
+// past this distance from the island centre (using max-norm so it follows
+// the square shore) is sand, not grass.
+const BEACH_INNER = 58;
+function isOnBeachRing(x, z) {
+  return Math.max(Math.abs(x), Math.abs(z)) > BEACH_INNER;
+}
 
-const isBlocked = (x, z) => isOnRoad(x, z) || isInPlaza(x, z) || isInRiver(x);
+const isBlocked = (x, z) =>
+  isOnRoad(x, z) || isInPlaza(x, z) || isOnBeachRing(x, z);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Layout data — hand-placed, path-safe, landmark-safe
@@ -678,10 +753,42 @@ const FLOWERS_RAW = [
   [ -10, 0, 38], [ 18, 0, -10], [ -6, 0, 14],
 ];
 
-// Apply the road / plaza filter exactly once at module load
+// Hand-placed grassy mounds. Each entry is [x, z, scale, hueShift, ry].
+// Coordinates avoid roads/plazas — verified against isBlocked at module load.
+const MOUNDS_RAW = [
+  [-26, 0,  -8, 1.4,   3, 0.4],
+  [ 22, 0,  -6, 1.2,  -4, 1.1],
+  [-14, 0,  18, 1.5,   8, 2.2],
+  [ 18, 0,  22, 1.1,  -7, -0.6],
+  [-30, 0, -22, 1.6,   2, 0.9],
+  [ 32, 0,  10, 1.3,   6, -1.3],
+  [-44, 0,  10, 1.0,  -2, 0.2],
+  [ 14, 0, -28, 1.4,   5, 1.7],
+  [-10, 0,  46, 1.2,  -3, 0.5],
+  [ 26, 0,  44, 1.0,   7, -0.8],
+];
+
+// Hand-placed bare-earth patches. Suggest desire-paths and worn ground
+// between landmarks; size varies for natural irregularity.
+const DIRT_RAW = [
+  [-18, 0, -14, 1.4],
+  [ 20, 0, -16, 1.1],
+  [-22, 0,  10, 1.0],
+  [ 12, 0,  10, 1.6],
+  [ 28, 0,  24, 1.2],
+  [-30, 0,  20, 1.3],
+  [-12, 0, -34, 1.0],
+  [ 14, 0,  34, 1.4],
+  [-44, 0,  -2, 1.0],
+  [ 44, 0,   2, 1.1],
+];
+
+// Apply the road / plaza / beach filter exactly once at module load
 const TREES   = TREES_RAW.filter(([x, , z]) => !isBlocked(x, z));
 const LAMPS   = LAMPS_RAW.filter(([x, , z]) => !isBlocked(x, z));
 const FLOWERS = FLOWERS_RAW.filter(([x, , z]) => !isBlocked(x, z));
+const MOUNDS  = MOUNDS_RAW.filter(([x, , z]) => !isBlocked(x, z));
+const DIRT    = DIRT_RAW.filter(([x, , z]) => !isBlocked(x, z));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FIREFLIES — small instanced orbs that orbit around each lamppost
@@ -791,6 +898,27 @@ export default function Decorations() {
     <group>
       {/* Wind-sway grass field */}
       <GrassField />
+
+      {/* Grassy mounds — break up the otherwise pancake-flat meadow */}
+      {MOUNDS.map((m, i) => (
+        <GrassMound
+          key={`mound-${i}`}
+          position={[m[0], 0, m[2]]}
+          scale={m[3]}
+          hueShift={m[4]}
+          ry={m[5]}
+        />
+      ))}
+
+      {/* Bare-earth patches — desire-paths between landmarks */}
+      {DIRT.map((d, i) => (
+        <DirtPatch
+          key={`dirt-${i}`}
+          position={[d[0], 0, d[2]]}
+          radius={d[3]}
+          seed={i * 11 + 5}
+        />
+      ))}
 
       {/* Trees — alternate species so the woodland reads as varied. The hue
           shift jitters the canopy palette per slot so even two adjacent
