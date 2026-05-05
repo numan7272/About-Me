@@ -344,25 +344,22 @@ function GrassTrail({ playerRef }) {
 
   const trailGeo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
 
-  // Pale crushed-grass colour, set once on the material so every strip
-  // shares it. Fade is done by shrinking the instance scale to zero over
-  // its lifetime — Three's MeshBasicMaterial with vertexColors only
-  // updates RGB, not alpha, so an RGB-fade would end at solid black.
+  // Pale crushed-grass colour. The material is fully opaque — fading is
+  // done by shrinking the instance's scale to zero, so we don't need
+  // `transparent`/`depthWrite:false` (which previously caused the strips
+  // to render as solid black on some GPUs because the missing alpha-fade
+  // of vertex colours collapsed RGB toward 0).
   const trailMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: 0xeaf0d0,
-    transparent: true,
-    opacity: 0.7,
-    depthWrite: false,
+    color: 0xe8edc8,
     side: THREE.DoubleSide,
     polygonOffset: true,
     polygonOffsetFactor: -3,
     polygonOffsetUnits: -3,
+    toneMapped: false,
   }), []);
 
   const nextDrop = useRef(0);
   const headIdx  = useRef(0);
-  // Per-slot bookkeeping. We rebuild each instance's matrix every frame
-  // based on stored pos+yaw + the current age factor.
   const birth      = useMemo(() => new Float32Array(TRAIL_MAX), []);
   const slotX      = useMemo(() => new Float32Array(TRAIL_MAX), []);
   const slotZ      = useMemo(() => new Float32Array(TRAIL_MAX), []);
@@ -372,14 +369,21 @@ function GrassTrail({ playerRef }) {
   useEffect(() => {
     const inst = instRef.current;
     if (!inst) return;
+    // Explicitly initialise instanceColor to white. Without this, some
+    // GPU drivers leave the per-instance colour buffer at zeros, which
+    // multiplies the material colour to black and produces the dark
+    // streaks the user has seen.
+    const white = new THREE.Color(1, 1, 1);
     for (let i = 0; i < TRAIL_MAX; i++) {
-      birth[i] = -1e6;             // already-expired sentinel
+      birth[i] = -1e6;
       dummy.position.set(0, -999, 0);
       dummy.scale.setScalar(0.001);
       dummy.updateMatrix();
       inst.setMatrixAt(i, dummy.matrix);
+      inst.setColorAt(i, white);
     }
     inst.instanceMatrix.needsUpdate = true;
+    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
   }, [dummy, birth]);
 
   useFrame((state) => {
@@ -390,14 +394,11 @@ function GrassTrail({ playerRef }) {
     const t = state.clock.getElapsedTime();
 
     // ── Fade pass: shrink each live strip's width to zero as it ages.
-    // Once age exceeds TRAIL_LIFE, the slot has scale 0.001 and isn't
-    // rendered (BasicMaterial respects scale → it just disappears).
     let dirty = false;
     for (let i = 0; i < TRAIL_MAX; i++) {
       if (birth[i] < -1e5) continue;
       const age = t - birth[i];
       if (age > TRAIL_LIFE) {
-        // Park it off-screen and mark it as expired so we stop touching it.
         dummy.position.set(0, -999, 0);
         dummy.scale.setScalar(0.001);
         dummy.updateMatrix();
@@ -407,7 +408,7 @@ function GrassTrail({ playerRef }) {
         continue;
       }
       const k    = 1 - age / TRAIL_LIFE;
-      const ease = k * k;            // quadratic ease-out
+      const ease = k * k;
       dummy.position.set(slotX[i], 0.014, slotZ[i]);
       dummy.rotation.set(-Math.PI / 2, 0, slotYaw[i]);
       dummy.scale.set(0.18 * ease, slotLength[i], 1);
@@ -435,7 +436,6 @@ function GrassTrail({ playerRef }) {
     tmpE.setFromQuaternion(tmpQ, "YXZ");
     const yaw = tmpE.y;
 
-    // Bike right (Up × Forward) for the L/R wheel offset
     tmpRight.set(Math.cos(yaw), 0, -Math.sin(yaw));
     const TRACK_HALF = 0.32;
     for (let side = -1; side <= 1; side += 2) {
@@ -451,7 +451,7 @@ function GrassTrail({ playerRef }) {
   });
 
   return (
-    <instancedMesh ref={instRef} args={[trailGeo, trailMat, TRAIL_MAX]} frustumCulled={false} receiveShadow />
+    <instancedMesh ref={instRef} args={[trailGeo, trailMat, TRAIL_MAX]} frustumCulled={false} />
   );
 }
 
