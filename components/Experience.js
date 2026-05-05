@@ -17,7 +17,6 @@ const KEY_MAP = [
   { name: "brake",    keys: ["Space"] },
 ];
 
-/** ── Landmark data ── */
 export const LANDMARKS = {
   haw: {
     id: "haw",
@@ -31,7 +30,7 @@ export const LANDMARKS = {
   },
   designa: {
     id: "designa",
-    title: "Working Student Testing Lab & QA",
+    title: "Working Student — Testing Lab & QA",
     subtitle: "DESIGNA Verkehrsleittechnik GmbH",
     timeframe: "Since 11/2025",
     text: "Analyzing server and system logs to narrow down root causes of issues in test environments. Documenting incidents, debugging, and testing hardware.",
@@ -61,32 +60,35 @@ export const LANDMARKS = {
   },
   homebase: {
     id: "homebase",
-    title: "Cybersecurity & Development HQ",
-    subtitle: "Independent Projects & Certifications",
+    title: "Home",
+    subtitle: "Personal Projects & Self-Learning",
     timeframe: "Ongoing",
-    text: "Building full-stack applications like scheduling assistants and threat intelligence dashboards. Currently completing the Google Cybersecurity Professional Certificate and documenting my learning track on GitHub.",
+    text: "At home I build my own projects from scratch to learn: full-stack apps, security tools, and small automation scripts. Every project teaches me something I can't learn in a classroom.",
     skills: ["Python & FastAPI", "React / Next.js", "Docker", "Kali Linux", "OSINT"],
     color: "#f472b6",
     accent: "#ec4899",
   },
 };
 
-// Initial camera position matches CAM_OFFSET in FollowCamera.js ([14, 18, 14])
-// so there is zero snap/jump on the very first frame.
 const INITIAL_CAMERA = { fov: 42, position: [14, 18, 14], near: 0.5, far: 300 };
 
 export default function Experience() {
   const [activeId, setActiveId] = useState(null);
-
-  // Mutable refs — changes never trigger a React re-render
   const followModeRef = useRef(true);
   const orbitRef      = useRef(null);
 
+  // Proximity trigger (driving near)
   const handleEnter = useCallback((id) => setActiveId(id), []);
   const handleExit  = useCallback(
     (id) => setActiveId((cur) => (cur === id ? null : cur)),
     [],
   );
+
+  // Click trigger (clicking on the building)
+  const handleClickOpen = useCallback((id) => setActiveId(id), []);
+
+  // Close via InfoCard X button
+  const handleClose = useCallback(() => setActiveId(null), []);
 
   const activeCard = useMemo(
     () => (activeId ? LANDMARKS[activeId] : null),
@@ -107,10 +109,9 @@ export default function Experience() {
             <kbd className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px]">W A S D</kbd>
             {" / "}
             <kbd className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px]">↑ ← ↓ →</kbd>
+            {" — or click any building"}
           </span>
-          <span className="md:hidden">Tap the pads to drive</span>
-          {" — "}
-          <span className="text-zinc-400/70">visit each landmark to explore</span>
+          <span className="md:hidden">Tap the pads to drive — or tap a building</span>
         </div>
       </div>
 
@@ -118,32 +119,23 @@ export default function Experience() {
         <Canvas
           shadows
           dpr={[1, 2]}
-          gl={{
-            antialias:       true,
-            powerPreference: "high-performance",
-            stencil:         false,
-          }}
+          gl={{ antialias: true, powerPreference: "high-performance", stencil: false }}
           camera={INITIAL_CAMERA}
           className="absolute inset-0"
         >
           <World
             onEnter={handleEnter}
             onExit={handleExit}
+            onClickOpen={handleClickOpen}
             followModeRef={followModeRef}
             orbitRef={orbitRef}
           />
         </Canvas>
       </KeyboardControls>
 
-      <InfoCard card={activeCard} />
+      <InfoCard card={activeCard} onClose={handleClose} />
       <MobileControls />
       <SocialDock />
-
-      {/*
-        "Zentrieren" button intentionally removed.
-        Pressing any drive key (WASD / arrows) re-engages follow mode
-        automatically — Bruno Simon style. No button needed.
-      */}
     </main>
   );
 }
