@@ -1,7 +1,7 @@
 "use client";
 
 import { Suspense, useRef, useMemo } from "react";
-import { Environment, SoftShadows, Sky, ContactShadows } from "@react-three/drei";
+import { Environment, SoftShadows, Sky, ContactShadows, Sparkles } from "@react-three/drei";
 import { Physics } from "@react-three/rapier";
 import { EffectComposer, Bloom, Vignette, ChromaticAberration } from "@react-three/postprocessing";
 import { Vector2 } from "three";
@@ -75,15 +75,11 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
           The sensor / collider still work perfectly.
         */}
         <Landmark id="haw"
-          model="/haw-logo-transformed.glb"
           position={[LM.haw.x, 0, LM.haw.z]}
           colliderHalfExtents={[3.0, 1.0, 1.0]}
           sensorHalfExtents={[6.5, 3.5, 6.5]}
           color="#22d3ee" glow="#06b6d4" label="HAW Kiel"
-          modelScale={3}
-          glossy
-          floating={false}
-          modelYOffset={0.05}
+          hideVisual
           onEnter={onEnter} onExit={onExit} onClickOpen={onClickOpen}
         />
 
@@ -138,6 +134,27 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
 
         <Player playerRef={playerRef} followModeRef={followModeRef} />
       </Physics>
+
+      {/* Atmosphere — drifting golden dust motes catch the bloom nicely */}
+      <Sparkles
+        count={140}
+        size={3}
+        speed={0.18}
+        scale={[120, 18, 120]}
+        position={[0, 9, 0]}
+        color="#ffe9b3"
+        opacity={0.55}
+      />
+      {/* A second, denser layer of subtle bluish dust closer to the ground */}
+      <Sparkles
+        count={90}
+        size={1.6}
+        speed={0.08}
+        scale={[110, 4, 110]}
+        position={[0, 2, 0]}
+        color="#bfd9ff"
+        opacity={0.4}
+      />
 
       <EffectComposer multisampling={0} disableNormalPass>
         <Bloom intensity={0.65} luminanceThreshold={0.82} luminanceSmoothing={0.5} mipmapBlur />

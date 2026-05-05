@@ -3,11 +3,14 @@
 import { useState, useMemo, useCallback, useRef } from "react";
 import { Canvas } from "@react-three/fiber";
 import { KeyboardControls } from "@react-three/drei";
+import * as THREE from "three";
 
 import World from "./World";
 import InfoCard from "./InfoCard";
 import SocialDock from "./SocialDock";
 import MobileControls from "./MobileControls";
+import MiniMap from "./Hud/MiniMap";
+import SpeedHud from "./Hud/SpeedHud";
 
 const KEY_MAP = [
   { name: "forward",  keys: ["ArrowUp",   "KeyW", "KeyZ"] },
@@ -124,7 +127,15 @@ export default function Experience() {
         <Canvas
           shadows
           dpr={[1, 2]}
-          gl={{ antialias: true, powerPreference: "high-performance", stencil: false }}
+          gl={{
+            antialias: true,
+            powerPreference: "high-performance",
+            stencil: false,
+            // Cinematic color pipeline — tone mapping happens in the renderer
+            toneMapping: THREE.ACESFilmicToneMapping,
+            toneMappingExposure: 1.05,
+            outputColorSpace: THREE.SRGBColorSpace,
+          }}
           camera={INITIAL_CAMERA}
           className="absolute inset-0"
         >
@@ -137,6 +148,10 @@ export default function Experience() {
           />
         </Canvas>
       </KeyboardControls>
+
+      {/* HUD overlays */}
+      <MiniMap activeId={activeId} />
+      <SpeedHud />
 
       <InfoCard card={activeCard} onClose={handleClose} />
       <MobileControls />

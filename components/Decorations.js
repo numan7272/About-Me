@@ -122,19 +122,12 @@ function GrassField() {
     });
     meshRef.current.instanceMatrix.needsUpdate = true;
 
-    // Attach per-instance sway phase as a buffer attribute
+    // Per-instance sway phase — read in the vertex shader as `instanceSway`.
     const geom = meshRef.current.geometry;
-    // replicate per-instance value per vertex
-    const vertCount = geom.attributes.position.count;
-    const perVertex  = new Float32Array(GRASS_COUNT * vertCount);
-    for (let i = 0; i < GRASS_COUNT; i++) {
-      for (let v = 0; v < vertCount; v++) {
-        perVertex[i * vertCount + v] = swayPhases[i];
-      }
-    }
-    // InstancedMesh with custom instanced attribute
-    const ia = new THREE.InstancedBufferAttribute(swayPhases, 1);
-    geom.setAttribute("instanceSway", ia);
+    geom.setAttribute(
+      "instanceSway",
+      new THREE.InstancedBufferAttribute(swayPhases, 1),
+    );
   }, [positions, swayPhases]);
 
   // Advance time uniform every frame
@@ -365,6 +358,106 @@ const ROCKS = [
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
+// FIREFLIES — small instanced orbs that orbit around each lamppost
+// All instances share one mesh; the per-instance matrix is rebuilt every
+// frame from a phase + radius derived from the instance index.
+// ─────────────────────────────────────────────────────────────────────────────
+const FLIES_PER_LAMP = 6;
+
+function Fireflies({ anchors }) {
+  const ref     = useRef();
+  const total   = anchors.length * FLIES_PER_LAMP;
+  const dummy   = useMemo(() => new THREE.Object3D(), []);
+  const tmpC    = useMemo(() => new THREE.Color(), []);
+  const seedRef = useRef(null);
+
+  // One-time per-instance random parameters (orbit radius, height, phase, hue)
+  if (seedRef.current === null) {
+    const rng = seededRng(0xface_b00c);
+    seedRef.current = new Float32Array(total * 4);
+    for (let i = 0; i < total; i++) {
+      seedRef.current[i * 4 + 0] = 0.4 + rng() * 0.7;          // radius
+      seedRef.current[i * 4 + 1] = 1.6 + rng() * 1.2;          // base height
+      seedRef.current[i * 4 + 2] = rng() * Math.PI * 2;        // phase
+      seedRef.current[i * 4 + 3] = 0.3 + rng() * 0.7;          // speed factor
+    }
+  }
+
+  const geo = useMemo(() => new THREE.SphereGeometry(0.045, 8, 8), []);
+  const mat = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        color: 0xffd97a,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+        vertexColors: true,
+      }),
+    [],
+  );
+
+  // Init transparent grey so hidden particles never bloom black
+  useEffect(() => {
+    if (!ref.current) return;
+    for (let i = 0; i < total; i++) {
+      dummy.position.set(0, -999, 0);
+      dummy.scale.setScalar(0.001);
+      dummy.updateMatrix();
+      ref.current.setMatrixAt(i, dummy.matrix);
+      ref.current.setColorAt(i, tmpC.set(0, 0, 0));
+    }
+    ref.current.instanceMatrix.needsUpdate = true;
+    if (ref.current.instanceColor) ref.current.instanceColor.needsUpdate = true;
+  }, [dummy, total, tmpC]);
+
+  useFrame((state) => {
+    const inst = ref.current;
+    if (!inst) return;
+    const t = state.clock.getElapsedTime();
+    const seed = seedRef.current;
+
+    let i = 0;
+    for (const [ax, , az] of anchors) {
+      for (let k = 0; k < FLIES_PER_LAMP; k++, i++) {
+        const r       = seed[i * 4 + 0];
+        const baseY   = seed[i * 4 + 1];
+        const phase   = seed[i * 4 + 2];
+        const speed   = seed[i * 4 + 3];
+
+        const angle = t * speed + phase;
+        const wob   = Math.sin(t * 1.3 + phase) * 0.15;
+        const x = ax + Math.cos(angle) * (r + wob);
+        const y = baseY + Math.sin(t * 1.7 + phase) * 0.18;
+        const z = az + Math.sin(angle) * (r + wob);
+
+        // Pulse intensity for that "blink" feel
+        const blink = 0.55 + Math.sin(t * 2.4 + phase * 1.7) * 0.45;
+
+        dummy.position.set(x, y, z);
+        dummy.scale.setScalar(0.7 + blink * 0.5);
+        dummy.updateMatrix();
+        inst.setMatrixAt(i, dummy.matrix);
+
+        const c = blink * 0.95;
+        inst.setColorAt(i, tmpC.set(c, c * 0.85, c * 0.4));
+      }
+    }
+
+    inst.instanceMatrix.needsUpdate = true;
+    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh
+      ref={ref}
+      args={[geo, mat, total]}
+      frustumCulled={false}
+    />
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Root export
 // ─────────────────────────────────────────────────────────────────────────────
 export default function Decorations() {
@@ -382,6 +475,9 @@ export default function Decorations() {
       {LAMPS.map((p, i) => (
         <Lamp key={`lp-${i}`} position={p} />
       ))}
+
+      {/* Fireflies orbiting each lamp */}
+      <Fireflies anchors={LAMPS} />
 
       {/* Pastel houses */}
       {HOUSES.map((h, i) => (

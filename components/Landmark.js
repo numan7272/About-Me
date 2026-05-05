@@ -227,6 +227,12 @@ export default function Landmark({
   floating   = true,
   modelScale    = 8,
   modelYOffset  = 0,
+  /**
+   * If true, render colliders + sensor + click zone but skip the visual mesh.
+   * Use it when the visual is rendered elsewhere (e.g. HAW logo lives in
+   * Ground.js as a flat decal, not here).
+   */
+  hideVisual = false,
   onEnter,
   onExit,
   onClickOpen,
@@ -246,6 +252,7 @@ export default function Landmark({
   const clickHeight = colliderHalfExtents[1] * 4;
 
   const renderVisual = () => {
+    if (hideVisual) return null;
     if (model) {
       const inner = <GltfLandmark url={model} scale={modelScale} glossy={glossy} />;
       return floating ? (

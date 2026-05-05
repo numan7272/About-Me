@@ -6,6 +6,7 @@ import { useGLTF, useKeyboardControls } from "@react-three/drei";
 import { RigidBody, CuboidCollider } from "@react-three/rapier";
 import * as THREE from "three";
 import { touchInput } from "@/lib/inputStore";
+import { bikeState } from "@/lib/bikeStore";
 
 const BIKE_URL   = "/vanmoof-transformed.glb";
 const MAX_SPEED  = 7.5;
@@ -333,6 +334,7 @@ export default function Player({ playerRef, followModeRef }) {
   const leanRef     = useRef(0);
   const tmpForward  = useMemo(() => new THREE.Vector3(), []);
   const tmpQuat     = useMemo(() => new THREE.Quaternion(), []);
+  const tmpEuler    = useMemo(() => new THREE.Euler(0, 0, 0, "YXZ"), []);
 
   useFrame((_, delta) => {
     const body = playerRef.current;
@@ -380,6 +382,15 @@ export default function Player({ playerRef, followModeRef }) {
 
     const targetLean = -turnIn * speedFactor * 0.18;
     leanRef.current  = THREE.MathUtils.lerp(leanRef.current, targetLean, Math.min(1, 6*delta));
+
+    // Publish state for the DOM HUDs (mini-map, speedometer)
+    const pos = body.translation();
+    bikeState.x     = pos.x;
+    bikeState.y     = pos.y;
+    bikeState.z     = pos.z;
+    bikeState.speed = groundSpeed;
+    tmpEuler.setFromQuaternion(tmpQuat);
+    bikeState.yaw   = tmpEuler.y;
   });
 
   return (

@@ -100,7 +100,7 @@ export default function InfoCard({ card, onClose }) {
 
         {/* Footer */}
         <p className="mt-4 text-[10px] text-zinc-600">
-          {"Drive close to explore · ESC or ✕ to close"}
+          {"Drive close or click a building · ESC or ✕ to close"}
         </p>
       </div>
     </div>
