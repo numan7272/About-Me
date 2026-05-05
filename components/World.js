@@ -11,6 +11,8 @@ import Player from "./Player";
 import Landmark from "./Landmark";
 import FollowCamera from "./FollowCamera";
 import Decorations from "./Decorations";
+import Water from "./Water";
+import Birds from "./Birds";
 
 // ─── Landmark positions (single source of truth) ─────────────────────────────
 const LM = {
@@ -60,6 +62,12 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
       <Environment preset="city" background={false} />
 
       <FollowCamera targetRef={playerRef} followModeRef={followModeRef} orbitRef={orbitRef} />
+
+      {/* Water surrounding the floating island — no physics, purely visual */}
+      <Water />
+
+      {/* Flock of birds circling overhead */}
+      <Birds />
 
       <Physics gravity={[0,-18,0]}>
         <Ground landmarkPositions={LM} />

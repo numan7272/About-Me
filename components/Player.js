@@ -7,6 +7,7 @@ import { RigidBody, CuboidCollider } from "@react-three/rapier";
 import * as THREE from "three";
 import { touchInput } from "@/lib/inputStore";
 import { bikeState } from "@/lib/bikeStore";
+import { triggerShake } from "@/lib/cameraShake";
 
 const BIKE_URL   = "/vanmoof-transformed.glb";
 const MAX_SPEED  = 7.5;
@@ -292,6 +293,157 @@ function SkidMarks({ playerRef }) {
   );
 }
 
+// ─── Drift Sparks ────────────────────────────────────────────────────────────
+// Bright additively-blended particles that fly outward from the wheels when
+// the bike is mid-drift (sharp turn at speed). They're tiny, very short-lived,
+// and read as "sparks" once bloom kicks in.
+const SPARK_COUNT = 32;
+
+function DriftSparks({ playerRef }) {
+  const instRef = useRef();
+  const dummy   = useMemo(() => new THREE.Object3D(), []);
+  const tmpC    = useMemo(() => new THREE.Color(), []);
+  const tmpQ    = useMemo(() => new THREE.Quaternion(), []);
+  const tmpV    = useMemo(() => new THREE.Vector3(), []);
+
+  // Per-particle state
+  const px   = useRef(new Float32Array(SPARK_COUNT));
+  const py   = useRef(new Float32Array(SPARK_COUNT));
+  const pz   = useRef(new Float32Array(SPARK_COUNT));
+  const vx   = useRef(new Float32Array(SPARK_COUNT));
+  const vy   = useRef(new Float32Array(SPARK_COUNT));
+  const vz   = useRef(new Float32Array(SPARK_COUNT));
+  const life = useRef(new Float32Array(SPARK_COUNT));
+  const maxL = useRef(new Float32Array(SPARK_COUNT));
+  const hue  = useRef(new Float32Array(SPARK_COUNT));   // 0 = cyan, 1 = orange
+  const head = useRef(0);
+  const accum = useRef(0);
+
+  const geo = useMemo(() => new THREE.SphereGeometry(0.06, 6, 6), []);
+  const mat = useMemo(
+    () =>
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        depthWrite: false,
+        blending: THREE.AdditiveBlending,
+        toneMapped: false,
+        vertexColors: true,
+      }),
+    [],
+  );
+
+  useEffect(() => {
+    const inst = instRef.current;
+    if (!inst) return;
+    for (let i = 0; i < SPARK_COUNT; i++) {
+      dummy.position.set(0, -999, 0);
+      dummy.scale.setScalar(0.001);
+      dummy.updateMatrix();
+      inst.setMatrixAt(i, dummy.matrix);
+      inst.setColorAt(i, tmpC.set(0, 0, 0));
+    }
+    inst.instanceMatrix.needsUpdate = true;
+    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+  }, [dummy, tmpC]);
+
+  useFrame((_, delta) => {
+    const inst = instRef.current;
+    const body = playerRef.current;
+    if (!inst) return;
+
+    const dt = Math.min(delta, 0.05);
+    accum.current += dt;
+
+    // Emission gating — only when both turning and moving fast enough
+    if (body) {
+      const vel    = body.linvel();
+      const angV   = body.angvel();
+      const speed  = Math.hypot(vel.x, vel.z);
+      const turning = Math.abs(angV.y) > 0.6 && speed > 2.5;
+
+      if (turning && accum.current > 0.025) {
+        accum.current = 0;
+        // Emit two sparks per pulse — outer wheel side
+        for (let burst = 0; burst < 2; burst++) {
+          const i = head.current % SPARK_COUNT;
+          head.current++;
+
+          const pos = body.translation();
+          const r2  = body.rotation();
+          tmpQ.set(r2.x, r2.y, r2.z, r2.w);
+          // Bike's local right axis (centrifugal direction)
+          const sign = -Math.sign(angV.y);
+          tmpV.set(sign * 0.45, 0, (Math.random() - 0.5) * 0.6).applyQuaternion(tmpQ);
+
+          px.current[i] = pos.x + tmpV.x;
+          py.current[i] = 0.18 + Math.random() * 0.05;
+          pz.current[i] = pos.z + tmpV.z;
+
+          // Outward + slightly upward velocity
+          tmpV.set(sign * (1.2 + Math.random()), 1.5 + Math.random() * 0.8,
+                   (Math.random() - 0.5) * 1.0).applyQuaternion(tmpQ);
+          vx.current[i] = tmpV.x;
+          vy.current[i] = tmpV.y;
+          vz.current[i] = tmpV.z;
+
+          const lifeT     = 0.28 + Math.random() * 0.22;
+          life.current[i] = lifeT;
+          maxL.current[i] = lifeT;
+          // Random hue cyan ↔ orange for variety
+          hue.current[i]  = Math.random() < 0.5 ? 0 : 1;
+        }
+      }
+    }
+
+    // Update all live particles
+    for (let i = 0; i < SPARK_COUNT; i++) {
+      if (life.current[i] <= 0) {
+        dummy.position.set(0, -999, 0);
+        dummy.scale.setScalar(0.001);
+        dummy.updateMatrix();
+        inst.setMatrixAt(i, dummy.matrix);
+        inst.setColorAt(i, tmpC.set(0, 0, 0));
+        continue;
+      }
+
+      life.current[i] -= dt;
+      vy.current[i] -= 4.5 * dt;          // gravity
+      px.current[i] += vx.current[i] * dt;
+      py.current[i] += vy.current[i] * dt;
+      pz.current[i] += vz.current[i] * dt;
+
+      const frac  = Math.max(0, life.current[i] / maxL.current[i]);
+      const scale = 0.45 + frac * 0.85;
+
+      dummy.position.set(px.current[i], py.current[i], pz.current[i]);
+      dummy.scale.setScalar(scale);
+      dummy.updateMatrix();
+      inst.setMatrixAt(i, dummy.matrix);
+
+      // Bright at start, dim at end. Cyan or orange tint based on hue array.
+      const intensity = frac * 1.6;
+      if (hue.current[i] < 0.5) {
+        tmpC.set(0.35 * intensity, 0.95 * intensity, intensity);  // cyan
+      } else {
+        tmpC.set(intensity, 0.55 * intensity, 0.18 * intensity);  // orange
+      }
+      inst.setColorAt(i, tmpC);
+    }
+
+    inst.instanceMatrix.needsUpdate = true;
+    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh
+      ref={instRef}
+      args={[geo, mat, SPARK_COUNT]}
+      frustumCulled={false}
+    />
+  );
+}
+
 // ─── Bike Model ───────────────────────────────────────────────────────────────
 function VanMoofModel({ scale = 1, leanRef }) {
   const { scene } = useGLTF(BIKE_URL);
@@ -406,6 +558,14 @@ export default function Player({ playerRef, followModeRef }) {
         ccd
         mass={1.2}
         position={[0, 1.2, 6]}
+        onCollisionEnter={() => {
+          // Speed-scaled camera shake. Tiny taps don't register, hard
+          // smacks rumble the camera.
+          const v = playerRef.current?.linvel();
+          if (!v) return;
+          const speed = Math.hypot(v.x, v.z);
+          if (speed > 0.8) triggerShake(Math.min(0.65, speed * 0.07));
+        }}
       >
         <CuboidCollider args={[0.32, 0.45, 0.85]} position={[0, 0.45, 0]} />
         <VanMoofModel scale={1} leanRef={leanRef} />
@@ -414,6 +574,7 @@ export default function Player({ playerRef, followModeRef }) {
       <SmokeParticles playerRef={playerRef} />
       <SpeedLines     playerRef={playerRef} />
       <SkidMarks      playerRef={playerRef} />
+      <DriftSparks    playerRef={playerRef} />
     </>
   );
 }
