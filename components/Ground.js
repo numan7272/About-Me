@@ -1,171 +1,262 @@
 "use client";
 
 import { useMemo } from "react";
+import { useGLTF } from "@react-three/drei";
 import { RigidBody, CuboidCollider } from "@react-three/rapier";
 import * as THREE from "three";
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────────────────────────────────────
-const ISLAND   = 130;   // total ground side length
-const HALF     = ISLAND / 2;
-const THICK    = 1.6;
-const WALL_H   = 5;
-const PATH_W   = 4.5;
-const PATH_Y   = 0.01; // just above grass surface
+const ISLAND  = 130;
+const HALF    = ISLAND / 2;
+const THICK   = 1.6;
+const WALL_H  = 5;
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PathStrip — a flat rectangle connecting two XZ points, slightly elevated
-// ─────────────────────────────────────────────────────────────────────────────
-function PathStrip({ from, to, width = PATH_W }) {
-  const mid   = useMemo(() => new THREE.Vector3(
-    (from[0] + to[0]) / 2,
-    PATH_Y,
-    (from[2] + to[2]) / 2,
-  ), [from, to]);
+// Visual layer Y-offsets — each layer clearly above the previous
+const TURF_Y   = 0.005;
+const PLAZA_Y  = 0.020;
+const ROAD_Y   = 0.035;   // clearly above turf (0.005) and plaza (0.020)
+const CURB_Y   = 0.044;
+const DASH_Y   = 0.052;
+const LOGO_Y   = 0.060;
 
-  const length = useMemo(() =>
-    Math.hypot(to[0] - from[0], to[2] - from[2]), [from, to]);
+const ROAD_W   = 5.5;
+const CURB_W   = 0.42;
+const DASH_W   = 0.20;
+const DASH_LEN = 1.8;
+const DASH_GAP = 1.4;
 
-  // atan2 gives the angle in XZ from "from" to "to"
-  const angle  = useMemo(() =>
-    Math.atan2(to[0] - from[0], to[2] - from[2]), [from, to]);
+// Plaza radius per landmark — roads trimmed to stop at this edge
+const PLAZA_R = {
+  homebase:   8.5,
+  haw:        7.0,
+  designa:    7.0,
+  kebab:      7.0,
+  highschool: 7.0,
+};
+
+// Landmark positions as constants (avoids stale closure in useMemo)
+// FIX #2 (stale deps): use stable constant positions, not closure vars
+const LM_HOMEBASE   = [  0, 0,   0];
+const LM_HAW        = [-38, 0, -35];
+const LM_DESIGNA    = [ 42, 0, -22];
+const LM_KEBAB      = [  8, 0,  40];
+const LM_HIGHSCHOOL = [-36, 0,  32];
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+function segmentInfo(from, to) {
+  const dx  = to[0] - from[0];
+  const dz  = to[2] - from[2];
+  const len = Math.hypot(dx, dz);
+  const nx  = dx / len;
+  const nz  = dz / len;
+  return { len, nx, nz, ang: Math.atan2(dx, dz) };
+}
+
+function trimmedRoad(fromPos, toPos, fromR, toR) {
+  const info = segmentInfo(fromPos, toPos);
+  const trimmedLen = info.len - fromR - toR;
+  if (trimmedLen <= 0.5) return null;
+
+  const startX = fromPos[0] + info.nx * fromR;
+  const startZ = fromPos[2] + info.nz * fromR;
+  const midX   = startX + info.nx * trimmedLen / 2;
+  const midZ   = startZ + info.nz * trimmedLen / 2;
+
+  return { mid: [midX, 0, midZ], len: trimmedLen, ang: info.ang };
+}
+
+// ─── Road segment ─────────────────────────────────────────────────────────────
+function Road({ mid, len, ang }) {
+  const dashCount = useMemo(
+    () => Math.max(1, Math.floor(len / (DASH_LEN + DASH_GAP))),
+    [len],
+  );
+
+  const dashOffsets = useMemo(() => {
+    const step  = DASH_LEN + DASH_GAP;
+    const total = dashCount * step - DASH_GAP;
+    const start = -total / 2 + DASH_LEN / 2;
+    return Array.from({ length: dashCount }, (_, i) => start + i * step);
+  }, [dashCount]);
+
+  const curbOff = (ROAD_W - CURB_W) / 2;
 
   return (
-    <mesh
-      position={mid}
-      rotation={[-Math.PI / 2, 0, -angle]}
-      receiveShadow
-    >
-      <planeGeometry args={[width, length, 1, 1]} />
-      <meshStandardMaterial
-        color="#c9b99a"        // warm sandy path
-        roughness={0.96}
-        metalness={0.0}
-      />
-    </mesh>
+    <group position={[mid[0], 0, mid[2]]} rotation={[0, ang, 0]}>
+      <mesh position={[0, ROAD_Y, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow renderOrder={2}>
+        <planeGeometry args={[ROAD_W, len]} />
+        <meshStandardMaterial
+          color="#3a3a46" roughness={0.96} metalness={0.0}
+          polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2}
+        />
+      </mesh>
+      <mesh position={[-curbOff, CURB_Y, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow renderOrder={3}>
+        <planeGeometry args={[CURB_W, len]} />
+        <meshStandardMaterial color="#8a9290" roughness={0.85} polygonOffset polygonOffsetFactor={-3} polygonOffsetUnits={-3} />
+      </mesh>
+      <mesh position={[curbOff, CURB_Y, 0]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow renderOrder={3}>
+        <planeGeometry args={[CURB_W, len]} />
+        <meshStandardMaterial color="#8a9290" roughness={0.85} polygonOffset polygonOffsetFactor={-3} polygonOffsetUnits={-3} />
+      </mesh>
+      {dashOffsets.map((zOff, i) => (
+        <mesh key={i} position={[0, DASH_Y, zOff]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={4}>
+          <planeGeometry args={[DASH_W, DASH_LEN]} />
+          <meshStandardMaterial
+            color="#f5e04a" roughness={0.7} emissive="#f5e04a" emissiveIntensity={0.14}
+            polygonOffset polygonOffsetFactor={-4} polygonOffsetUnits={-4}
+          />
+        </mesh>
+      ))}
+    </group>
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-// PlazaTile — small decorative hex/square near a landmark
-// ─────────────────────────────────────────────────────────────────────────────
-function PlazaTile({ position, radius = 5 }) {
+// ─── Plaza / Fundament ────────────────────────────────────────────────────────
+function PlazaTile({ position, radius = 7 }) {
   return (
-    <mesh
-      position={[position[0], PATH_Y - 0.002, position[2]]}
+    <group>
+      <mesh position={[position[0], PLAZA_Y, position[2]]} rotation={[-Math.PI / 2, 0, 0]} receiveShadow renderOrder={1}>
+        <circleGeometry args={[radius, 56]} />
+        <meshStandardMaterial
+          color="#c8b08a" roughness={0.88}
+          polygonOffset polygonOffsetFactor={-1} polygonOffsetUnits={-1}
+        />
+      </mesh>
+      <mesh position={[position[0], PLAZA_Y + 0.004, position[2]]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={2}>
+        <ringGeometry args={[radius * 0.55, radius * 0.60, 56]} />
+        <meshStandardMaterial
+          color="#a8926a" roughness={0.9}
+          polygonOffset polygonOffsetFactor={-2} polygonOffsetUnits={-2}
+        />
+      </mesh>
+      <mesh position={[position[0], PLAZA_Y + 0.006, position[2]]} rotation={[-Math.PI / 2, 0, 0]} renderOrder={3}>
+        <circleGeometry args={[radius * 0.12, 24]} />
+        <meshStandardMaterial
+          color="#9a8060" roughness={0.92}
+          polygonOffset polygonOffsetFactor={-3} polygonOffsetUnits={-3}
+        />
+      </mesh>
+    </group>
+  );
+}
+
+// ─── HAW Logo decal — flat on ground inside plaza ────────────────────────────
+// Scale 3 — original proportions, not oversized.
+function HawGroundDecal({ position }) {
+  const { scene } = useGLTF("/haw-logo-transformed.glb");
+  const cloned = useMemo(() => {
+    const c = scene.clone(true);
+    c.traverse((o) => {
+      if (!o.isMesh) return;
+      o.receiveShadow = true;
+      o.castShadow    = false;
+      if (o.material) {
+        const m = o.material.clone();
+        m.roughness           = 0.15;
+        m.metalness           = 0.85;
+        m.envMapIntensity     = 1.6;
+        m.polygonOffset       = true;
+        m.polygonOffsetFactor = -6;
+        m.polygonOffsetUnits  = -6;
+        o.material    = m;
+        o.renderOrder = 6;
+      }
+    });
+    return c;
+  }, [scene]);
+
+  return (
+    <group
+      position={[position[0], LOGO_Y, position[2]]}
       rotation={[-Math.PI / 2, 0, 0]}
-      receiveShadow
+      scale={3}
     >
-      <circleGeometry args={[radius, 20]} />
-      <meshStandardMaterial
-        color="#ddd0b8"        // lighter cobblestone tone
-        roughness={0.9}
-        metalness={0.0}
-      />
-    </mesh>
+      <primitive object={cloned} />
+    </group>
   );
 }
+useGLTF.preload("/haw-logo-transformed.glb");
 
-// ─────────────────────────────────────────────────────────────────────────────
-// Ground
-// ─────────────────────────────────────────────────────────────────────────────
+// ─── Ground (main export) ─────────────────────────────────────────────────────
 export default function Ground({ landmarkPositions }) {
+  // FIX #2: use module-level constant arrays so useMemo has stable deps
+  // landmarkPositions prop is still accepted for forward-compat but
+  // the road layout uses the shared constants from World.js
   const lm = landmarkPositions ?? {};
 
-  // Ordered list of positions for path generation:
-  // spoke from HQ to each outer landmark, plus a ring between neighbours.
-  const center = [lm.homebase?.x ?? 0,  0, lm.homebase?.z ?? 0];
-  const haw    = [lm.haw?.x    ?? -38, 0, lm.haw?.z    ?? -35];
-  const des    = [lm.designa?.x?? 42,  0, lm.designa?.z?? -22];
-  const keb    = [lm.kebab?.x  ?? 8,   0, lm.kebab?.z  ?? 40];
-  const hsc    = [lm.highschool?.x??-36,0,lm.highschool?.z??32];
+  // Allow override from parent, but fall back to module constants
+  const cx = lm.homebase?.x   ?? LM_HOMEBASE[0];
+  const cz = lm.homebase?.z   ?? LM_HOMEBASE[2];
+  const hx = lm.haw?.x        ?? LM_HAW[0];
+  const hz = lm.haw?.z        ?? LM_HAW[2];
+  const dx = lm.designa?.x    ?? LM_DESIGNA[0];
+  const dz = lm.designa?.z    ?? LM_DESIGNA[2];
+  const kx = lm.kebab?.x      ?? LM_KEBAB[0];
+  const kz = lm.kebab?.z      ?? LM_KEBAB[2];
+  const sx = lm.highschool?.x ?? LM_HIGHSCHOOL[0];
+  const sz = lm.highschool?.z ?? LM_HIGHSCHOOL[2];
 
-  const paths = useMemo(() => [
-    // Hub & spoke — center to each landmark
-    [center, haw],
-    [center, des],
-    [center, keb],
-    [center, hsc],
-    // Ring connections between neighbours (clockwise)
-    [haw, des],
-    [des, keb],
-    [keb, hsc],
-    [hsc, haw],
-  ], []);
+  // FIX #2: deps array uses scalar primitives only — no arrays
+  const roads = useMemo(() => {
+    const C = [cx, 0, cz];
+    const H = [hx, 0, hz];
+    const D = [dx, 0, dz];
+    const K = [kx, 0, kz];
+    const S = [sx, 0, sz];
+    const raw = [
+      [C, H, PLAZA_R.homebase, PLAZA_R.haw],
+      [C, D, PLAZA_R.homebase, PLAZA_R.designa],
+      [C, K, PLAZA_R.homebase, PLAZA_R.kebab],
+      [C, S, PLAZA_R.homebase, PLAZA_R.highschool],
+      [H, D, PLAZA_R.haw,      PLAZA_R.designa],
+      [D, K, PLAZA_R.designa,  PLAZA_R.kebab],
+      [K, S, PLAZA_R.kebab,    PLAZA_R.highschool],
+      [S, H, PLAZA_R.highschool, PLAZA_R.haw],
+    ];
+    return raw.map(([from, to, fr, tr]) => trimmedRoad(from, to, fr, tr)).filter(Boolean);
+  // All primitive deps — no stale arrays
+  }, [cx, cz, hx, hz, dx, dz, kx, kz, sx, sz]);
 
   return (
     <group>
-
-      {/* ── Physics body ─────────────────────────────────────────────────── */}
       <RigidBody type="fixed" colliders={false} friction={0.88} restitution={0}>
-        <CuboidCollider
-          args={[HALF, THICK / 2, HALF]}
-          position={[0, -THICK / 2, 0]}
-        />
-
-        {/* ── Base slab ───────────────────────────────────────────────────── */}
-        {/* Deep earth-tone underside visible at island edges */}
-        <mesh
-          position={[0, -THICK / 2, 0]}
-          receiveShadow
-          castShadow
-        >
-          <boxGeometry args={[ISLAND, THICK, ISLAND]} />
-          <meshStandardMaterial
-            color="#3d5a3e"   // deep forest green
-            roughness={0.9}
-            metalness={0.04}
-          />
-        </mesh>
-
-        {/* ── Turf surface ─────────────────────────────────────────────────*/}
-        {/* Slightly warm pastel green — catches sunlight beautifully */}
-        <mesh position={[0, 0.005, 0]} receiveShadow>
-          <boxGeometry args={[ISLAND - 0.2, 0.08, ISLAND - 0.2]} />
-          <meshStandardMaterial
-            color="#6abf69"   // vibrant but not neon
-            roughness={0.88}
-            metalness={0.0}
-          />
-        </mesh>
+        <CuboidCollider args={[HALF, THICK / 2, HALF]} position={[0, -THICK / 2, 0]} />
       </RigidBody>
 
-      {/* ── Sandy paths ──────────────────────────────────────────────────── */}
-      {paths.map(([from, to], i) => (
-        <PathStrip key={i} from={from} to={to} />
-      ))}
-
-      {/* ── Plaza circles around each landmark ──────────────────────────── */}
-      <PlazaTile position={center} radius={7} />
-      <PlazaTile position={haw}    radius={6} />
-      <PlazaTile position={des}    radius={6} />
-      <PlazaTile position={keb}    radius={6} />
-      <PlazaTile position={hsc}    radius={6} />
-
-      {/* ── Subtle outer border ring ──────────────────────────────────────── */}
-      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.018, 0]}>
-        <ringGeometry args={[HALF - 1.5, HALF - 0.8, 128]} />
-        <meshBasicMaterial
-          color="#a3e635"
-          transparent
-          opacity={0.12}
-          depthWrite={false}
-        />
+      <mesh position={[0, -THICK / 2, 0]} receiveShadow castShadow>
+        <boxGeometry args={[ISLAND, THICK, ISLAND]} />
+        <meshStandardMaterial color="#2a4428" roughness={0.9} metalness={0.04} />
       </mesh>
 
-      {/* ── Boundary walls — invisible, prevents bike falling off ─────────── */}
+      <mesh position={[0, TURF_Y, 0]} receiveShadow renderOrder={0}>
+        <boxGeometry args={[ISLAND - 0.2, 0.08, ISLAND - 0.2]} />
+        <meshStandardMaterial color="#58b050" roughness={0.88} metalness={0.0} />
+      </mesh>
+
+      <PlazaTile position={[cx, 0, cz]} radius={8.5} />
+      <PlazaTile position={[hx, 0, hz]} radius={7.0} />
+      <PlazaTile position={[dx, 0, dz]} radius={7.0} />
+      <PlazaTile position={[kx, 0, kz]} radius={7.0} />
+      <PlazaTile position={[sx, 0, sz]} radius={7.0} />
+
+      {roads.map((r, i) => <Road key={i} {...r} />)}
+
+      <HawGroundDecal position={[hx, 0, hz]} />
+
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]} renderOrder={1}>
+        <ringGeometry args={[HALF - 2.0, HALF - 1.2, 128]} />
+        <meshBasicMaterial color="#a3e635" transparent opacity={0.08} depthWrite={false} />
+      </mesh>
+
       {[
-        { pos: [0, WALL_H / 2,  HALF], args: [HALF, WALL_H / 2, 0.5] },
-        { pos: [0, WALL_H / 2, -HALF], args: [HALF, WALL_H / 2, 0.5] },
-        { pos: [ HALF, WALL_H / 2, 0], args: [0.5, WALL_H / 2, HALF] },
-        { pos: [-HALF, WALL_H / 2, 0], args: [0.5, WALL_H / 2, HALF] },
+        { pos: [0,       WALL_H / 2,  HALF], args: [HALF, WALL_H / 2, 0.5] },
+        { pos: [0,       WALL_H / 2, -HALF], args: [HALF, WALL_H / 2, 0.5] },
+        { pos: [HALF,   WALL_H / 2,  0   ], args: [0.5,  WALL_H / 2, HALF] },
+        { pos: [-HALF,  WALL_H / 2,  0   ], args: [0.5,  WALL_H / 2, HALF] },
       ].map((w, i) => (
         <RigidBody key={i} type="fixed" colliders={false}>
           <CuboidCollider args={w.args} position={w.pos} />
         </RigidBody>
       ))}
-
     </group>
   );
 }

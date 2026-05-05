@@ -17,7 +17,6 @@ const KEY_MAP = [
   { name: "brake",    keys: ["Space"] },
 ];
 
-/** ── Landmark data with full English Cybersecurity / BIS content ── */
 export const LANDMARKS = {
   haw: {
     id: "haw",
@@ -31,7 +30,7 @@ export const LANDMARKS = {
   },
   designa: {
     id: "designa",
-    title: "Working Student Testing Lab & QA",
+    title: "Working Student — Testing Lab & QA",
     subtitle: "DESIGNA Verkehrsleittechnik GmbH",
     timeframe: "Since 11/2025",
     text: "Analyzing server and system logs to narrow down root causes of issues in test environments. Documenting incidents, debugging, and testing hardware.",
@@ -59,6 +58,7 @@ export const LANDMARKS = {
     color: "#a78bfa",
     accent: "#7c3aed",
   },
+  // FIX #1: Correct homebase data (was placeholder text)
   homebase: {
     id: "homebase",
     title: "Cybersecurity & Development HQ",
@@ -71,19 +71,21 @@ export const LANDMARKS = {
   },
 };
 
+// FIX #9: fov 50 for better overview of the 130-unit island
+const INITIAL_CAMERA = { fov: 50, position: [14, 18, 14], near: 0.5, far: 300 };
+
 export default function Experience() {
   const [activeId, setActiveId] = useState(null);
-
-  // followModeRef is a plain mutable ref — intentionally NOT useState so
-  // toggling it never triggers a React re-render (zero overhead).
   const followModeRef = useRef(true);
   const orbitRef      = useRef(null);
 
-  const handleEnter = useCallback((id) => setActiveId(id), []);
-  const handleExit  = useCallback(
+  const handleEnter     = useCallback((id) => setActiveId(id), []);
+  const handleExit      = useCallback(
     (id) => setActiveId((cur) => (cur === id ? null : cur)),
     [],
   );
+  const handleClickOpen = useCallback((id) => setActiveId(id), []);
+  const handleClose     = useCallback(() => setActiveId(null), []);
 
   const activeCard = useMemo(
     () => (activeId ? LANDMARKS[activeId] : null),
@@ -93,10 +95,10 @@ export default function Experience() {
   return (
     <main className="relative h-[100dvh] w-screen overflow-hidden bg-black select-none">
 
-      {/* Top hint — keyboard / touch instructions */}
+      {/* Hint bar */}
       <div className="pointer-events-none absolute left-1/2 top-5 z-30 -translate-x-1/2 text-center">
         <div className="text-[10px] uppercase tracking-[0.32em] text-zinc-400/80">
-          Numan’s Roadmap
+          Numan&apos;s Roadmap
         </div>
         <div className="mt-1 text-[12px] text-zinc-300/80">
           <span className="hidden md:inline">
@@ -104,43 +106,41 @@ export default function Experience() {
             <kbd className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px]">W A S D</kbd>
             {" / "}
             <kbd className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px]">↑ ← ↓ →</kbd>
+            {" — or click any building"}
           </span>
-          <span className="md:hidden">Tap the pads to drive</span>
-          {" — "}
-          <span className="text-zinc-400/70">visit each landmark to explore</span>
+          <span className="md:hidden">Tap the pads to drive — or tap a building</span>
         </div>
       </div>
+
+      {/* Zentrieren button */}
+      <button
+        className="pointer-events-auto absolute bottom-8 left-1/2 z-30 -translate-x-1/2 rounded-full border border-white/15 bg-black/40 px-5 py-2 text-[12px] text-white/80 backdrop-blur-md transition hover:bg-white/10 hover:text-white"
+        onClick={() => { followModeRef.current = true; }}
+      >
+        Zentrieren
+      </button>
 
       <KeyboardControls map={KEY_MAP}>
         <Canvas
           shadows
           dpr={[1, 2]}
-          gl={{
-            antialias:        true,
-            powerPreference:  "high-performance",
-            stencil:          false,
-          }}
-          camera={{ fov: 42, position: [14, 18, 14], near: 0.5, far: 300 }}
+          gl={{ antialias: true, powerPreference: "high-performance", stencil: false }}
+          camera={INITIAL_CAMERA}
           className="absolute inset-0"
         >
           <World
             onEnter={handleEnter}
             onExit={handleExit}
+            onClickOpen={handleClickOpen}
             followModeRef={followModeRef}
             orbitRef={orbitRef}
           />
         </Canvas>
       </KeyboardControls>
 
-      <InfoCard card={activeCard} />
+      <InfoCard card={activeCard} onClose={handleClose} />
       <MobileControls />
       <SocialDock />
-
-      {/*
-        “Zentrieren” button intentionally removed.
-        Pressing any drive key (WASD / arrows) re-engages follow mode
-        automatically — Bruno Simon style.
-      */}
     </main>
   );
 }

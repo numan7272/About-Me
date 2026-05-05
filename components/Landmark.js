@@ -130,77 +130,6 @@ function SchoolBuilding({ color = "#a78bfa", glowColor = "#7c3aed" }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// KEBAB SHOP — procedural döner-style building
-// ─────────────────────────────────────────────────────────────────────────────
-function KebabBuilding({ color = "#fb923c", glowColor = "#ef4444" }) {
-  const signRef = useRef();
-  useFrame((s) => {
-    if (!signRef.current) return;
-    const t = s.clock.getElapsedTime();
-    signRef.current.children.forEach((c, i) => {
-      if (c.isMesh && c.material) {
-        c.material.emissiveIntensity = 0.6 + Math.sin(t * 2.5 + i * 1.2) * 0.3;
-      }
-    });
-  });
-
-  return (
-    <group>
-      {/* Main body */}
-      <mesh position={[0, 1.6, 0]} castShadow receiveShadow>
-        <boxGeometry args={[4.0, 3.2, 3.0]} />
-        <meshStandardMaterial color="#fef3c7" roughness={0.7} metalness={0.0} />
-      </mesh>
-      {/* Flat roof with overhang */}
-      <mesh position={[0, 3.3, 0]} castShadow>
-        <boxGeometry args={[4.6, 0.22, 3.6]} />
-        <meshStandardMaterial color={color} roughness={0.4} metalness={0.15} />
-      </mesh>
-      {/* Awning */}
-      <mesh position={[0, 2.55, 1.7]} rotation={[0.3, 0, 0]} castShadow>
-        <boxGeometry args={[3.6, 0.12, 1.1]} />
-        <meshStandardMaterial color="#dc2626" roughness={0.5} metalness={0.0} />
-      </mesh>
-      {/* Door */}
-      <mesh position={[0, 0.9, 1.51]} castShadow>
-        <boxGeometry args={[0.85, 1.8, 0.08]} />
-        <meshStandardMaterial color="#78350f" roughness={0.8} metalness={0.1} />
-      </mesh>
-      {/* Windows */}
-      <group ref={signRef}>
-        {[[-1.4, 1.7, 1.51],[1.4, 1.7, 1.51]].map(([x, y, z], i) => (
-          <mesh key={i} position={[x, y, z]}>
-            <boxGeometry args={[0.9, 0.75, 0.08]} />
-            <meshStandardMaterial
-              color="#fed7aa" emissive="#f97316" emissiveIntensity={0.6}
-              roughness={0.2} metalness={0.1}
-            />
-          </mesh>
-        ))}
-        {/* Neon sign strip */}
-        <mesh position={[0, 3.0, 1.52]}>
-          <boxGeometry args={[2.4, 0.28, 0.08]} />
-          <meshStandardMaterial
-            color="#ff4500" emissive="#ff4500" emissiveIntensity={0.9}
-            roughness={0.1} metalness={0.0}
-          />
-        </mesh>
-      </group>
-      {/* Chimney */}
-      <mesh position={[1.2, 4.0, -0.5]} castShadow>
-        <boxGeometry args={[0.35, 0.9, 0.35]} />
-        <meshStandardMaterial color="#9ca3af" roughness={0.9} metalness={0.0} />
-      </mesh>
-      {/* Ground ring */}
-      <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, 0.02, 0]}>
-        <ringGeometry args={[2.4, 2.8, 48]} />
-        <meshBasicMaterial color={glowColor} transparent opacity={0.2} side={THREE.DoubleSide} depthWrite={false} />
-      </mesh>
-    </group>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
 // GENERIC BEACON
 // ─────────────────────────────────────────────────────────────────────────────
 function ProceduralLandmark({ color = "#22d3ee", shape = "box" }) {
@@ -233,7 +162,7 @@ function ProceduralLandmark({ color = "#22d3ee", shape = "box" }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GLB loader — only used when the file is confirmed to exist in /public
+// GLB loader
 // ─────────────────────────────────────────────────────────────────────────────
 function GltfLandmark({ url, scale = 1, glossy = true }) {
   const { scene } = useGLTF(url);
@@ -256,13 +185,14 @@ function GltfLandmark({ url, scale = 1, glossy = true }) {
   return <primitive object={scene} scale={scale} />;
 }
 
-// Only preload GLBs that actually exist in /public:
 useGLTF.preload("/haw-logo-transformed.glb");
 useGLTF.preload("/designa-logo-transformed.glb");
+// FIX #3: correct filename casing — must match exact filename in /public
 useGLTF.preload("/yekdoener-transformed.glb");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CLICK ZONE
+// FIX #4: use opacity={0} instead of visible={false} so raycaster still hits it
 // ─────────────────────────────────────────────────────────────────────────────
 function ClickZone({ halfExtents, clickHeight, onClick }) {
   return (
@@ -273,6 +203,7 @@ function ClickZone({ halfExtents, clickHeight, onClick }) {
       onPointerOut={()  => (document.body.style.cursor = "auto")}
     >
       <boxGeometry args={[halfExtents[0] * 2, clickHeight, halfExtents[2] * 2]} />
+      {/* FIX #4: transparent + opacity 0 instead of visible={false} */}
       <meshBasicMaterial transparent opacity={0} depthWrite={false} />
     </mesh>
   );
@@ -327,7 +258,6 @@ export default function Landmark({
     }
     if (proceduralShape === "house")  return <group position={[0, modelYOffset, 0]}><House  color={color} glowColor={glow} /></group>;
     if (proceduralShape === "school") return <group position={[0, modelYOffset, 0]}><SchoolBuilding color={color} glowColor={glow} /></group>;
-    if (proceduralShape === "kebab")  return <group position={[0, modelYOffset, 0]}><KebabBuilding  color={color} glowColor={glow} /></group>;
     return (
       <Float speed={1.2} rotationIntensity={0.2} floatIntensity={0.6}>
         <group position={[0, modelYOffset, 0]}>

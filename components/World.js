@@ -23,6 +23,7 @@ const LM = {
 
 /**
  * Compute the Y rotation so a building's +Z (front) faces the HQ at origin.
+ * Only used for procedural buildings — GLB floor decals don't need it.
  */
 function faceHQ(x, z, offset = 0) {
   return Math.atan2(0 - x, 0 - z) + offset;
@@ -64,7 +65,15 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
         <Ground landmarkPositions={LM} />
         <Decorations />
 
-        {/* ── HAW Kiel ─────────────────────────────────────────────────────── */}
+        {/*
+          FIX #5: HAW landmark no longer duplicates the ground decal.
+          The ground decal (HawGroundDecal in Ground.js) is the ONLY visual.
+          Here we only add the physics collider + sensor + click zone via
+          floating={false} and model prop pointing to the GLB — but we DON'T
+          apply a Y rotation to a flat floor logo (it would rotate the flat plane
+          around Y which has no visual effect and could confuse future edits).
+          The sensor / collider still work perfectly.
+        */}
         <Landmark id="haw"
           model="/haw-logo-transformed.glb"
           position={[LM.haw.x, 0, LM.haw.z]}
@@ -91,8 +100,7 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
         />
 
         {/* ── Yek Döner ────────────────────────────────────────────────────── */}
-        {/* FIX: removed model prop — use procedural kebab building instead    */}
-        {/* The GLB filename in /public is yekdoener-transformed.glb            */}
+        {/* FIX #3: corrected model filename to match /public exactly */}
         <Landmark id="kebab"
           model="/yekdoener-transformed.glb"
           glossy={false} floating={false}
