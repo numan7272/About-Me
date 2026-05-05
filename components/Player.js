@@ -8,6 +8,7 @@ import * as THREE from "three";
 import { touchInput } from "@/lib/inputStore";
 import { bikeState, bikeCommand } from "@/lib/bikeStore";
 import { triggerShake } from "@/lib/cameraShake";
+import { isInGrass } from "@/lib/islandShape";
 
 const BIKE_URL   = "/vanmoof-transformed.glb";
 const MAX_SPEED  = 7.5;
@@ -378,6 +379,10 @@ function GrassTrail({ playerRef }) {
 
     const pos = body.translation();
     if (isOnTarmac(pos.x, pos.z)) return;
+    // Only leave tracks on the meadow — sand prints would look out of
+    // place on the beach and the trail isn't supposed to extend off the
+    // visible island.
+    if (!isInGrass(pos.x, pos.z)) return;
 
     // Drop a patch every 0.06 s of grass-rolling — gives a continuous trail
     // at top speed without exhausting the 90-slot pool too quickly.

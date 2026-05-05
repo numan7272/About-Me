@@ -5,6 +5,8 @@ import { useFrame } from "@react-three/fiber";
 import { RigidBody, CuboidCollider } from "@react-three/rapier";
 import * as THREE from "three";
 
+import { isInGrass } from "@/lib/islandShape";
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Seeded pseudo-random helper — deterministic so the layout never re-shuffles.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -82,24 +84,10 @@ const GRASS_FRAG = /* glsl */`
   }
 `;
 
-const ISLAND_HALF  = 62;           // keep inside 130-unit ground
-const EXCLUSION_R  = 9;            // clear ring around each landmark (>= max plaza R)
+const ISLAND_HALF  = 68;           // sampling bounds; the polygon-fit test
+                                    // (isInGrass) trims candidates beyond
+                                    // the actual irregular coastline.
 const GRASS_COUNT  = 5500;
-
-// Main landmark positions duplicated here to exclude grass from plazas
-const LANDMARK_XZ = [
-  [-38, -35],
-  [ 42, -22],
-  [  8,  40],
-  [-36,  32],
-  [  0,   0],
-];
-
-function isTooCloseToLandmark(x, z) {
-  return LANDMARK_XZ.some(
-    ([lx, lz]) => Math.hypot(x - lx, z - lz) < EXCLUSION_R,
-  );
-}
 
 function GrassField() {
   const meshRef   = useRef();
@@ -118,14 +106,13 @@ function GrassField() {
       attempts++;
       const x = (rng() - 0.5) * (ISLAND_HALF * 2 - 4);
       const z = (rng() - 0.5) * (ISLAND_HALF * 2 - 4);
-      // Skip plazas, roads, the perimeter beach ring, and the corner-cut
-      // sandbars. Road & plaza helpers (isOnRoad / isInPlaza) are declared
-      // later in this file but are valid at render time because the module
-      // body has already finished evaluating by the time GrassField mounts.
-      if (isTooCloseToLandmark(x, z)) continue;
+      // Anchor candidates to the grass polygon and exclude paved surfaces.
+      // isInGrass is the canonical "is this point inside the grass area"
+      // check from islandShape — it already excludes the beach and the
+      // surrounding water.
+      if (!isInGrass(x, z))           continue;
       if (isOnRoad(x, z))             continue;
       if (isInPlaza(x, z))            continue;
-      if (isOnBeachRing(x, z))        continue;
       // Wider scale spread + a subtle clumping factor — blades nearer the
       // edges grow taller, so the field looks layered rather than uniform.
       const edgeFactor = Math.min(
@@ -676,16 +663,12 @@ function isInPlaza(x, z) {
   return PLAZAS.some(([px, pz, r]) => Math.hypot(x - px, z - pz) < r);
 }
 
-// Beach ring perimeter — kept in sync with Ground.js BEACH_INNER. Anything
-// past this distance from the island centre (using max-norm so it follows
-// the square shore) is sand, not grass.
-const BEACH_INNER = 58;
-function isOnBeachRing(x, z) {
-  return Math.max(Math.abs(x), Math.abs(z)) > BEACH_INNER;
-}
-
+// Decoration positions must sit on grass — not on roads, plazas, the beach
+// ring, or beyond the irregular coastline. The grass polygon test comes
+// from the shared islandShape module so the coast is the single source of
+// truth.
 const isBlocked = (x, z) =>
-  isOnRoad(x, z) || isInPlaza(x, z) || isOnBeachRing(x, z);
+  isOnRoad(x, z) || isInPlaza(x, z) || !isInGrass(x, z);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Layout data — hand-placed, path-safe, landmark-safe
