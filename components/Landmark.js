@@ -188,7 +188,7 @@ function GltfLandmark({ url, scale = 1, glossy = true }) {
 useGLTF.preload("/haw-logo-transformed.glb");
 useGLTF.preload("/designa-logo-transformed.glb");
 // FIX #3: correct filename casing — must match exact filename in /public
-useGLTF.preload("/yek-doener-transformed.glb");
+useGLTF.preload("/yekdoener-transformed.glb");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // CLICK ZONE

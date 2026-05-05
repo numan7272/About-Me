@@ -102,7 +102,7 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
         {/* ── Yek Döner ────────────────────────────────────────────────────── */}
         {/* FIX #3: corrected model filename to match /public exactly */}
         <Landmark id="kebab"
-          model="/yek-doener-transformed.glb"
+          model="/yekdoener-transformed.glb"
           glossy={false} floating={false}
           position={[LM.kebab.x, 0, LM.kebab.z]}
           rotation={[0, faceHQ(LM.kebab.x, LM.kebab.z), 0]}
