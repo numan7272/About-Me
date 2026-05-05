@@ -194,6 +194,37 @@ export default function Ground({ landmarkPositions }) {
         <meshStandardMaterial color="#58b050" roughness={0.88} metalness={0.0} />
       </mesh>
 
+      {/* Sandy beach patches around the perimeter (purely visual, slightly
+          above the turf so they layer cleanly without z-fighting). */}
+      {[
+        [-58,   0, 9],
+        [ 58,   0, 9],
+        [  0, -58, 9],
+        [  0,  58, 9],
+        [-55, -55, 7],
+        [ 55, -55, 7],
+        [-55,  55, 7],
+        [ 55,  55, 7],
+      ].map(([x, z, r], i) => (
+        <mesh
+          key={`beach-${i}`}
+          rotation={[-Math.PI / 2, 0, 0]}
+          position={[x, TURF_Y + 0.005, z]}
+          receiveShadow
+          renderOrder={0}
+        >
+          <circleGeometry args={[r, 32]} />
+          <meshStandardMaterial
+            color="#e7c98b"
+            roughness={0.95}
+            metalness={0.0}
+            polygonOffset
+            polygonOffsetFactor={-1}
+            polygonOffsetUnits={-1}
+          />
+        </mesh>
+      ))}
+
       <PlazaTile position={[cx, 0, cz]} radius={8.5} />
       <PlazaTile position={[hx, 0, hz]} radius={7.0} />
       <PlazaTile position={[dx, 0, dz]} radius={7.0} />

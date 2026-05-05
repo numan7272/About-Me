@@ -61,14 +61,13 @@ export const LANDMARKS = {
     color: "#a78bfa",
     accent: "#7c3aed",
   },
-  // FIX #1: Correct homebase data (was placeholder text)
   homebase: {
     id: "homebase",
-    title: "Cybersecurity & Development HQ",
-    subtitle: "Independent Projects & Certifications",
+    title: "Home — Personal Workshop",
+    subtitle: "Self-taught & project-driven",
     timeframe: "Ongoing",
-    text: "Building full-stack applications like scheduling assistants and threat intelligence dashboards. Currently completing the Google Cybersecurity Professional Certificate and documenting my learning track on GitHub.",
-    skills: ["Python & FastAPI", "React / Next.js", "Docker", "Kali Linux", "OSINT"],
+    text: "Where I learn by doing. Side projects, prototypes and tools that scratch my own itch — full-stack apps, automation scripts, networking experiments. The fastest way to learn something is to break it on purpose, fix it, and ship the next one.",
+    skills: ["Python & FastAPI", "React / Next.js", "Docker", "Linux", "Self-Taught"],
     color: "#f472b6",
     accent: "#ec4899",
   },

@@ -2,9 +2,20 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Map as MapIcon, X } from "lucide-react";
-import { bikeState, MAP_META } from "@/lib/bikeStore";
+import { bikeState, MAP_META, teleportRequest } from "@/lib/bikeStore";
 
 const SIZE = 144;
+const PADDING = 8;
+const DRAW_SCALE = (SIZE / 2 - PADDING) / (MAP_META.islandSize / 2);
+
+// Friendly labels for the quick-travel hover tip / aria-label
+const LM_LABEL = {
+  homebase:   "Home (HQ)",
+  haw:        "HAW Kiel",
+  designa:    "Designa",
+  kebab:      "Yek Döner",
+  highschool: "Thor Heyerdahl Gymnasium",
+};
 
 /**
  * Compact canvas mini-map fixed in the top-right corner.
@@ -41,9 +52,7 @@ export default function MiniMap({ activeId }) {
 
     let rafId;
     const half = SIZE / 2;
-    const islandRadius = MAP_META.islandSize / 2;
-    const padding = 8;
-    const drawScale = (half - padding) / islandRadius;
+    const drawScale = DRAW_SCALE;
 
     const draw = () => {
       ctx.clearRect(0, 0, SIZE, SIZE);
@@ -123,19 +132,16 @@ export default function MiniMap({ activeId }) {
     );
   }
 
-  // ── Open: full mini-map ─────────────────────────────────────────────────
+  // ── Open: full mini-map (with quick-travel buttons over each dot) ───────
   return (
-    <div
-      className="pointer-events-auto absolute right-4 top-4 z-30 select-none"
-      aria-hidden
-    >
+    <div className="pointer-events-auto absolute right-4 top-4 z-30 select-none">
       <div
         className="relative rounded-2xl border border-white/10 bg-zinc-900/55 p-2 shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl ring-1 ring-white/5"
-        style={{ width: SIZE + 16, height: SIZE + 30 }}
+        style={{ width: SIZE + 16, height: SIZE + 50 }}
       >
         <div className="flex items-center justify-between px-1 pb-1">
           <span className="text-[9px] font-medium uppercase tracking-[0.22em] text-zinc-400">
-            Map
+            Travel
           </span>
           <button
             type="button"
@@ -146,11 +152,54 @@ export default function MiniMap({ activeId }) {
             <X size={11} strokeWidth={2.4} />
           </button>
         </div>
-        <canvas
-          ref={canvasRef}
-          style={{ width: SIZE, height: SIZE }}
-          className="rounded-xl"
-        />
+
+        {/* Canvas + click overlays. The wrapper is `relative` and sized to
+            the canvas so absolute-positioned buttons line up with dots. */}
+        <div className="relative" style={{ width: SIZE, height: SIZE }}>
+          <canvas
+            ref={canvasRef}
+            style={{ width: SIZE, height: SIZE }}
+            className="rounded-xl"
+            aria-hidden
+          />
+
+          {MAP_META.landmarks.map((lm) => {
+            const lx = SIZE / 2 + lm.x * DRAW_SCALE;
+            const ly = SIZE / 2 + lm.z * DRAW_SCALE;
+            const HIT = 24;
+            return (
+              <button
+                key={lm.id}
+                type="button"
+                onClick={() => teleportRequest(lm.id)}
+                aria-label={`Schnellreise zu ${LM_LABEL[lm.id] ?? lm.id}`}
+                title={LM_LABEL[lm.id] ?? lm.id}
+                className="group absolute rounded-full transition hover:scale-110"
+                style={{
+                  left: lx - HIT / 2,
+                  top:  ly - HIT / 2,
+                  width:  HIT,
+                  height: HIT,
+                  background: "transparent",
+                  cursor: "pointer",
+                }}
+              >
+                {/* Soft ring on hover for affordance */}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 rounded-full opacity-0 transition group-hover:opacity-100"
+                  style={{
+                    boxShadow: `0 0 0 2px ${lm.color}aa, 0 0 14px ${lm.color}99`,
+                  }}
+                />
+              </button>
+            );
+          })}
+        </div>
+
+        <p className="mt-1 px-1 text-[8.5px] uppercase tracking-[0.2em] text-zinc-500">
+          Klicke ein Symbol
+        </p>
       </div>
     </div>
   );

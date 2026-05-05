@@ -1,12 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { useGLTF, useKeyboardControls } from "@react-three/drei";
 import { RigidBody, CuboidCollider } from "@react-three/rapier";
 import * as THREE from "three";
 import { touchInput } from "@/lib/inputStore";
-import { bikeState } from "@/lib/bikeStore";
+import { bikeState, bikeCommand } from "@/lib/bikeStore";
 import { triggerShake } from "@/lib/cameraShake";
 
 const BIKE_URL   = "/vanmoof-transformed.glb";
@@ -483,8 +483,12 @@ useGLTF.preload(BIKE_URL);
 // ─── Player ───────────────────────────────────────────────────────────────────
 export default function Player({ playerRef, followModeRef }) {
   const [, getKeys] = useKeyboardControls();
+  const { camera }  = useThree();
+
   const leanRef     = useRef(0);
   const tmpForward  = useMemo(() => new THREE.Vector3(), []);
+  const tmpRight    = useMemo(() => new THREE.Vector3(), []);
+  const tmpDesired  = useMemo(() => new THREE.Vector3(), []);
   const tmpQuat     = useMemo(() => new THREE.Quaternion(), []);
   const tmpEuler    = useMemo(() => new THREE.Euler(0, 0, 0, "YXZ"), []);
 
@@ -492,6 +496,22 @@ export default function Player({ playerRef, followModeRef }) {
     const body = playerRef.current;
     if (!body) return;
 
+    /* ── 0) one-shot teleport (quick-travel from the mini-map) ─────────── */
+    if (bikeCommand.teleportTo) {
+      const t = bikeCommand.teleportTo;
+      body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+      body.setAngvel({ x: 0, y: 0, z: 0 }, true);
+      body.setTranslation({ x: t.x, y: t.y, z: t.z }, true);
+      if (typeof t.yaw === "number") {
+        const half = t.yaw / 2;
+        body.setRotation({ x: 0, y: Math.sin(half), z: 0, w: Math.cos(half) }, true);
+      }
+      bikeCommand.teleportTo = null;
+      // Snap follow camera back so it doesn't pan across the whole map
+      if (followModeRef) followModeRef.current = true;
+    }
+
+    /* ── 1) read input — keyboard digital + joystick analog ────────────── */
     const k            = getKeys();
     const forwardDown  = k.forward  || touchInput.forward;
     const backwardDown = k.backward || touchInput.backward;
@@ -499,43 +519,113 @@ export default function Player({ playerRef, followModeRef }) {
     const rightDown    = k.right    || touchInput.right;
     const brakeDown    = k.brake    || touchInput.brake;
 
+    const joyMag = Math.hypot(touchInput.joystickX, touchInput.joystickY);
+    const useJoystick = touchInput.joystickActive && joyMag > 0.05;
+
     if (followModeRef?.current !== undefined) {
-      if (forwardDown || backwardDown || leftDown || rightDown) followModeRef.current = true;
+      if (forwardDown || backwardDown || leftDown || rightDown || useJoystick) {
+        followModeRef.current = true;
+      }
     }
 
-    const fwdIn  = (forwardDown  ? 1 : 0) - (backwardDown ? 1 : 0);
-    const turnIn = (leftDown     ? 1 : 0) - (rightDown    ? 1 : 0);
-
+    /* ── 2) current rotation, body forward axis ────────────────────────── */
     const r2 = body.rotation();
     tmpQuat.set(r2.x, r2.y, r2.z, r2.w);
-    tmpForward.set(0, 0, 1).applyQuaternion(tmpQuat);
+    tmpForward.set(0, 0, 1).applyQuaternion(tmpQuat);  // bike's local +Z in world
 
-    const targetSpeed = fwdIn * MAX_SPEED * (brakeDown ? 0 : 1);
-    const cur    = body.linvel();
-    const lerpT  = Math.min(1, ACCEL * delta);
-    const brakeT = brakeDown ? Math.min(1, 10 * delta) : lerpT;
-
-    body.setLinvel({
-      x: THREE.MathUtils.lerp(cur.x, brakeDown ? 0 : tmpForward.x * targetSpeed, brakeDown ? brakeT : lerpT),
-      y: cur.y,
-      z: THREE.MathUtils.lerp(cur.z, brakeDown ? 0 : tmpForward.z * targetSpeed, brakeDown ? brakeT : lerpT),
-    }, true);
-
+    const cur         = body.linvel();
     const groundSpeed = Math.hypot(cur.x, cur.z);
-    const speedFactor = turnIn !== 0
-      ? THREE.MathUtils.clamp(groundSpeed / MAX_SPEED, 0.55, 1)
-      : 0;
+    const lerpT       = Math.min(1, ACCEL * delta);
+    const brakeT      = brakeDown ? Math.min(1, 10 * delta) : lerpT;
 
-    body.setAngvel({
-      x: 0,
-      y: turnIn !== 0 ? turnIn * TURN_SPEED * speedFactor : 0,
-      z: 0,
-    }, true);
+    let targetVx, targetVz, angY;
 
-    const targetLean = -turnIn * speedFactor * 0.18;
-    leanRef.current  = THREE.MathUtils.lerp(leanRef.current, targetLean, Math.min(1, 6*delta));
+    if (useJoystick) {
+      /* ── 3a) Bruno-Simon-style directional joystick ──────────────────────
+         Joystick angle = desired heading (camera-relative). We rotate the
+         bike toward that heading with a P-controller on yaw error, while
+         driving forward at throttle = joystick magnitude. Pulling sideways
+         no longer spins on the spot — it banks the bike into a turn. */
+      camera.getWorldDirection(tmpRight);   // cam forward, will reuse
+      tmpRight.y = 0;
+      tmpRight.normalize();
+      // tmpRight currently holds the cam-forward; build axes from it.
+      const camForwardX = tmpRight.x;
+      const camForwardZ = tmpRight.z;
+      // World up × cam-forward = cam-right (in XZ plane)
+      const camRightX = -camForwardZ;
+      const camRightZ =  camForwardX;
 
-    // Publish state for the DOM HUDs (mini-map, speedometer)
+      // Desired world direction = cam-forward * jY  +  cam-right * jX
+      tmpDesired.set(
+        camForwardX * touchInput.joystickY + camRightX * touchInput.joystickX,
+        0,
+        camForwardZ * touchInput.joystickY + camRightZ * touchInput.joystickX,
+      );
+      const desLen = Math.hypot(tmpDesired.x, tmpDesired.z) || 1;
+      tmpDesired.x /= desLen;
+      tmpDesired.z /= desLen;
+
+      const desiredYaw = Math.atan2(tmpDesired.x, tmpDesired.z);
+
+      // Wrap delta yaw to [-π, π]
+      tmpEuler.setFromQuaternion(tmpQuat);
+      let dy = desiredYaw - tmpEuler.y;
+      while (dy >  Math.PI) dy -= Math.PI * 2;
+      while (dy < -Math.PI) dy += Math.PI * 2;
+
+      // P-controller, capped to a sane angular speed
+      const ANG_CAP = TURN_SPEED * 1.6;
+      angY = THREE.MathUtils.clamp(dy * 5, -ANG_CAP, ANG_CAP);
+
+      // Throttle along the bike's *current* forward axis — gives a smooth
+      // turning feel rather than rubber-banding sideways.
+      const throttle = Math.min(1, joyMag);
+      const targetSpeed = throttle * MAX_SPEED;
+      targetVx = tmpForward.x * targetSpeed;
+      targetVz = tmpForward.z * targetSpeed;
+
+      // Lean visually into the turn, scaled by both throttle and yaw error
+      const leanTarget = THREE.MathUtils.clamp(dy, -1, 1) * 0.22 * throttle;
+      leanRef.current  = THREE.MathUtils.lerp(
+        leanRef.current,
+        leanTarget,
+        Math.min(1, 6 * delta),
+      );
+    } else {
+      /* ── 3b) Digital keyboard fallback ────────────────────────────────── */
+      const fwdIn  = (forwardDown  ? 1 : 0) - (backwardDown ? 1 : 0);
+      const turnIn = (leftDown     ? 1 : 0) - (rightDown    ? 1 : 0);
+
+      const targetSpeed = fwdIn * MAX_SPEED * (brakeDown ? 0 : 1);
+      targetVx = tmpForward.x * targetSpeed;
+      targetVz = tmpForward.z * targetSpeed;
+
+      const speedFactor = turnIn !== 0
+        ? THREE.MathUtils.clamp(groundSpeed / MAX_SPEED, 0.55, 1)
+        : 0;
+      angY = turnIn !== 0 ? turnIn * TURN_SPEED * speedFactor : 0;
+
+      const leanTarget = -turnIn * speedFactor * 0.18;
+      leanRef.current  = THREE.MathUtils.lerp(
+        leanRef.current,
+        leanTarget,
+        Math.min(1, 6 * delta),
+      );
+    }
+
+    /* ── 4) commit physics ──────────────────────────────────────────────── */
+    body.setLinvel(
+      {
+        x: THREE.MathUtils.lerp(cur.x, brakeDown ? 0 : targetVx, brakeDown ? brakeT : lerpT),
+        y: cur.y,
+        z: THREE.MathUtils.lerp(cur.z, brakeDown ? 0 : targetVz, brakeDown ? brakeT : lerpT),
+      },
+      true,
+    );
+    body.setAngvel({ x: 0, y: angY, z: 0 }, true);
+
+    /* ── 5) HUD bridge ──────────────────────────────────────────────────── */
     const pos = body.translation();
     bikeState.x     = pos.x;
     bikeState.y     = pos.y;

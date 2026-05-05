@@ -312,7 +312,8 @@ function Rock({ position, seed = 1 }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Road / plaza exclusion — keep trees and lamps off the streets
+// Road / plaza exclusion — keep trees and lamps off the streets.
+// MUST stay in sync with the road list in components/Ground.js.
 // ─────────────────────────────────────────────────────────────────────────────
 const ROAD_SEGMENTS = [
   [[  0,   0], [-38, -35]],   // HQ ↔ HAW
@@ -320,9 +321,11 @@ const ROAD_SEGMENTS = [
   [[  0,   0], [  8,  40]],   // HQ ↔ Kebab
   [[  0,   0], [-36,  32]],   // HQ ↔ Highschool
   [[-38, -35], [ 42, -22]],   // HAW ↔ Designa
+  [[ 42, -22], [  8,  40]],   // Designa ↔ Kebab  ← was missing
+  [[  8,  40], [-36,  32]],   // Kebab ↔ Highschool
   [[-36,  32], [-38, -35]],   // Highschool ↔ HAW
 ];
-const ROAD_CLEARANCE = 5.0;   // metres from any road centre-line
+const ROAD_CLEARANCE = 5.5;   // metres from any road centre-line
 
 const PLAZAS = [
   [  0,   0, 9.5],
@@ -351,7 +354,13 @@ function isInPlaza(x, z) {
   return PLAZAS.some(([px, pz, r]) => Math.hypot(x - px, z - pz) < r);
 }
 
-const isBlocked = (x, z) => isOnRoad(x, z) || isInPlaza(x, z);
+// River runs north→south at world x = 25, full island length, ~3 m half-width.
+// Add a small buffer so trees/lamps never spawn at the bank either.
+const RIVER_X = 25;
+const RIVER_HALF_WIDTH = 4.5;
+const isInRiver = (x) => Math.abs(x - RIVER_X) < RIVER_HALF_WIDTH;
+
+const isBlocked = (x, z) => isOnRoad(x, z) || isInPlaza(x, z) || isInRiver(x);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Layout data — hand-placed, path-safe, landmark-safe

@@ -110,11 +110,14 @@ function SchoolBuilding({ color = "#a78bfa", glowColor = "#7c3aed" }) {
           </mesh>
         ))}
       </group>
-      <mesh position={[-3.5, 6.5, 0]} castShadow>
+      {/* Flagpole — sits on the actual roof. Building footprint is
+          x ∈ [-3,3], z ∈ [-2,2]; roof top is at y = 5.3, so a 4-unit pole
+          centred at y = 7.3 has its base resting on the roof. */}
+      <mesh position={[2.0, 7.3, -1.5]} castShadow>
         <cylinderGeometry args={[0.05, 0.05, 4.0, 6]} />
         <meshStandardMaterial color="#9ca3af" roughness={0.4} metalness={0.8} />
       </mesh>
-      <mesh position={[-2.65, 8.0, 0]}>
+      <mesh position={[2.85, 8.4, -1.5]}>
         <boxGeometry args={[1.7, 0.9, 0.04]} />
         <meshStandardMaterial
           color={color} emissive={color} emissiveIntensity={0.2}

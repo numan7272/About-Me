@@ -13,6 +13,7 @@ import FollowCamera from "./FollowCamera";
 import Decorations from "./Decorations";
 import Water from "./Water";
 import Birds from "./Birds";
+import River from "./River";
 
 // ─── Landmark positions (single source of truth) ─────────────────────────────
 const LM = {
@@ -72,6 +73,7 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
       <Physics gravity={[0,-18,0]}>
         <Ground landmarkPositions={LM} />
         <Decorations />
+        <River />
 
         {/* HAW logo — full 3D logo just like Designa. The ground decal
             previously rendered in Ground.js was removed so this is the
