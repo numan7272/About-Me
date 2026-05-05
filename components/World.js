@@ -14,6 +14,7 @@ import Decorations from "./Decorations";
 import Water from "./Water";
 import Birds from "./Birds";
 import River from "./River";
+import MobileControls from "./MobileControls";
 
 // ─── Landmark positions (single source of truth) ─────────────────────────────
 const LM = {
@@ -140,6 +141,10 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
 
         <Player playerRef={playerRef} followModeRef={followModeRef} />
       </Physics>
+
+      {/* In-scene 3D joystick (mobile only). Lives outside <Physics> on
+          purpose — it's a HUD prop, not a colliding entity. */}
+      <MobileControls />
 
       {/* Atmosphere — drifting golden dust motes catch the bloom nicely */}
       <Sparkles

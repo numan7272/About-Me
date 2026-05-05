@@ -8,7 +8,6 @@ import * as THREE from "three";
 import World from "./World";
 import InfoCard from "./InfoCard";
 import SocialDock from "./SocialDock";
-import MobileControls from "./MobileControls";
 import MiniMap from "./Hud/MiniMap";
 import SpeedHud from "./Hud/SpeedHud";
 
@@ -110,7 +109,7 @@ export default function Experience() {
             <kbd className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px]">↑ ← ↓ →</kbd>
             {" — or click any building"}
           </span>
-          <span className="md:hidden">Tap the pads to drive — or tap a building</span>
+          <span className="md:hidden">Drag the dial next to the bike — or tap a building</span>
         </div>
       </div>
 
@@ -154,7 +153,6 @@ export default function Experience() {
       <SpeedHud />
 
       <InfoCard card={activeCard} onClose={handleClose} />
-      <MobileControls />
       <SocialDock />
     </main>
   );
