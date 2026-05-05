@@ -12,17 +12,20 @@ const MAX_SPEED  = 7.5;
 const ACCEL      = 6;
 const TURN_SPEED = 2.6;
 
-// ─── Smoke Particle System ────────────────────────────────────────────────────
-// 40 quads recycled via a pool pattern. Each particle stores its state in
-// Float32Arrays so we never allocate per-frame.
+// ─────────────────────────────────────────────────────────────────────────────
+// SMOKE PARTICLES
+// ─────────────────────────────────────────────────────────────────────────────
+// 40 recycled instanced quads. All particle state lives in flat Float32Arrays
+// (zero per-frame GC). InstancedMesh gives a single draw call.
 const SMOKE_COUNT = 40;
 
 function SmokeParticles({ playerRef }) {
-  const meshRef      = useRef();
-  const clockRef     = useRef(0);
-  const nextEmit     = useRef(0);
+  const instRef  = useRef();
+  const clockRef = useRef(0);
+  const nextEmit = useRef(0);
+  const pool     = useRef(0);
 
-  // Per-particle state (all flat arrays, zero GC)
+  // Flat arrays — one slot per particle
   const px   = useRef(new Float32Array(SMOKE_COUNT));
   const py   = useRef(new Float32Array(SMOKE_COUNT));
   const pz   = useRef(new Float32Array(SMOKE_COUNT));
@@ -34,83 +37,69 @@ function SmokeParticles({ playerRef }) {
   const sc   = useRef(new Float32Array(SMOKE_COUNT));
   const rot  = useRef(new Float32Array(SMOKE_COUNT));
   const rvel = useRef(new Float32Array(SMOKE_COUNT));
-  const pool = useRef(0);
 
-  // Shared geometry + material (single draw call)
-  const geo = useMemo(() => {
-    const g = new THREE.PlaneGeometry(1, 1);
-    return g;
-  }, []);
-
-  const mat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: new THREE.Color(0.78, 0.78, 0.82),
+  const dummy   = useMemo(() => new THREE.Object3D(), []);
+  const instGeo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
+  const instMat = useMemo(() => new THREE.MeshBasicMaterial({
+    color: 0xffffff,
     transparent: true,
-    opacity: 0,
     depthWrite: false,
     side: THREE.DoubleSide,
+    vertexColors: true,   // ← required for setColorAt to have any effect
   }), []);
 
-  // We render each particle as a separate mesh child — but all share the same
-  // geometry/material via InstancedMesh for efficiency.
-  const dummy     = useMemo(() => new THREE.Object3D(), []);
-  const colorArr  = useMemo(() => new Float32Array(SMOKE_COUNT * 4), []);
-
-  const instRef = useRef();
-  const instGeo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
-  const instMat = useMemo(() => {
-    const m = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      depthWrite: false,
-      side: THREE.DoubleSide,
-      vertexColors: false,
-    });
-    return m;
-  }, []);
-
+  // Initialise: park all particles off-screen and prime instanceColor buffer
   useEffect(() => {
-    // Initialise all particles as dead (life = 0)
+    const inst = instRef.current;
+    if (!inst) return;
     life.current.fill(0);
-  }, []);
+    const black = new THREE.Color(0, 0, 0);
+    for (let i = 0; i < SMOKE_COUNT; i++) {
+      dummy.position.set(0, -999, 0);
+      dummy.scale.setScalar(0.001);
+      dummy.updateMatrix();
+      inst.setMatrixAt(i, dummy.matrix);
+      inst.setColorAt(i, black);        // ← allocates instanceColor buffer
+    }
+    inst.instanceMatrix.needsUpdate = true;
+    inst.instanceColor.needsUpdate  = true;
+  }, [dummy]);
 
-  useFrame((state, delta) => {
+  const tmpQ  = useMemo(() => new THREE.Quaternion(), []);
+  const tmpB  = useMemo(() => new THREE.Vector3(), []);
+  const tmpC  = useMemo(() => new THREE.Color(), []);
+
+  useFrame((_, delta) => {
     const inst = instRef.current;
     if (!inst) return;
     const body = playerRef.current;
 
     clockRef.current += delta;
-    const t    = clockRef.current;
-    const dt   = Math.min(delta, 0.05);
+    const t  = clockRef.current;
+    const dt = Math.min(delta, 0.05);
 
-    // ── Emission ──────────────────────────────────────────────────────────────
+    // ── Emission ────────────────────────────────────────────────────────────
     let speed = 0;
-    if (body) {
-      const v = body.linvel();
-      speed = Math.hypot(v.x, v.z);
-    }
+    if (body) { const v = body.linvel(); speed = Math.hypot(v.x, v.z); }
 
-    const emitRate = speed > 0.5 ? 0.035 : 0; // seconds between particles
-    if (emitRate > 0 && t > nextEmit.current && body) {
-      nextEmit.current = t + emitRate;
+    if (speed > 0.5 && t > nextEmit.current && body) {
+      nextEmit.current = t + 0.035;
       const i = pool.current % SMOKE_COUNT;
       pool.current++;
 
       const pos  = body.translation();
       const bvel = body.linvel();
+      const r2   = body.rotation();
+      tmpQ.set(r2.x, r2.y, r2.z, r2.w);
+      tmpB.set(0, 0, -0.9).applyQuaternion(tmpQ);
 
-      // Spawn at wheel position (slightly behind + at ground level)
-      const rot2  = body.rotation();
-      const q     = new THREE.Quaternion(rot2.x, rot2.y, rot2.z, rot2.w);
-      const back  = new THREE.Vector3(0, 0, -0.9).applyQuaternion(q);
+      px.current[i] = pos.x + tmpB.x + (Math.random()-0.5)*0.25;
+      py.current[i] = 0.18;
+      pz.current[i] = pos.z + tmpB.z + (Math.random()-0.5)*0.25;
 
-      px.current[i]  = pos.x + back.x + (Math.random()-0.5)*0.25;
-      py.current[i]  = 0.18;
-      pz.current[i]  = pos.z + back.z + (Math.random()-0.5)*0.25;
-
-      const spread = 0.4;
-      vx.current[i]  = -bvel.x * 0.08 + (Math.random()-0.5)*spread;
-      vy.current[i]  = 0.35 + Math.random()*0.55;
-      vz.current[i]  = -bvel.z * 0.08 + (Math.random()-0.5)*spread;
+      vx.current[i] = -bvel.x * 0.08 + (Math.random()-0.5)*0.4;
+      vy.current[i] = 0.35 + Math.random()*0.55;
+      vz.current[i] = -bvel.z * 0.08 + (Math.random()-0.5)*0.4;
 
       const lifeT    = 0.55 + Math.random()*0.45;
       life.current[i] = lifeT;
@@ -120,36 +109,31 @@ function SmokeParticles({ playerRef }) {
       rvel.current[i] = (Math.random()-0.5)*1.2;
     }
 
-    // ── Update & render each particle ────────────────────────────────────────
+    // ── Update all particles ──────────────────────────────────────────────────
     for (let i = 0; i < SMOKE_COUNT; i++) {
       if (life.current[i] <= 0) {
-        // park off-screen
         dummy.position.set(0, -999, 0);
         dummy.scale.setScalar(0.001);
         dummy.updateMatrix();
         inst.setMatrixAt(i, dummy.matrix);
-        inst.setColorAt(i, new THREE.Color(0,0,0));
+        inst.setColorAt(i, tmpC.set(0, 0, 0));
         continue;
       }
 
       life.current[i] -= dt;
 
-      // Update position
       const drag = 1 - 0.9*dt;
-      vx.current[i] *= drag;
-      vz.current[i] *= drag;
-      vy.current[i] -= 0.12*dt; // slight gravity
+      vx.current[i] *= drag;  vz.current[i] *= drag;
+      vy.current[i] -= 0.12*dt;
       px.current[i] += vx.current[i]*dt;
       py.current[i] += vy.current[i]*dt;
       pz.current[i] += vz.current[i]*dt;
       rot.current[i] += rvel.current[i]*dt;
 
-      // Life fraction 0→1 (1=just born, 0=dead)
       const frac  = Math.max(0, life.current[i] / maxL.current[i]);
-      // Grow as it ages, fade out
       const scale = sc.current[i] * (1 + (1-frac)*2.2);
-      const alpha = frac < 0.2 ? frac/0.2 : frac; // fade in quick, linger
-      const finalAlpha = alpha * 0.55;
+      // Fade in fast (0→0.2), then fade out gently (0.2→1)
+      const alpha = (frac < 0.2 ? frac/0.2 : frac) * 0.55;
 
       dummy.position.set(px.current[i], py.current[i], pz.current[i]);
       dummy.rotation.set(0, 0, rot.current[i]);
@@ -157,11 +141,10 @@ function SmokeParticles({ playerRef }) {
       dummy.updateMatrix();
       inst.setMatrixAt(i, dummy.matrix);
 
-      // Grey colour, slightly warm
+      // Premultiply colour by alpha so the BasicMaterial fakes transparency
       const grey = 0.72 + frac*0.12;
-      const col  = new THREE.Color(grey, grey-0.02, grey-0.04);
-      col.multiplyScalar(finalAlpha);
-      inst.setColorAt(i, col);
+      tmpC.set(grey*alpha, (grey-0.02)*alpha, (grey-0.04)*alpha);
+      inst.setColorAt(i, tmpC);
     }
 
     inst.instanceMatrix.needsUpdate = true;
@@ -169,16 +152,18 @@ function SmokeParticles({ playerRef }) {
   });
 
   return (
-    <instancedMesh
-      ref={instRef}
-      args={[instGeo, instMat, SMOKE_COUNT]}
-      frustumCulled={false}
-    />
+    <instancedMesh ref={instRef} args={[instGeo, instMat, SMOKE_COUNT]} frustumCulled={false} />
   );
 }
 
-// ─── Speed-lines (radial streaks when going fast) ─────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// SPEED LINES — radial additive streaks visible at >72% max speed
+// ─────────────────────────────────────────────────────────────────────────────
+// Each line has a seeded radius variation so they feel organic without
+// calling Math.random() inside useFrame (which causes frame-to-frame jitter).
 const LINE_COUNT = 18;
+const LINE_SEED  = Array.from({ length: LINE_COUNT }, () => Math.random());
+
 function SpeedLines({ playerRef }) {
   const groupRef = useRef();
   const linesRef = useRef([]);
@@ -189,106 +174,123 @@ function SpeedLines({ playerRef }) {
     linesRef.current = [];
     for (let i = 0; i < LINE_COUNT; i++) {
       const geo = new THREE.BufferGeometry();
-      const pts = new Float32Array(6); // 2 points × 3 coords
-      geo.setAttribute('position', new THREE.BufferAttribute(pts, 3));
+      geo.setAttribute('position', new THREE.BufferAttribute(new Float32Array(6), 3));
       const mat = new THREE.LineBasicMaterial({
-        color: 0xffffff, transparent: true, opacity: 0,
-        blending: THREE.AdditiveBlending, depthWrite: false,
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
       });
       const line = new THREE.Line(geo, mat);
       line.frustumCulled = false;
       g.add(line);
-      linesRef.current.push({ line, geo });
+      linesRef.current.push({ line, geo, seed: LINE_SEED[i] });
     }
   }, []);
 
   const tmpV = useMemo(() => new THREE.Vector3(), []);
   const tmpQ = useMemo(() => new THREE.Quaternion(), []);
 
-  useFrame((state, delta) => {
+  useFrame((state) => {
     const body = playerRef.current;
     if (!body || !groupRef.current) return;
 
-    const vel    = body.linvel();
-    const speed  = Math.hypot(vel.x, vel.z);
-    const t      = state.clock.getElapsedTime();
-    const active = speed > MAX_SPEED * 0.72;
-    const alpha  = active ? Math.min(1,(speed - MAX_SPEED*0.72)/(MAX_SPEED*0.28)) * 0.28 : 0;
+    const vel   = body.linvel();
+    const speed = Math.hypot(vel.x, vel.z);
+    const t     = state.clock.getElapsedTime();
+    const alpha = speed > MAX_SPEED * 0.72
+      ? Math.min(1, (speed - MAX_SPEED*0.72) / (MAX_SPEED*0.28)) * 0.28
+      : 0;
+
+    if (alpha === 0) {
+      // Hide all lines without touching geometry
+      for (const { line } of linesRef.current) line.material.opacity = 0;
+      return;
+    }
 
     const pos = body.translation();
-    const rot = body.rotation();
-    tmpQ.set(rot.x, rot.y, rot.z, rot.w);
+    const r2  = body.rotation();
+    tmpQ.set(r2.x, r2.y, r2.z, r2.w);
 
-    linesRef.current.forEach(({ line, geo }, i) => {
-      const angleOffset = (i / LINE_COUNT) * Math.PI * 2;
-      const r = 1.8 + Math.sin(t*6 + i)*0.3;
-      const len = 0.6 + Math.random()*0.4;
+    linesRef.current.forEach(({ line, geo, seed }, i) => {
+      const angle = (i / LINE_COUNT) * Math.PI * 2;
+      // Seeded radius variation: no Math.random() in the hot path
+      const r   = 1.6 + seed * 0.8 + Math.sin(t*6 + i)*0.25;
+      const len = 0.55 + seed * 0.45;
 
-      tmpV.set(Math.cos(angleOffset)*r, 0.6, Math.sin(angleOffset)*r);
-      tmpV.applyQuaternion(tmpQ);
+      tmpV.set(Math.cos(angle)*r, 0.55, Math.sin(angle)*r).applyQuaternion(tmpQ);
 
       const pts = geo.attributes.position.array;
-      pts[0] = pos.x + tmpV.x;         pts[1] = pos.y + tmpV.y + 0.3; pts[2] = pos.z + tmpV.z;
-      pts[3] = pos.x + tmpV.x*len;     pts[4] = pos.y + tmpV.y + 0.3; pts[5] = pos.z + tmpV.z*len;
+      pts[0] = pos.x + tmpV.x;       pts[1] = pos.y + 0.3 + tmpV.y; pts[2] = pos.z + tmpV.z;
+      pts[3] = pos.x + tmpV.x*len;   pts[4] = pos.y + 0.3 + tmpV.y; pts[5] = pos.z + tmpV.z*len;
       geo.attributes.position.needsUpdate = true;
 
-      line.material.opacity = alpha * (0.6 + Math.sin(t*14+i)*0.4);
+      // Flicker using seeded phase so each line pulses independently
+      line.material.opacity = alpha * (0.5 + seed * 0.5 + Math.sin(t*12 + seed*10)*0.3);
     });
   });
 
   return <group ref={groupRef} />;
 }
 
-// ─── Skid Mark Decals (instanced quads left on the ground) ───────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// SKID MARKS — instanced quads stamped on the ground when turning
+// ─────────────────────────────────────────────────────────────────────────────
 const SKID_MAX = 60;
+
 function SkidMarks({ playerRef }) {
   const instRef  = useRef();
   const dummy    = useMemo(() => new THREE.Object3D(), []);
   const skidGeo  = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
   const skidMat  = useMemo(() => new THREE.MeshBasicMaterial({
-    color: 0x111116, transparent: true, opacity: 0.45,
-    depthWrite: false, side: THREE.DoubleSide,
+    color: 0xffffff,        // colour driven by setColorAt
+    transparent: true,
+    opacity: 1.0,           // opacity baked into vertex colour via setColorAt
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    vertexColors: true,     // ← required for setColorAt
   }), []);
 
   const nextSkid = useRef(0);
   const headIdx  = useRef(0);
-  const alphas   = useRef(new Float32Array(SKID_MAX).fill(0));
   const tmpQ     = useMemo(() => new THREE.Quaternion(), []);
   const tmpE     = useMemo(() => new THREE.Euler(), []);
+  const tmpC     = useMemo(() => new THREE.Color(), []);
 
   useEffect(() => {
     const inst = instRef.current;
     if (!inst) return;
-    // Park all off-screen initially
+    const black = new THREE.Color(0, 0, 0);
     for (let i = 0; i < SKID_MAX; i++) {
-      dummy.position.set(0, -999, 0); dummy.scale.setScalar(0.001); dummy.updateMatrix();
+      dummy.position.set(0, -999, 0);
+      dummy.scale.setScalar(0.001);
+      dummy.updateMatrix();
       inst.setMatrixAt(i, dummy.matrix);
-      inst.setColorAt(i, new THREE.Color(0,0,0));
+      inst.setColorAt(i, black);  // ← allocates instanceColor buffer
     }
     inst.instanceMatrix.needsUpdate = true;
+    inst.instanceColor.needsUpdate  = true;
   }, [dummy]);
 
-  useFrame((state, delta) => {
+  useFrame((state) => {
     const inst = instRef.current;
     const body = playerRef.current;
     if (!inst || !body) return;
 
     const vel   = body.linvel();
     const speed = Math.hypot(vel.x, vel.z);
-    const rot2  = body.rotation();
+    const angV  = body.angvel();
     const t     = state.clock.getElapsedTime();
 
-    // Emit a skid mark stamp when turning at speed
-    const angVel = body.angvel();
-    const isTurning = Math.abs(angVel.y) > 0.4 && speed > 1.5;
-
-    if (isTurning && t > nextSkid.current) {
+    if (Math.abs(angV.y) > 0.4 && speed > 1.5 && t > nextSkid.current) {
       nextSkid.current = t + 0.08;
       const i   = headIdx.current % SKID_MAX;
       headIdx.current++;
 
       const pos = body.translation();
-      tmpQ.set(rot2.x, rot2.y, rot2.z, rot2.w);
+      const r2  = body.rotation();
+      tmpQ.set(r2.x, r2.y, r2.z, r2.w);
       tmpE.setFromQuaternion(tmpQ, 'YXZ');
 
       dummy.position.set(pos.x, 0.013, pos.z);
@@ -297,9 +299,8 @@ function SkidMarks({ playerRef }) {
       dummy.updateMatrix();
       inst.setMatrixAt(i, dummy.matrix);
 
-      const dark = 0.07 + Math.random()*0.04;
-      inst.setColorAt(i, new THREE.Color(dark, dark, dark*1.05));
-      alphas.current[i] = 1;
+      const v = 0.07 + Math.random()*0.04;
+      inst.setColorAt(i, tmpC.set(v, v, v * 1.05));
 
       inst.instanceMatrix.needsUpdate = true;
       inst.instanceColor.needsUpdate  = true;
@@ -307,18 +308,13 @@ function SkidMarks({ playerRef }) {
   });
 
   return (
-    <instancedMesh
-      ref={instRef}
-      args={[skidGeo, skidMat, SKID_MAX]}
-      frustumCulled={false}
-    />
+    <instancedMesh ref={instRef} args={[skidGeo, skidMat, SKID_MAX]} frustumCulled={false} />
   );
 }
 
-// ─── Bike lean (tilt into turns) ─────────────────────────────────────────────
-const leanAngle = { value: 0 };
-
-// ─── VanMoof Model ────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// BIKE MODEL  (lean animation baked in)
+// ─────────────────────────────────────────────────────────────────────────────
 function VanMoofModel({ scale = 1, leanRef }) {
   const { scene } = useGLTF(BIKE_URL);
   const groupRef  = useRef();
@@ -337,10 +333,11 @@ function VanMoofModel({ scale = 1, leanRef }) {
   }, [scene]);
 
   useFrame((_, delta) => {
-    if (!groupRef.current || !leanRef) return;
-    const target = leanRef.current;
+    if (!groupRef.current || leanRef === null || leanRef === undefined) return;
     groupRef.current.rotation.z = THREE.MathUtils.lerp(
-      groupRef.current.rotation.z, target, Math.min(1, 8*delta),
+      groupRef.current.rotation.z,
+      leanRef.current,
+      Math.min(1, 8 * delta),
     );
   });
 
@@ -353,12 +350,14 @@ function VanMoofModel({ scale = 1, leanRef }) {
 
 useGLTF.preload(BIKE_URL);
 
-// ─── Player ───────────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────────────────────
+// PLAYER
+// ─────────────────────────────────────────────────────────────────────────────
 export default function Player({ playerRef, followModeRef }) {
-  const [, getKeys]  = useKeyboardControls();
-  const leanRef      = useRef(0);
-  const tmpForward   = useMemo(() => new THREE.Vector3(), []);
-  const tmpQuat      = useMemo(() => new THREE.Quaternion(), []);
+  const [, getKeys] = useKeyboardControls();
+  const leanRef     = useRef(0);
+  const tmpForward  = useMemo(() => new THREE.Vector3(), []);
+  const tmpQuat     = useMemo(() => new THREE.Quaternion(), []);
 
   useFrame((_, delta) => {
     const body = playerRef.current;
@@ -378,8 +377,8 @@ export default function Player({ playerRef, followModeRef }) {
     const fwdIn  = (forwardDown  ? 1 : 0) - (backwardDown ? 1 : 0);
     const turnIn = (leftDown     ? 1 : 0) - (rightDown    ? 1 : 0);
 
-    const rot = body.rotation();
-    tmpQuat.set(rot.x, rot.y, rot.z, rot.w);
+    const r2 = body.rotation();
+    tmpQuat.set(r2.x, r2.y, r2.z, r2.w);
     tmpForward.set(0, 0, 1).applyQuaternion(tmpQuat);
 
     const targetSpeed = fwdIn * MAX_SPEED * (brakeDown ? 0 : 1);
@@ -388,28 +387,25 @@ export default function Player({ playerRef, followModeRef }) {
     const brakeT = brakeDown ? Math.min(1, 10 * delta) : lerpT;
 
     body.setLinvel({
-      x: brakeDown
-        ? THREE.MathUtils.lerp(cur.x, 0, brakeT)
-        : THREE.MathUtils.lerp(cur.x, tmpForward.x * targetSpeed, lerpT),
+      x: THREE.MathUtils.lerp(cur.x, brakeDown ? 0 : tmpForward.x * targetSpeed, brakeDown ? brakeT : lerpT),
       y: cur.y,
-      z: brakeDown
-        ? THREE.MathUtils.lerp(cur.z, 0, brakeT)
-        : THREE.MathUtils.lerp(cur.z, tmpForward.z * targetSpeed, lerpT),
+      z: THREE.MathUtils.lerp(cur.z, brakeDown ? 0 : tmpForward.z * targetSpeed, brakeDown ? brakeT : lerpT),
     }, true);
 
     const groundSpeed = Math.hypot(cur.x, cur.z);
     const speedFactor = turnIn !== 0
       ? THREE.MathUtils.clamp(groundSpeed / MAX_SPEED, 0.55, 1)
       : 0;
+
     body.setAngvel({
       x: 0,
       y: turnIn !== 0 ? turnIn * TURN_SPEED * speedFactor : 0,
       z: 0,
     }, true);
 
-    // ── Lean into turns ─────────────────────────────────────────────────────
+    // Lean: target angle proportional to turn input × speed
     const targetLean = -turnIn * speedFactor * 0.18;
-    leanRef.current = THREE.MathUtils.lerp(leanRef.current, targetLean, Math.min(1,6*delta));
+    leanRef.current  = THREE.MathUtils.lerp(leanRef.current, targetLean, Math.min(1, 6*delta));
   });
 
   return (
@@ -430,7 +426,7 @@ export default function Player({ playerRef, followModeRef }) {
         <VanMoofModel scale={1} leanRef={leanRef} />
       </RigidBody>
 
-      {/* Effects live OUTSIDE the RigidBody (world-space) */}
+      {/* Effects rendered in world-space, outside the RigidBody */}
       <SmokeParticles playerRef={playerRef} />
       <SpeedLines     playerRef={playerRef} />
       <SkidMarks      playerRef={playerRef} />
