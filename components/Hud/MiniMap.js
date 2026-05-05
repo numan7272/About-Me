@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { Map as MapIcon, X } from "lucide-react";
 import { bikeState, MAP_META } from "@/lib/bikeStore";
 
 const SIZE = 144;
@@ -8,13 +9,20 @@ const SIZE = 144;
 /**
  * Compact canvas mini-map fixed in the top-right corner.
  *
- * Renders the island silhouette, every landmark marker, and a triangle
- * representing the bike (rotated by its yaw). Self-driven via rAF, so it
- * never causes React re-renders.
+ * Closed by default on mobile (< md breakpoint) — surface a small icon
+ * button instead. On desktop opens by default. The canvas redraw loop
+ * pauses while collapsed so it doesn't waste a per-frame allocation.
  */
 export default function MiniMap({ activeId }) {
   const canvasRef = useRef(null);
   const activeRef = useRef(activeId);
+  const [isOpen, setIsOpen]   = useState(true);
+
+  // Default state per breakpoint, set after mount to avoid SSR mismatch
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    setIsOpen(window.matchMedia("(min-width: 768px)").matches);
+  }, []);
 
   // Keep the rAF loop seeing the latest activeId without re-binding
   useEffect(() => {
@@ -22,6 +30,7 @@ export default function MiniMap({ activeId }) {
   }, [activeId]);
 
   useEffect(() => {
+    if (!isOpen) return;
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
@@ -34,12 +43,11 @@ export default function MiniMap({ activeId }) {
     const half = SIZE / 2;
     const islandRadius = MAP_META.islandSize / 2;
     const padding = 8;
-    const drawScale = (half - padding) / islandRadius; // world unit → px
+    const drawScale = (half - padding) / islandRadius;
 
     const draw = () => {
       ctx.clearRect(0, 0, SIZE, SIZE);
 
-      // Island disc background
       ctx.beginPath();
       ctx.arc(half, half, half - 2, 0, Math.PI * 2);
       ctx.fillStyle = "rgba(28, 38, 60, 0.55)";
@@ -48,20 +56,17 @@ export default function MiniMap({ activeId }) {
       ctx.strokeStyle = "rgba(120, 200, 255, 0.4)";
       ctx.stroke();
 
-      // North marker
       ctx.fillStyle = "rgba(190, 220, 255, 0.55)";
       ctx.font = "10px system-ui, sans-serif";
       ctx.textAlign = "center";
       ctx.fillText("N", half, 12);
 
-      // Landmark dots
       const id = activeRef.current;
       MAP_META.landmarks.forEach((lm) => {
         const x = half + lm.x * drawScale;
         const y = half + lm.z * drawScale;
         const isActive = id === lm.id;
 
-        // Pulsing glow when active
         if (isActive) {
           const t = (performance.now() / 600) % (Math.PI * 2);
           const r = 8 + Math.sin(t) * 2.5;
@@ -80,12 +85,10 @@ export default function MiniMap({ activeId }) {
         ctx.stroke();
       });
 
-      // Bike marker (triangle pointing forward)
       const bx = half + bikeState.x * drawScale;
       const by = half + bikeState.z * drawScale;
       ctx.save();
       ctx.translate(bx, by);
-      // Yaw 0 = facing -Z (north); rotate canvas so triangle points there
       ctx.rotate(bikeState.yaw);
       ctx.beginPath();
       ctx.moveTo(0, -7);
@@ -104,19 +107,44 @@ export default function MiniMap({ activeId }) {
 
     draw();
     return () => cancelAnimationFrame(rafId);
-  }, []);
+  }, [isOpen]);
 
+  // ── Closed: small toggle button ─────────────────────────────────────────
+  if (!isOpen) {
+    return (
+      <button
+        type="button"
+        onClick={() => setIsOpen(true)}
+        aria-label="Karte öffnen"
+        className="pointer-events-auto absolute right-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-zinc-900/55 text-zinc-200 shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-xl ring-1 ring-white/5 transition hover:bg-white/10 hover:text-white"
+      >
+        <MapIcon size={16} strokeWidth={2.2} />
+      </button>
+    );
+  }
+
+  // ── Open: full mini-map ─────────────────────────────────────────────────
   return (
     <div
-      className="pointer-events-none absolute right-5 top-5 z-30 select-none"
+      className="pointer-events-auto absolute right-4 top-4 z-30 select-none"
       aria-hidden
     >
       <div
         className="relative rounded-2xl border border-white/10 bg-zinc-900/55 p-2 shadow-[0_10px_30px_rgba(0,0,0,0.5)] backdrop-blur-xl ring-1 ring-white/5"
         style={{ width: SIZE + 16, height: SIZE + 30 }}
       >
-        <div className="mb-1 px-1 text-[9px] font-medium uppercase tracking-[0.22em] text-zinc-400">
-          Map
+        <div className="flex items-center justify-between px-1 pb-1">
+          <span className="text-[9px] font-medium uppercase tracking-[0.22em] text-zinc-400">
+            Map
+          </span>
+          <button
+            type="button"
+            onClick={() => setIsOpen(false)}
+            aria-label="Karte schließen"
+            className="pointer-events-auto -mr-0.5 flex h-5 w-5 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/10 hover:text-white"
+          >
+            <X size={11} strokeWidth={2.4} />
+          </button>
         </div>
         <canvas
           ref={canvasRef}

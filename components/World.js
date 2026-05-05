@@ -73,21 +73,17 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
         <Ground landmarkPositions={LM} />
         <Decorations />
 
-        {/*
-          FIX #5: HAW landmark no longer duplicates the ground decal.
-          The ground decal (HawGroundDecal in Ground.js) is the ONLY visual.
-          Here we only add the physics collider + sensor + click zone via
-          floating={false} and model prop pointing to the GLB — but we DON'T
-          apply a Y rotation to a flat floor logo (it would rotate the flat plane
-          around Y which has no visual effect and could confuse future edits).
-          The sensor / collider still work perfectly.
-        */}
+        {/* HAW logo — full 3D logo just like Designa. The ground decal
+            previously rendered in Ground.js was removed so this is the
+            only HAW visual. */}
         <Landmark id="haw"
+          model="/haw-logo-transformed.glb"
           position={[LM.haw.x, 0, LM.haw.z]}
-          colliderHalfExtents={[3.0, 1.0, 1.0]}
-          sensorHalfExtents={[6.5, 3.5, 6.5]}
+          rotation={[0, faceHQ(LM.haw.x, LM.haw.z), 0]}
+          colliderHalfExtents={[3.2, 2.8, 1.0]}
+          sensorHalfExtents={[6.5, 4.0, 6.5]}
           color="#22d3ee" glow="#06b6d4" label="HAW Kiel"
-          hideVisual
+          modelScale={10} glossy floating
           onEnter={onEnter} onExit={onExit} onClickOpen={onClickOpen}
         />
 

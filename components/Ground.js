@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo } from "react";
-import { useGLTF } from "@react-three/drei";
 import { RigidBody, CuboidCollider } from "@react-three/rapier";
 import * as THREE from "three";
 
@@ -139,43 +138,6 @@ function PlazaTile({ position, radius = 7 }) {
   );
 }
 
-// ─── HAW Logo decal — flat on ground inside plaza ────────────────────────────
-// Scale 3 — original proportions, not oversized.
-function HawGroundDecal({ position }) {
-  const { scene } = useGLTF("/haw-logo-transformed.glb");
-  const cloned = useMemo(() => {
-    const c = scene.clone(true);
-    c.traverse((o) => {
-      if (!o.isMesh) return;
-      o.receiveShadow = true;
-      o.castShadow    = false;
-      if (o.material) {
-        const m = o.material.clone();
-        m.roughness           = 0.15;
-        m.metalness           = 0.85;
-        m.envMapIntensity     = 1.6;
-        m.polygonOffset       = true;
-        m.polygonOffsetFactor = -6;
-        m.polygonOffsetUnits  = -6;
-        o.material    = m;
-        o.renderOrder = 6;
-      }
-    });
-    return c;
-  }, [scene]);
-
-  return (
-    <group
-      position={[position[0], LOGO_Y, position[2]]}
-      rotation={[-Math.PI / 2, 0, 0]}
-      scale={3}
-    >
-      <primitive object={cloned} />
-    </group>
-  );
-}
-useGLTF.preload("/haw-logo-transformed.glb");
-
 // ─── Ground (main export) ─────────────────────────────────────────────────────
 export default function Ground({ landmarkPositions }) {
   // FIX #2: use module-level constant arrays so useMemo has stable deps
@@ -239,8 +201,6 @@ export default function Ground({ landmarkPositions }) {
       <PlazaTile position={[sx, 0, sz]} radius={7.0} />
 
       {roads.map((r, i) => <Road key={i} {...r} />)}
-
-      <HawGroundDecal position={[hx, 0, hz]} />
 
       <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.04, 0]} renderOrder={1}>
         <ringGeometry args={[HALF - 2.0, HALF - 1.2, 128]} />

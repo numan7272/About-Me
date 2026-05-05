@@ -312,9 +312,51 @@ function Rock({ position, seed = 1 }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Road / plaza exclusion — keep trees and lamps off the streets
+// ─────────────────────────────────────────────────────────────────────────────
+const ROAD_SEGMENTS = [
+  [[  0,   0], [-38, -35]],   // HQ ↔ HAW
+  [[  0,   0], [ 42, -22]],   // HQ ↔ Designa
+  [[  0,   0], [  8,  40]],   // HQ ↔ Kebab
+  [[  0,   0], [-36,  32]],   // HQ ↔ Highschool
+  [[-38, -35], [ 42, -22]],   // HAW ↔ Designa
+  [[-36,  32], [-38, -35]],   // Highschool ↔ HAW
+];
+const ROAD_CLEARANCE = 5.0;   // metres from any road centre-line
+
+const PLAZAS = [
+  [  0,   0, 9.5],
+  [-38, -35, 8.0],
+  [ 42, -22, 8.0],
+  [  8,  40, 8.0],
+  [-36,  32, 8.0],
+];
+
+function distToSeg(px, pz, ax, az, bx, bz) {
+  const dx = bx - ax, dz = bz - az;
+  const len2 = dx * dx + dz * dz;
+  if (len2 < 1e-6) return Math.hypot(px - ax, pz - az);
+  let t = ((px - ax) * dx + (pz - az) * dz) / len2;
+  t = Math.max(0, Math.min(1, t));
+  return Math.hypot(px - (ax + t * dx), pz - (az + t * dz));
+}
+
+function isOnRoad(x, z) {
+  return ROAD_SEGMENTS.some(([[ax, az], [bx, bz]]) =>
+    distToSeg(x, z, ax, az, bx, bz) < ROAD_CLEARANCE,
+  );
+}
+
+function isInPlaza(x, z) {
+  return PLAZAS.some(([px, pz, r]) => Math.hypot(x - px, z - pz) < r);
+}
+
+const isBlocked = (x, z) => isOnRoad(x, z) || isInPlaza(x, z);
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Layout data — hand-placed, path-safe, landmark-safe
 // ─────────────────────────────────────────────────────────────────────────────
-const TREES = [
+const TREES_RAW = [
   [-55, 0, -50], [-50, 0, 15], [-55, 0, 45],
   [ 55, 0,  50], [ 50, 0,-45], [ 55, 0,  5],
   [ -8, 0, -55], [ 18, 0,-55], [-22, 0, -52],
@@ -324,7 +366,9 @@ const TREES = [
   [-22, 0, -10], [ 10, 0, -22], [-12, 0,  15],
 ];
 
-const LAMPS = [
+// Hand-placed lamp slots — many overlap roads/plazas. The filter at the
+// bottom of this file removes any that fall on a path.
+const LAMPS_RAW = [
   // Along north-south spine
   [  0, 0,  18], [  0, 0, -18],
   [  0, 0,  30], [  0, 0, -30],
@@ -334,6 +378,10 @@ const LAMPS = [
   // Quad corners
   [ 20, 0,  20], [-20, 0, -20],
   [ 20, 0, -20], [-20, 0,  20],
+  // Outer ring of lamps — well clear of every road
+  [-46, 0,   0], [ 46, 0,   0],
+  [  0, 0,  46], [  0, 0, -46],
+  [ 32, 0,  32], [-32, 0, -32],
 ];
 
 const HOUSES = [
@@ -356,6 +404,10 @@ const ROCKS = [
   [  0, 0,  48], [ 48, 0,  18], [-48, 0, -18],
   [ 30, 0,  30], [-30, 0,  30], [ 15, 0, -45],
 ];
+
+// Apply the road / plaza filter exactly once at module load
+const TREES = TREES_RAW.filter(([x, , z]) => !isBlocked(x, z));
+const LAMPS = LAMPS_RAW.filter(([x, , z]) => !isBlocked(x, z));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FIREFLIES — small instanced orbs that orbit around each lamppost

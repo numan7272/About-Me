@@ -115,9 +115,10 @@ export default function Experience() {
         </div>
       </div>
 
-      {/* Zentrieren button */}
+      {/* Zentrieren button — sits above the social dock so they never collide */}
       <button
-        className="pointer-events-auto absolute bottom-8 left-1/2 z-30 -translate-x-1/2 rounded-full border border-white/15 bg-black/40 px-5 py-2 text-[12px] text-white/80 backdrop-blur-md transition hover:bg-white/10 hover:text-white"
+        className="pointer-events-auto absolute left-1/2 z-30 -translate-x-1/2 rounded-full border border-white/15 bg-black/40 px-5 py-2 text-[12px] text-white/80 backdrop-blur-md transition hover:bg-white/10 hover:text-white
+                   bottom-20 md:bottom-20"
         onClick={() => { followModeRef.current = true; }}
       >
         Zentrieren
