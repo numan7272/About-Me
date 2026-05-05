@@ -28,7 +28,7 @@ const WATER_FRAG = /* glsl */ `
   uniform float uTime;
   varying vec3 vWorldPos;
 
-  // Sharp band centred on `centre` of width `w` — used to convert a
+  // Sharp band centred on the given offset of width w — used to convert a
   // smooth signal into a thin bright stripe.
   float band(float v, float centre, float w) {
     return 1.0 - smoothstep(0.0, w, abs(v - centre));
