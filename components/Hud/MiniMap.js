@@ -124,7 +124,7 @@ export default function MiniMap({ activeId }) {
       <button
         type="button"
         onClick={() => setIsOpen(true)}
-        aria-label="Karte öffnen"
+        aria-label="Open map"
         className="pointer-events-auto absolute right-4 top-4 z-30 flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-zinc-900/55 text-zinc-200 shadow-[0_8px_24px_rgba(0,0,0,0.5)] backdrop-blur-xl ring-1 ring-white/5 transition hover:bg-white/10 hover:text-white"
       >
         <MapIcon size={16} strokeWidth={2.2} />
@@ -146,7 +146,7 @@ export default function MiniMap({ activeId }) {
           <button
             type="button"
             onClick={() => setIsOpen(false)}
-            aria-label="Karte schließen"
+            aria-label="Close map"
             className="pointer-events-auto -mr-0.5 flex h-5 w-5 items-center justify-center rounded-full text-zinc-400 transition hover:bg-white/10 hover:text-white"
           >
             <X size={11} strokeWidth={2.4} />
@@ -172,7 +172,7 @@ export default function MiniMap({ activeId }) {
                 key={lm.id}
                 type="button"
                 onClick={() => teleportRequest(lm.id)}
-                aria-label={`Schnellreise zu ${LM_LABEL[lm.id] ?? lm.id}`}
+                aria-label={`Quick travel to ${LM_LABEL[lm.id] ?? lm.id}`}
                 title={LM_LABEL[lm.id] ?? lm.id}
                 className="group absolute rounded-full transition hover:scale-110"
                 style={{
@@ -198,7 +198,7 @@ export default function MiniMap({ activeId }) {
         </div>
 
         <p className="mt-1 px-1 text-[8.5px] uppercase tracking-[0.2em] text-zinc-500">
-          Klicke ein Symbol
+          Tap an icon
         </p>
       </div>
     </div>

@@ -73,6 +73,52 @@ export const LANDMARKS = {
   },
 };
 
+// Hidden discoveries scattered across the map — clickable little props
+// with their own story cards. They share the InfoCard schema so the
+// existing overlay system handles them with no changes.
+export const EASTER_EGGS = {
+  raspberrypi: {
+    id: "raspberrypi",
+    title: "Hardware Hacking & OSINT",
+    subtitle: "Easter Egg · Raspberry Pi Zero",
+    timeframe: "Hidden",
+    text: "A Raspberry Pi Zero? The perfect tool for invisible network setups and custom security gadgets. I love going beyond writing code — modifying hardware and configuring systems like Kali Linux from the ground up for specific use cases. Real cybersecurity understanding doesn't stop at code; it starts at the hardware.",
+    skills: ["Kali Linux", "Hardware Modding", "OSINT"],
+    color: "#a3e635",
+    accent: "#65a30d",
+  },
+  router: {
+    id: "router",
+    title: "The Gastro Pentest",
+    subtitle: "Easter Egg · Compromised Router",
+    timeframe: "Hidden",
+    text: "Three years in the family business meant more than just running the till and serving customers. I used the shop as my first security lab and ran a hands-on review of the network. Result: open ports and unsecured camera systems. I isolated the network, implemented port filtering, and hardened the passwords. Real-world security problem-solving.",
+    skills: ["Network Audit", "Port Filtering", "Wi-Fi Hardening"],
+    color: "#fb923c",
+    accent: "#ea580c",
+  },
+  container: {
+    id: "container",
+    title: "Self-Hosted Architectures",
+    subtitle: "Easter Egg · Shipping Container",
+    timeframe: "Hidden",
+    text: "Why rely on someone else's cloud when you can build the architecture yourself? With \"Funke\" I built a complete real-time communication platform (WebRTC, Node.js, Socket.IO). With \"Synapser\" a backend using FastAPI and Google OR-Tools. Everything containerised in Docker and self-hosted. I want full control over my own infrastructure.",
+    skills: ["Docker", "WebRTC", "FastAPI", "Self-Hosted"],
+    color: "#22d3ee",
+    accent: "#0891b2",
+  },
+  weight: {
+    id: "weight",
+    title: "Resistance & Growth",
+    subtitle: "Easter Egg · 20 kg Plate",
+    timeframe: "Hidden",
+    text: "Gym membership since late 2019, actively grinding since January 2022. At 183 cm and 109 kg it isn't just about raw strength — it's the counterweight to hours sitting in front of code. Strength training teaches a simple truth that also applies in IT: without consistent resistance there is no growth. Not in muscle, and not in solving complex backend bugs.",
+    skills: ["Strength Training", "Discipline", "Mind-Body Balance"],
+    color: "#f472b6",
+    accent: "#ec4899",
+  },
+};
+
 // FIX #9: fov 50 for better overview of the 130-unit island
 const INITIAL_CAMERA = { fov: 50, position: [14, 18, 14], near: 0.5, far: 300 };
 
@@ -90,7 +136,7 @@ export default function Experience() {
   const handleClose     = useCallback(() => setActiveId(null), []);
 
   const activeCard = useMemo(
-    () => (activeId ? LANDMARKS[activeId] : null),
+    () => (activeId ? (LANDMARKS[activeId] ?? EASTER_EGGS[activeId] ?? null) : null),
     [activeId],
   );
 
@@ -114,13 +160,13 @@ export default function Experience() {
         </div>
       </div>
 
-      {/* Zentrieren button — sits above the social dock so they never collide */}
+      {/* Recenter button — sits above the social dock so they never collide */}
       <button
         className="pointer-events-auto absolute left-1/2 z-30 -translate-x-1/2 rounded-full border border-white/15 bg-black/40 px-5 py-2 text-[12px] text-white/80 backdrop-blur-md transition hover:bg-white/10 hover:text-white
                    bottom-20 md:bottom-20"
         onClick={() => { followModeRef.current = true; }}
       >
-        Zentrieren
+        Recenter
       </button>
 
       <KeyboardControls map={KEY_MAP}>

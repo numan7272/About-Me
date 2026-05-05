@@ -14,6 +14,7 @@ import Decorations from "./Decorations";
 import Water from "./Water";
 import Birds from "./Birds";
 import MobileControls from "./MobileControls";
+import EasterEggs from "./EasterEggs";
 
 // ─── Landmark positions (single source of truth) ─────────────────────────────
 const LM = {
@@ -143,6 +144,11 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
       {/* In-scene 3D joystick (mobile only). Lives outside <Physics> on
           purpose — it's a HUD prop, not a colliding entity. */}
       <MobileControls />
+
+      {/* Hidden discoveries — small clickable props that open their own
+          info card. Kept outside Physics: pointer events use R3F's
+          raycaster, no rigid body required. */}
+      <EasterEggs onClickOpen={onClickOpen} />
 
       {/* Atmosphere — drifting golden dust motes catch the bloom nicely */}
       <Sparkles
