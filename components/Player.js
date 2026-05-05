@@ -293,6 +293,126 @@ function SkidMarks({ playerRef }) {
   );
 }
 
+// ─── Grass Trail ─────────────────────────────────────────────────────────────
+// Flat dirt-patch instances laid down behind the bike whenever it's rolling
+// on the meadow (i.e. anywhere off the paved roads).  Looks like crushed-grass
+// tracks fading into the field. Recycles oldest entries once full.
+const TRAIL_MAX = 90;
+
+// Road segments duplicated from Decorations.js — the grass trail is suppressed
+// on tarmac because tracks would read as litter on a paved road.
+const TRAIL_ROAD_SEG = [
+  [[  0,   0], [-38, -35]],
+  [[  0,   0], [ 42, -22]],
+  [[  0,   0], [  8,  40]],
+  [[  0,   0], [-36,  32]],
+  [[-38, -35], [ 42, -22]],
+  [[ 42, -22], [  8,  40]],
+  [[  8,  40], [-36,  32]],
+  [[-36,  32], [-38, -35]],
+];
+const TRAIL_ROAD_HALF = 3.0;        // a hair narrower than the visual road
+
+function distToSegSq(px, pz, ax, az, bx, bz) {
+  const dx = bx - ax, dz = bz - az;
+  const len2 = dx * dx + dz * dz;
+  if (len2 < 1e-6) return (px - ax) ** 2 + (pz - az) ** 2;
+  let t = ((px - ax) * dx + (pz - az) * dz) / len2;
+  t = Math.max(0, Math.min(1, t));
+  const cx = ax + t * dx;
+  const cz = az + t * dz;
+  return (px - cx) ** 2 + (pz - cz) ** 2;
+}
+
+function isOnTarmac(x, z) {
+  const r2 = TRAIL_ROAD_HALF * TRAIL_ROAD_HALF;
+  for (const [[ax, az], [bx, bz]] of TRAIL_ROAD_SEG) {
+    if (distToSegSq(x, z, ax, az, bx, bz) < r2) return true;
+  }
+  return false;
+}
+
+function GrassTrail({ playerRef }) {
+  const instRef  = useRef();
+  const dummy    = useMemo(() => new THREE.Object3D(), []);
+  const tmpQ     = useMemo(() => new THREE.Quaternion(), []);
+  const tmpE     = useMemo(() => new THREE.Euler(), []);
+  const tmpC     = useMemo(() => new THREE.Color(), []);
+  const trailGeo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
+  const trailMat = useMemo(() => new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 1.0,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+    vertexColors: true,
+  }), []);
+
+  const nextDrop = useRef(0);
+  const headIdx  = useRef(0);
+
+  useEffect(() => {
+    const inst = instRef.current;
+    if (!inst) return;
+    const dim = new THREE.Color(0, 0, 0);
+    for (let i = 0; i < TRAIL_MAX; i++) {
+      dummy.position.set(0, -999, 0);
+      dummy.scale.setScalar(0.001);
+      dummy.updateMatrix();
+      inst.setMatrixAt(i, dummy.matrix);
+      inst.setColorAt(i, dim);
+    }
+    inst.instanceMatrix.needsUpdate = true;
+    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+  }, [dummy]);
+
+  useFrame((state) => {
+    const inst = instRef.current;
+    const body = playerRef.current;
+    if (!inst || !body) return;
+
+    const vel   = body.linvel();
+    const speed = Math.hypot(vel.x, vel.z);
+    const t     = state.clock.getElapsedTime();
+    if (speed < 1.2) return;
+
+    const pos = body.translation();
+    if (isOnTarmac(pos.x, pos.z)) return;
+
+    // Drop a patch every 0.06 s of grass-rolling — gives a continuous trail
+    // at top speed without exhausting the 90-slot pool too quickly.
+    if (t < nextDrop.current) return;
+    nextDrop.current = t + 0.06;
+
+    const r2 = body.rotation();
+    tmpQ.set(r2.x, r2.y, r2.z, r2.w);
+    tmpE.setFromQuaternion(tmpQ, "YXZ");
+
+    const i = headIdx.current % TRAIL_MAX;
+    headIdx.current++;
+
+    dummy.position.set(pos.x, 0.014, pos.z);
+    dummy.rotation.set(-Math.PI / 2, 0, tmpE.y);
+    // Wider than skid marks (the bike is rolling, not sliding) and a bit
+    // shorter so trail patches read as discrete crushed-grass prints.
+    dummy.scale.set(0.55 + Math.random() * 0.18, 0.7 + Math.random() * 0.25, 1);
+    dummy.updateMatrix();
+    inst.setMatrixAt(i, dummy.matrix);
+
+    // Earthy dark olive — variation per patch so the trail isn't a uniform
+    // stripe. Pre-multiplied by a low alpha-equivalent for depthWrite=false.
+    const v = 0.10 + Math.random() * 0.05;
+    inst.setColorAt(i, tmpC.set(v * 0.95, v * 1.05, v * 0.55));
+
+    inst.instanceMatrix.needsUpdate = true;
+    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh ref={instRef} args={[trailGeo, trailMat, TRAIL_MAX]} frustumCulled={false} receiveShadow />
+  );
+}
+
 // ─── Drift Sparks ────────────────────────────────────────────────────────────
 // Bright additively-blended particles that fly outward from the wheels when
 // the bike is mid-drift (sharp turn at speed). They're tiny, very short-lived,
@@ -665,6 +785,7 @@ export default function Player({ playerRef, followModeRef }) {
       <SpeedLines     playerRef={playerRef} />
       <SkidMarks      playerRef={playerRef} />
       <DriftSparks    playerRef={playerRef} />
+      <GrassTrail     playerRef={playerRef} />
     </>
   );
 }

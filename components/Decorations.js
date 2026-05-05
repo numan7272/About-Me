@@ -32,11 +32,15 @@ const GRASS_VERT = /* glsl */`
   uniform float uTime;
   uniform float uWindStrength;    // 0 → 1
 
+  varying float vTip;
+  varying float vSway;
+
   void main() {
     #include <begin_vertex>
 
     // Normalised height of this vertex inside the local cone (0 = root, 1 = tip)
-    float tipFactor = smoothstep(0.0, 1.0, (position.y + 0.001) / 0.55);
+    // Cone height is 0.95 (see geometry args below); normalize against that.
+    float tipFactor = smoothstep(0.0, 1.0, (position.y + 0.001) / 0.95);
 
     // Combine two sine waves with different frequencies — natural-feeling sway
     float wave  = sin(uTime * 1.6 + instanceSway) * 0.55
@@ -44,6 +48,9 @@ const GRASS_VERT = /* glsl */`
 
     transformed.x += wave * tipFactor * uWindStrength;
     transformed.z += wave * tipFactor * uWindStrength * 0.4;
+
+    vTip  = tipFactor;
+    vSway = instanceSway;
 
     #include <project_vertex>
     #include <fog_vertex>
@@ -54,17 +61,30 @@ const GRASS_FRAG = /* glsl */`
   #include <common>
   #include <fog_pars_fragment>
 
+  varying float vTip;
+  varying float vSway;
+
   void main() {
-    // Simple gradient from dark base to bright tip using screen-space dFdy
-    float brightness = 0.55 + dFdx(gl_FragCoord.y) * 0.0 + 0.45 * gl_FragCoord.y / 600.0;
-    gl_FragColor = vec4(mix(vec3(0.15, 0.45, 0.18), vec3(0.38, 0.78, 0.28), 0.6), 1.0);
+    // Per-blade hue jitter so a field of 5500 doesn't look like one solid mat.
+    // sin(vSway) ∈ [-1, 1] — mapped to a small saturation/value wobble.
+    float jitter = 0.5 + 0.5 * sin(vSway * 3.71);
+
+    // Root colour: deep moss; tip colour: sun-bleached straw with a hint of green.
+    vec3 root = mix(vec3(0.10, 0.30, 0.13), vec3(0.14, 0.38, 0.17), jitter);
+    vec3 tip  = mix(vec3(0.42, 0.78, 0.30), vec3(0.66, 0.86, 0.36), jitter);
+
+    vec3 col = mix(root, tip, vTip);
+    // Tiny vertical AO so the field reads as volumetric rather than flat
+    col *= mix(0.78, 1.0, vTip);
+
+    gl_FragColor = vec4(col, 1.0);
     #include <fog_fragment>
   }
 `;
 
 const ISLAND_HALF  = 62;           // keep inside 130-unit ground
-const EXCLUSION_R  = 7;            // clear ring around each landmark
-const GRASS_COUNT  = 3200;
+const EXCLUSION_R  = 9;            // clear ring around each landmark (>= max plaza R)
+const GRASS_COUNT  = 5500;
 
 // Main landmark positions duplicated here to exclude grass from plazas
 const LANDMARK_XZ = [
@@ -100,8 +120,14 @@ function GrassField() {
       const z = (rng() - 0.5) * (ISLAND_HALF * 2 - 4);
       // Skip near landmark plazas and near map edges
       if (isTooCloseToLandmark(x, z)) continue;
-      const scale  = 0.9 + rng() * 0.9;
-      const rotY   = rng() * Math.PI * 2;
+      // Wider scale spread + a subtle clumping factor — blades nearer the
+      // edges grow taller, so the field looks layered rather than uniform.
+      const edgeFactor = Math.min(
+        1,
+        Math.hypot(x, z) / (ISLAND_HALF * 0.95),
+      );
+      const scale = 0.55 + rng() * 1.25 + edgeFactor * 0.35;
+      const rotY  = rng() * Math.PI * 2;
       positions.push({ x, z, scale, rotY });
       swayPhases[placed] = rng() * Math.PI * 2;
       placed++;
@@ -163,45 +189,103 @@ function GrassField() {
       frustumCulled={false}
       receiveShadow
     >
-      {/* 3-sided cone = 3 low-poly triangles per blade */}
-      <coneGeometry args={[0.1, 0.55, 3]} />
+      {/* 3-sided cone = 3 low-poly triangles per blade. Taller (0.95) +
+          slightly skinnier than before for a thicker, more pasture feel. */}
+      <coneGeometry args={[0.085, 0.95, 3]} />
       <primitive object={material} attach="material" />
     </instancedMesh>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LOW-POLY TREE
+// LOW-POLY TREES — three species rotated through the placement list so the
+// island reads as a real woodland rather than a stamp duplicated 21 times.
 // ─────────────────────────────────────────────────────────────────────────────
-function Tree({ position, scale = 1 }) {
+
+// 1) FIR — original stacked-cone shape. Tall, layered, spruce-like.
+function FirTree({ position, scale = 1, hueShift = 0, rotY = 0 }) {
+  const c1 = new THREE.Color(`hsl(${135 + hueShift}, 50%, 27%)`).getStyle();
+  const c2 = new THREE.Color(`hsl(${130 + hueShift}, 55%, 35%)`).getStyle();
+  const c3 = new THREE.Color(`hsl(${125 + hueShift}, 58%, 42%)`).getStyle();
   return (
     <RigidBody type="fixed" colliders={false} position={position}>
       <CuboidCollider args={[0.2 * scale, 0.7 * scale, 0.2 * scale]} position={[0, 0.7 * scale, 0]} />
-      <group scale={scale}>
-        {/* Trunk */}
+      <group scale={scale} rotation={[0, rotY, 0]}>
         <mesh castShadow position={[0, 0.55, 0]}>
           <cylinderGeometry args={[0.12, 0.16, 1.1, 7]} />
-          <meshStandardMaterial color="#6b4226" roughness={0.96} metalness={0.0} />
+          <meshStandardMaterial color="#6b4226" roughness={0.96} />
         </mesh>
-        {/* Bottom wide canopy */}
         <mesh castShadow position={[0, 1.65, 0]}>
           <coneGeometry args={[0.75, 1.6, 7]} />
-          <meshStandardMaterial color="#1a6b35" roughness={0.88} metalness={0.0} />
+          <meshStandardMaterial color={c1} roughness={0.88} />
         </mesh>
-        {/* Middle canopy */}
         <mesh castShadow position={[0, 2.5, 0]}>
           <coneGeometry args={[0.52, 1.2, 7]} />
-          <meshStandardMaterial color="#228c42" roughness={0.85} metalness={0.0} />
+          <meshStandardMaterial color={c2} roughness={0.85} />
         </mesh>
-        {/* Top tip */}
         <mesh castShadow position={[0, 3.1, 0]}>
           <coneGeometry args={[0.3, 0.85, 6]} />
-          <meshStandardMaterial color="#2db84f" roughness={0.82} metalness={0.0} />
+          <meshStandardMaterial color={c3} roughness={0.82} />
         </mesh>
       </group>
     </RigidBody>
   );
 }
+
+// 2) PINE — taller and skinnier, single tall cone canopy. Reads as cypress.
+function PineTree({ position, scale = 1, hueShift = 0, rotY = 0 }) {
+  const c = new THREE.Color(`hsl(${145 + hueShift}, 45%, 28%)`).getStyle();
+  return (
+    <RigidBody type="fixed" colliders={false} position={position}>
+      <CuboidCollider args={[0.18 * scale, 0.85 * scale, 0.18 * scale]} position={[0, 0.85 * scale, 0]} />
+      <group scale={scale} rotation={[0, rotY, 0]}>
+        <mesh castShadow position={[0, 0.55, 0]}>
+          <cylinderGeometry args={[0.09, 0.13, 1.1, 6]} />
+          <meshStandardMaterial color="#5a3a22" roughness={0.96} />
+        </mesh>
+        <mesh castShadow position={[0, 2.4, 0]}>
+          <coneGeometry args={[0.55, 3.2, 8]} />
+          <meshStandardMaterial color={c} roughness={0.85} />
+        </mesh>
+        <mesh castShadow position={[0, 3.7, 0]}>
+          <coneGeometry args={[0.28, 0.9, 6]} />
+          <meshStandardMaterial color={c} roughness={0.82} />
+        </mesh>
+      </group>
+    </RigidBody>
+  );
+}
+
+// 3) BUSH — round, dome-shaped foliage on a short trunk. Reads as oak/maple.
+function BushTree({ position, scale = 1, hueShift = 0, rotY = 0 }) {
+  const c1 = new THREE.Color(`hsl(${110 + hueShift}, 48%, 32%)`).getStyle();
+  const c2 = new THREE.Color(`hsl(${100 + hueShift}, 52%, 40%)`).getStyle();
+  return (
+    <RigidBody type="fixed" colliders={false} position={position}>
+      <CuboidCollider args={[0.25 * scale, 0.55 * scale, 0.25 * scale]} position={[0, 0.55 * scale, 0]} />
+      <group scale={scale} rotation={[0, rotY, 0]}>
+        <mesh castShadow position={[0, 0.4, 0]}>
+          <cylinderGeometry args={[0.16, 0.20, 0.8, 7]} />
+          <meshStandardMaterial color="#7a4a28" roughness={0.95} />
+        </mesh>
+        <mesh castShadow position={[0, 1.2, 0]}>
+          <icosahedronGeometry args={[0.95, 0]} />
+          <meshStandardMaterial color={c1} roughness={0.85} flatShading />
+        </mesh>
+        <mesh castShadow position={[0.45, 1.55, 0.15]}>
+          <icosahedronGeometry args={[0.55, 0]} />
+          <meshStandardMaterial color={c2} roughness={0.82} flatShading />
+        </mesh>
+        <mesh castShadow position={[-0.3, 1.7, -0.2]}>
+          <icosahedronGeometry args={[0.45, 0]} />
+          <meshStandardMaterial color={c2} roughness={0.82} flatShading />
+        </mesh>
+      </group>
+    </RigidBody>
+  );
+}
+
+const TREE_SPECIES = [FirTree, PineTree, BushTree, FirTree, BushTree, PineTree];
 
 // ─────────────────────────────────────────────────────────────────────────────
 // LOW-POLY HOUSE  (box body + pyramid roof)
@@ -215,58 +299,120 @@ const HOUSE_PALETTE = [
   { wall: "#fdf5c8", roof: "#c8a030" },
 ];
 
-function House({ position, rotation = 0, paletteIdx = 0, scale = 1 }) {
+function House({ position, rotation = 0, paletteIdx = 0, scale = 1, variant = 0 }) {
   const { wall, roof } = HOUSE_PALETTE[paletteIdx % HOUSE_PALETTE.length];
+  const tall = variant === 1;            // tall narrow townhouse variant
+  const cottage = variant === 2;         // wide low cottage variant
+  const w  = cottage ? 3.1 : tall ? 1.8 : 2.4;
+  const h  = tall ? 3.0 : 2.2;
+  const d  = cottage ? 2.0 : 2.4;
+  const rh = tall ? 1.8 : 1.5;
+
   return (
     <RigidBody type="fixed" colliders={false} position={position}>
       <CuboidCollider
-        args={[1.2 * scale, 1.2 * scale, 1.2 * scale]}
-        position={[0, 1.2 * scale, 0]}
+        args={[(w / 2) * scale, (h / 2) * scale, (d / 2) * scale]}
+        position={[0, (h / 2) * scale, 0]}
       />
       <group scale={scale} rotation={[0, rotation, 0]}>
+        {/* Stone foundation */}
+        <mesh castShadow receiveShadow position={[0, 0.12, 0]}>
+          <boxGeometry args={[w + 0.18, 0.24, d + 0.18]} />
+          <meshStandardMaterial color="#9a9286" roughness={0.92} />
+        </mesh>
         {/* Walls */}
-        <mesh castShadow receiveShadow position={[0, 1.1, 0]}>
-          <boxGeometry args={[2.4, 2.2, 2.4]} />
+        <mesh castShadow receiveShadow position={[0, h / 2 + 0.24, 0]}>
+          <boxGeometry args={[w, h, d]} />
           <meshStandardMaterial color={wall} roughness={0.82} metalness={0.02} />
         </mesh>
-        {/* Pyramid roof */}
-        <mesh castShadow position={[0, 2.65, 0]}>
-          <coneGeometry args={[1.95, 1.5, 4]} />
+        {/* Roof — 4-sided pyramid */}
+        <mesh castShadow position={[0, h + 0.24 + rh / 2, 0]}>
+          <coneGeometry args={[Math.max(w, d) * 0.8 + 0.05, rh, 4]} />
           <meshStandardMaterial color={roof} roughness={0.76} metalness={0.02} />
         </mesh>
+        {/* Chimney (variant-dependent offset) */}
+        <mesh castShadow position={[w * 0.28, h + 0.24 + rh * 0.6, -d * 0.28]}>
+          <boxGeometry args={[0.22, 0.8, 0.22]} />
+          <meshStandardMaterial color="#8a6a55" roughness={0.9} />
+        </mesh>
+        {/* Smoke puff (just a tiny rounded cap, static) */}
+        <mesh position={[w * 0.28, h + 0.24 + rh * 0.6 + 0.5, -d * 0.28]}>
+          <sphereGeometry args={[0.18, 8, 8]} />
+          <meshStandardMaterial color="#c8c4be" roughness={0.95} transparent opacity={0.6} />
+        </mesh>
         {/* Door */}
-        <mesh position={[0, 0.55, 1.21]}>
-          <boxGeometry args={[0.6, 1.0, 0.06]} />
+        <mesh position={[0, 0.74, d / 2 + 0.01]}>
+          <boxGeometry args={[0.6, 1.2, 0.06]} />
           <meshStandardMaterial color="#4a3520" roughness={0.7} />
         </mesh>
-        {/* Window */}
-        <mesh position={[0.7, 1.3, 1.21]}>
-          <boxGeometry args={[0.45, 0.45, 0.06]} />
-          <meshStandardMaterial color="#b8d8f8" roughness={0.1} metalness={0.05} />
+        {/* Door step */}
+        <mesh position={[0, 0.18, d / 2 + 0.18]}>
+          <boxGeometry args={[0.8, 0.12, 0.32]} />
+          <meshStandardMaterial color="#a89a86" roughness={0.9} />
         </mesh>
+        {/* Front window with frame */}
+        <mesh position={[w * 0.32, h * 0.55 + 0.24, d / 2 + 0.005]}>
+          <boxGeometry args={[0.55, 0.55, 0.04]} />
+          <meshStandardMaterial color="#5a4a3a" roughness={0.7} />
+        </mesh>
+        <mesh position={[w * 0.32, h * 0.55 + 0.24, d / 2 + 0.012]}>
+          <boxGeometry args={[0.42, 0.42, 0.04]} />
+          <meshStandardMaterial color="#cfe6f7" roughness={0.15} metalness={0.15} emissive="#fff7d6" emissiveIntensity={0.18} />
+        </mesh>
+        {/* Side window */}
+        {tall ? null : (
+          <mesh position={[-w * 0.32, h * 0.55 + 0.24, d / 2 + 0.005]}>
+            <boxGeometry args={[0.42, 0.42, 0.04]} />
+            <meshStandardMaterial color="#cfe6f7" roughness={0.15} metalness={0.15} emissive="#fff7d6" emissiveIntensity={0.15} />
+          </mesh>
+        )}
+        {/* Planter box under window — adds life on the cottage variant */}
+        {cottage && (
+          <>
+            <mesh position={[w * 0.32, h * 0.32 + 0.24, d / 2 + 0.16]}>
+              <boxGeometry args={[0.6, 0.16, 0.18]} />
+              <meshStandardMaterial color="#6b4a2c" roughness={0.85} />
+            </mesh>
+            <mesh position={[w * 0.32, h * 0.32 + 0.36, d / 2 + 0.16]}>
+              <icosahedronGeometry args={[0.13, 0]} />
+              <meshStandardMaterial color="#cf3a7b" roughness={0.7} flatShading />
+            </mesh>
+          </>
+        )}
       </group>
     </RigidBody>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// LAMP POST
+// LAMPS — two variants alternated through the placement list.
+// 1) StreetLamp: original swing-arm pole with a glowing bulb (urban feel).
+// 2) HangingLantern: bell-shaped cage on a curved arm (warmer, garden feel).
 // ─────────────────────────────────────────────────────────────────────────────
-function Lamp({ position }) {
+function StreetLamp({ position }) {
   return (
     <RigidBody type="fixed" colliders={false} position={position}>
       <CuboidCollider args={[0.08, 1.5, 0.08]} position={[0, 1.5, 0]} />
+      {/* Base plate */}
+      <mesh castShadow position={[0, 0.05, 0]}>
+        <cylinderGeometry args={[0.18, 0.22, 0.1, 12]} />
+        <meshStandardMaterial color="#3a3a3f" metalness={0.6} roughness={0.5} />
+      </mesh>
       {/* Pole */}
-      <mesh castShadow position={[0, 1.5, 0]}>
+      <mesh castShadow position={[0, 1.55, 0]}>
         <cylinderGeometry args={[0.055, 0.07, 3.0, 8]} />
         <meshStandardMaterial color="#1f2937" metalness={0.65} roughness={0.42} />
       </mesh>
       {/* Arm */}
-      <mesh castShadow position={[0.22, 2.9, 0]}>
+      <mesh castShadow position={[0.22, 2.95, 0]}>
         <boxGeometry args={[0.48, 0.07, 0.14]} />
         <meshStandardMaterial color="#27272a" metalness={0.6} roughness={0.45} />
       </mesh>
-      {/* Bulb */}
+      {/* Lamp head + bulb */}
+      <mesh castShadow position={[0.44, 2.92, 0]}>
+        <cylinderGeometry args={[0.13, 0.16, 0.15, 10]} />
+        <meshStandardMaterial color="#27272a" metalness={0.55} roughness={0.55} />
+      </mesh>
       <mesh position={[0.44, 2.82, 0]}>
         <sphereGeometry args={[0.1, 12, 12]} />
         <meshStandardMaterial
@@ -288,6 +434,63 @@ function Lamp({ position }) {
   );
 }
 
+function HangingLantern({ position }) {
+  return (
+    <RigidBody type="fixed" colliders={false} position={position}>
+      <CuboidCollider args={[0.08, 1.4, 0.08]} position={[0, 1.4, 0]} />
+      {/* Base */}
+      <mesh castShadow position={[0, 0.06, 0]}>
+        <cylinderGeometry args={[0.20, 0.24, 0.12, 8]} />
+        <meshStandardMaterial color="#1d1816" metalness={0.5} roughness={0.6} />
+      </mesh>
+      {/* Pole */}
+      <mesh castShadow position={[0, 1.45, 0]}>
+        <cylinderGeometry args={[0.05, 0.06, 2.7, 8]} />
+        <meshStandardMaterial color="#221b15" metalness={0.4} roughness={0.5} />
+      </mesh>
+      {/* Curved arm — a horizontal then vertical drop (two short cylinders) */}
+      <mesh castShadow position={[0.18, 2.78, 0]} rotation={[0, 0, Math.PI / 2]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.42, 8]} />
+        <meshStandardMaterial color="#221b15" metalness={0.4} roughness={0.5} />
+      </mesh>
+      <mesh castShadow position={[0.39, 2.62, 0]}>
+        <cylinderGeometry args={[0.04, 0.04, 0.34, 8]} />
+        <meshStandardMaterial color="#221b15" metalness={0.4} roughness={0.5} />
+      </mesh>
+      {/* Lantern cage — black frame */}
+      <mesh castShadow position={[0.39, 2.32, 0]}>
+        <boxGeometry args={[0.34, 0.42, 0.34]} />
+        <meshStandardMaterial color="#1a1411" metalness={0.5} roughness={0.5} />
+      </mesh>
+      {/* Glow core inside the cage */}
+      <mesh position={[0.39, 2.32, 0]}>
+        <boxGeometry args={[0.22, 0.30, 0.22]} />
+        <meshStandardMaterial
+          color="#fef3c7"
+          emissive="#fb923c"
+          emissiveIntensity={2.2}
+          toneMapped={false}
+        />
+      </mesh>
+      {/* Decorative cap on top */}
+      <mesh castShadow position={[0.39, 2.62, 0]}>
+        <coneGeometry args={[0.18, 0.16, 4]} />
+        <meshStandardMaterial color="#1a1411" metalness={0.45} roughness={0.55} />
+      </mesh>
+      <pointLight
+        position={[0.39, 2.32, 0]}
+        intensity={0.55}
+        distance={9}
+        decay={2}
+        color="#fb923c"
+        castShadow={false}
+      />
+    </RigidBody>
+  );
+}
+
+const LAMP_VARIANTS = [StreetLamp, HangingLantern];
+
 // ─────────────────────────────────────────────────────────────────────────────
 // ROCK
 // ─────────────────────────────────────────────────────────────────────────────
@@ -297,6 +500,8 @@ function Rock({ position, seed = 1 }) {
   const sy = 0.5 + rng() * 0.45;
   const sz = 0.8 + rng() * 0.6;
   const ry = rng() * Math.PI;
+  // Slightly varied stone palette so a cluster of rocks doesn't look stamped
+  const tint = `hsl(${210 + Math.floor(rng() * 35) - 15}, 8%, ${40 + Math.floor(rng() * 14)}%)`;
   return (
     <mesh
       castShadow
@@ -306,8 +511,53 @@ function Rock({ position, seed = 1 }) {
       scale={[sx, sy, sz]}
     >
       <dodecahedronGeometry args={[0.52, 0]} />
-      <meshStandardMaterial color="#6b7280" roughness={0.94} metalness={0.08} />
+      <meshStandardMaterial color={tint} roughness={0.94} metalness={0.08} flatShading />
     </mesh>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// FLOWER PATCH — small clump of bright icosahedral "blossoms" on stems.
+// Adds a pop of saturated colour at ground level so the meadow doesn't feel
+// like one flat green carpet.
+// ─────────────────────────────────────────────────────────────────────────────
+const FLOWER_HUES = ["#fde68a", "#fbcfe8", "#a7f3d0", "#bfdbfe", "#fca5a5", "#ddd6fe"];
+
+function FlowerPatch({ position, seed = 1 }) {
+  const rng = useMemo(() => seededRng(seed), [seed]);
+  const blooms = useMemo(
+    () => Array.from({ length: 5 + Math.floor(rng() * 4) }, () => ({
+      x:    (rng() - 0.5) * 0.9,
+      z:    (rng() - 0.5) * 0.9,
+      h:    0.18 + rng() * 0.18,
+      hue:  FLOWER_HUES[Math.floor(rng() * FLOWER_HUES.length)],
+      size: 0.07 + rng() * 0.04,
+    })),
+    [rng],
+  );
+  return (
+    <group position={position}>
+      {blooms.map((b, i) => (
+        <group key={i} position={[b.x, 0, b.z]}>
+          {/* Stem */}
+          <mesh castShadow position={[0, b.h / 2, 0]}>
+            <cylinderGeometry args={[0.012, 0.018, b.h, 5]} />
+            <meshStandardMaterial color="#3f6c30" roughness={0.85} />
+          </mesh>
+          {/* Blossom */}
+          <mesh castShadow position={[0, b.h, 0]}>
+            <icosahedronGeometry args={[b.size, 0]} />
+            <meshStandardMaterial
+              color={b.hue}
+              emissive={b.hue}
+              emissiveIntensity={0.18}
+              roughness={0.65}
+              flatShading
+            />
+          </mesh>
+        </group>
+      ))}
+    </group>
   );
 }
 
@@ -394,29 +644,44 @@ const LAMPS_RAW = [
 ];
 
 const HOUSES = [
-  { pos: [-52, 0,  -5], rot: 0.4,        pi: 0, sc: 1.1  },
-  { pos: [ 52, 0,  28], rot: -0.3,       pi: 1, sc: 0.9  },
-  { pos: [ 52, 0, -38], rot: 0.8,        pi: 2, sc: 1.0  },
-  { pos: [-52, 0,  55], rot: -0.6,       pi: 3, sc: 1.2  },
-  { pos: [ 18, 0,  55], rot: 1.1,        pi: 4, sc: 0.85 },
-  { pos: [-18, 0, -55], rot: -0.9,       pi: 5, sc: 1.05 },
-  { pos: [ 55, 0,  -5], rot: 0.2,        pi: 0, sc: 0.95 },
-  { pos: [-55, 0,  25], rot: 0.6,        pi: 2, sc: 1.15 },
-  { pos: [  5, 0, -56], rot: -0.4,       pi: 3, sc: 0.9  },
-  { pos: [-40, 0,  -8], rot: 0.7,        pi: 5, sc: 0.8  },
-  { pos: [ 40, 0,  10], rot: -0.5,       pi: 1, sc: 1.0  },
-  { pos: [-12, 0,  52], rot: 0.3,        pi: 4, sc: 1.1  },
+  { pos: [-52, 0,  -5], rot: 0.4,        pi: 0, sc: 1.1,  v: 0 },
+  { pos: [ 52, 0,  28], rot: -0.3,       pi: 1, sc: 0.9,  v: 2 },
+  { pos: [ 52, 0, -38], rot: 0.8,        pi: 2, sc: 1.0,  v: 1 },
+  { pos: [-52, 0,  55], rot: -0.6,       pi: 3, sc: 1.2,  v: 0 },
+  { pos: [ 18, 0,  55], rot: 1.1,        pi: 4, sc: 0.85, v: 2 },
+  { pos: [-18, 0, -55], rot: -0.9,       pi: 5, sc: 1.05, v: 1 },
+  { pos: [ 55, 0,  -5], rot: 0.2,        pi: 0, sc: 0.95, v: 2 },
+  { pos: [-55, 0,  25], rot: 0.6,        pi: 2, sc: 1.15, v: 0 },
+  { pos: [  5, 0, -56], rot: -0.4,       pi: 3, sc: 0.9,  v: 1 },
+  { pos: [-40, 0,  -8], rot: 0.7,        pi: 5, sc: 0.8,  v: 2 },
+  { pos: [ 40, 0,  10], rot: -0.5,       pi: 1, sc: 1.0,  v: 0 },
+  { pos: [-12, 0,  52], rot: 0.3,        pi: 4, sc: 1.1,  v: 1 },
 ];
 
 const ROCKS = [
   [-45, 0,  30], [ 45, 0, -30], [-30, 0, -48],
   [  0, 0,  48], [ 48, 0,  18], [-48, 0, -18],
   [ 30, 0,  30], [-30, 0,  30], [ 15, 0, -45],
+  // Small clusters near landmark plazas for more "settled" feel
+  [-44, 0, -40], [-32, 0, -42], [ 36, 0, -28],
+  [ 12, 0,  44], [-30, 0,  38], [ 25, 0,  -2],
+];
+
+// Hand-placed flower patches — bright dots in the grass. Filtered like
+// the trees so they never spawn on a road or plaza tile.
+const FLOWERS_RAW = [
+  [-44, 0,  -2], [-30, 0, -10], [-18, 0,  10],
+  [ 30, 0,  -8], [ 22, 0,  10], [ 44, 0,   8],
+  [-12, 0,  20], [ 14, 0,  22], [-22, 0, -22],
+  [ -6, 0, -42], [ 24, 0,  30], [ -28, 0, 12],
+  [ 38, 0,  -2], [ -42, 0, 20], [ 28, 0, -42],
+  [ -10, 0, 38], [ 18, 0, -10], [ -6, 0, 14],
 ];
 
 // Apply the road / plaza filter exactly once at module load
-const TREES = TREES_RAW.filter(([x, , z]) => !isBlocked(x, z));
-const LAMPS = LAMPS_RAW.filter(([x, , z]) => !isBlocked(x, z));
+const TREES   = TREES_RAW.filter(([x, , z]) => !isBlocked(x, z));
+const LAMPS   = LAMPS_RAW.filter(([x, , z]) => !isBlocked(x, z));
+const FLOWERS = FLOWERS_RAW.filter(([x, , z]) => !isBlocked(x, z));
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FIREFLIES — small instanced orbs that orbit around each lamppost
@@ -527,20 +792,39 @@ export default function Decorations() {
       {/* Wind-sway grass field */}
       <GrassField />
 
-      {/* Low-poly trees */}
-      {TREES.map((p, i) => (
-        <Tree key={`tr-${i}`} position={p} scale={0.85 + (i % 4) * 0.15} />
+      {/* Trees — alternate species so the woodland reads as varied. The hue
+          shift jitters the canopy palette per slot so even two adjacent
+          firs don't look identical. */}
+      {TREES.map((p, i) => {
+        const Species = TREE_SPECIES[i % TREE_SPECIES.length];
+        const hueShift = ((i * 47) % 30) - 15;        // ±15° hue jitter
+        const rotY     = ((i * 113) % 360) * Math.PI / 180;
+        return (
+          <Species
+            key={`tr-${i}`}
+            position={p}
+            scale={0.85 + (i % 5) * 0.18}
+            hueShift={hueShift}
+            rotY={rotY}
+          />
+        );
+      })}
+
+      {/* Flower patches scattered across the meadow */}
+      {FLOWERS.map((p, i) => (
+        <FlowerPatch key={`fl-${i}`} position={p} seed={i * 13 + 3} />
       ))}
 
-      {/* Lamp posts */}
-      {LAMPS.map((p, i) => (
-        <Lamp key={`lp-${i}`} position={p} />
-      ))}
+      {/* Lamps — alternated between street-pole and hanging-lantern variants */}
+      {LAMPS.map((p, i) => {
+        const Variant = LAMP_VARIANTS[i % LAMP_VARIANTS.length];
+        return <Variant key={`lp-${i}`} position={p} />;
+      })}
 
       {/* Fireflies orbiting each lamp */}
       <Fireflies anchors={LAMPS} />
 
-      {/* Pastel houses */}
+      {/* Pastel houses with shape variants */}
       {HOUSES.map((h, i) => (
         <House
           key={`h-${i}`}
@@ -548,6 +832,7 @@ export default function Decorations() {
           rotation={h.rot}
           paletteIdx={h.pi}
           scale={h.sc}
+          variant={h.v}
         />
       ))}
 

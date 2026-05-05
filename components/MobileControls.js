@@ -1,43 +1,46 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { touchInput, resetTouchInput } from "@/lib/inputStore";
 import { bikeState } from "@/lib/bikeStore";
 
 /**
- * Bruno-Simon-style 3D joystick — a glowing dial on the ground next to the
- * bike. The base ring lies flat on the floor, a metallic knob hovers in the
- * centre and tilts toward the player's finger. It rides along with the bike
- * (offset to the camera-right) so the user's thumb stays in roughly the same
- * screen spot while driving.
+ * Bruno-Simon-style 3D joystick.
  *
- * Reads bike position from `bikeState` (no playerRef threading) and writes
- * joystick output into `touchInput`, just like the previous 2D HUD did.
+ * The bike sits in the centre of two concentric outline rings drawn flat on
+ * the ground.  When the player taps & drags inside the dial, a bright sweep
+ * arc points outward in the direction of the touch — that direction is what
+ * the bike steers toward.  No floating knob, no offset — purely a directional
+ * compass that orbits the bike.
+ *
+ * Reads bike position from `bikeState`, writes input into `touchInput`. The
+ * dial's local frame is yaw-aligned to the camera each frame so that pulling
+ * the touch "up" on screen always means "drive forward".
  */
 
-const RING_OUTER  = 1.55;
-const RING_INNER  = 1.18;
-const KNOB_R      = 0.42;
-const MAX_OFFSET  = (RING_OUTER - KNOB_R) * 0.78;
-const DEADZONE    = 0.08;
-const HOVER_Y     = 0.18;
-const SCREEN_X    = 2.6;  // camera-right offset from the bike
+const INNER_R    = 1.7;
+const OUTER_R    = 2.9;
+const RING_W     = 0.07;          // outline thickness (geometry-only, fixed)
+const ARC_SPREAD = Math.PI / 3.8; // ~47° wedge
+const CAPTURE_R  = OUTER_R + 1.2; // touch tolerance beyond the outer ring
+const DEADZONE   = 0.10;
 
 export default function MobileControls() {
   const { camera, gl } = useThree();
   const groupRef   = useRef();
-  const knobRef    = useRef();
-  const captureRef = useRef();
+  const arcRef     = useRef();
+  const arcMatRef  = useRef();
+  const innerMatRef = useRef();
+  const outerMatRef = useRef();
 
   const activeRef  = useRef(false);
   const pointerId  = useRef(null);
-  const knob2D     = useRef({ x: 0, y: 0 });
 
   const [enabled, setEnabled] = useState(false);
 
-  // Detect touch viewport once on mount (avoids SSR mismatch)
+  // Detect touch viewport once on mount
   useEffect(() => {
     if (typeof window === "undefined") return;
     const isTouch =
@@ -52,7 +55,6 @@ export default function MobileControls() {
     const cleanup = () => {
       activeRef.current = false;
       pointerId.current = null;
-      knob2D.current    = { x: 0, y: 0 };
       resetTouchInput();
     };
     window.addEventListener("blur", cleanup);
@@ -64,204 +66,205 @@ export default function MobileControls() {
     };
   }, [enabled]);
 
-  // Reusable scratch vectors
-  const camFwd  = useMemo(() => new THREE.Vector3(), []);
-  const camRight = useMemo(() => new THREE.Vector3(), []);
-  const tmpLocal = useMemo(() => new THREE.Vector3(), []);
+  // Scratch vectors / matrix
+  const camFwd      = useMemo(() => new THREE.Vector3(), []);
+  const camRight    = useMemo(() => new THREE.Vector3(), []);
+  const tmpLocal    = useMemo(() => new THREE.Vector3(), []);
+  const tmpHit      = useMemo(() => new THREE.Vector3(), []);
+  const basis       = useMemo(() => new THREE.Matrix4(), []);
+  const xAxis       = useMemo(() => new THREE.Vector3(), []);
+  const yAxis       = useMemo(() => new THREE.Vector3(), []);
+  const zAxis       = useMemo(() => new THREE.Vector3(0, 1, 0), []);
+  const dragNDC     = useMemo(() => new THREE.Vector2(), []);
+  const dragRay     = useMemo(() => new THREE.Raycaster(), []);
+  const dragPlane   = useMemo(() => new THREE.Plane(new THREE.Vector3(0, 1, 0), -0.04), []);
 
-  // ── Per-frame: position group, animate knob ──────────────────────────────
+  // ── Per-frame: re-orient dial, animate arc opacity + direction ───────────
   useFrame((_, delta) => {
     const g = groupRef.current;
     if (!g) return;
 
-    // Camera-right (XZ plane) so the dial always sits to the user's right
+    // Camera-forward & camera-right in the XZ plane
     camera.getWorldDirection(camFwd);
     camFwd.y = 0;
     if (camFwd.lengthSq() < 1e-6) camFwd.set(0, 0, -1);
     camFwd.normalize();
     camRight.set(-camFwd.z, 0, camFwd.x);
 
-    g.position.set(
-      bikeState.x + camRight.x * SCREEN_X,
-      0.06,
-      bikeState.z + camRight.z * SCREEN_X,
-    );
-    // Yaw the dial so its local +Y (after the -π/2 X tilt) points along
-    // camera-forward — i.e. pushing the knob away from the user always means
-    // "drive forward in screen space". Derivation: with XYZ Euler order, the
-    // X-tilt maps local +Y → world -Z, so rotation.z = atan2(-camFwd.x,
-    // -camFwd.z) lines local +Y up with the world camera-forward direction.
-    g.rotation.set(-Math.PI / 2, 0, 0);
-    g.rotation.z = Math.atan2(-camFwd.x, -camFwd.z);
+    // Build the dial's basis: local +X = camera-right, +Y = camera-forward,
+    // +Z = world-up. After this, ring geometry drawn in the local XY plane
+    // lies flat on the ground with "up" on the dial = camera-forward.
+    xAxis.set(camRight.x, 0, camRight.z);
+    yAxis.set(camFwd.x,   0, camFwd.z);
+    basis.makeBasis(xAxis, yAxis, zAxis);
+    g.quaternion.setFromRotationMatrix(basis);
+    g.position.set(bikeState.x, 0.04, bikeState.z);
 
-    // Knob: lerp toward the active finger position (or zero on release)
-    const knob = knobRef.current;
-    if (knob) {
-      const targetX = activeRef.current ? knob2D.current.x : 0;
-      const targetY = activeRef.current ? knob2D.current.y : 0;
-      const t = Math.min(1, 18 * delta);
-      knob.position.x = THREE.MathUtils.lerp(knob.position.x, targetX, t);
-      knob.position.y = THREE.MathUtils.lerp(knob.position.y, targetY, t);
-      // Subtle hover bob when idle
-      const idle = !activeRef.current ? Math.sin(performance.now() * 0.003) * 0.03 : 0;
-      knob.position.z = HOVER_Y + idle;
+    // Arc visual: rotate to face touch direction, fade in/out with magnitude
+    const arc = arcRef.current;
+    const mag = Math.hypot(touchInput.joystickX, touchInput.joystickY);
+    const targetAngle = mag > DEADZONE
+      ? Math.atan2(touchInput.joystickY, touchInput.joystickX)
+      : (arc ? arc.rotation.z : 0);
+
+    if (arc) {
+      // Shortest-path lerp toward target angle so it never spins long way round
+      let dz = targetAngle - arc.rotation.z;
+      while (dz >  Math.PI) dz -= Math.PI * 2;
+      while (dz < -Math.PI) dz += Math.PI * 2;
+      arc.rotation.z += dz * Math.min(1, 22 * delta);
+    }
+
+    if (arcMatRef.current) {
+      const targetOpacity = activeRef.current && mag > DEADZONE
+        ? Math.min(1, mag) * 0.85
+        : 0.0;
+      arcMatRef.current.opacity = THREE.MathUtils.lerp(
+        arcMatRef.current.opacity,
+        targetOpacity,
+        Math.min(1, 14 * delta),
+      );
+    }
+
+    // Subtle pulse on the rings while idle so the dial doesn't read as static
+    const t = performance.now() * 0.001;
+    if (innerMatRef.current) {
+      innerMatRef.current.opacity = 0.32 + Math.sin(t * 1.4) * 0.08;
+    }
+    if (outerMatRef.current) {
+      outerMatRef.current.opacity = 0.55 + Math.sin(t * 1.4 + 0.6) * 0.10;
     }
   });
 
-  if (!enabled) return null;
-
-  // ── Pointer handlers (raycast hits the capture disc; `e.point` is world) ─
-  const updateFromEvent = (e) => {
+  // ── Pointer handlers ─────────────────────────────────────────────────────
+  // We compute the dial-local touch position by raycasting from screen-space
+  // coordinates onto a horizontal plane at the dial's height. This works
+  // whether or not the cursor is currently over the capture mesh — letting
+  // the user drag their finger outside the dial without losing the input.
+  const writeFromClient = useCallback((clientX, clientY) => {
     const g = groupRef.current;
     if (!g) return;
-    // Convert world hit point into the dial's local frame. After the rotations
-    // above, local +X is "right" in screen space and local +Y is "forward".
-    tmpLocal.copy(e.point);
+    const rect = gl.domElement.getBoundingClientRect();
+    dragNDC.x = ((clientX - rect.left) / rect.width)  * 2 - 1;
+    dragNDC.y = -((clientY - rect.top)  / rect.height) * 2 + 1;
+    dragRay.setFromCamera(dragNDC, camera);
+    if (!dragRay.ray.intersectPlane(dragPlane, tmpHit)) return;
+
+    tmpLocal.copy(tmpHit);
     g.worldToLocal(tmpLocal);
 
     let dx = tmpLocal.x;
     let dy = tmpLocal.y;
     const dist = Math.hypot(dx, dy);
-    if (dist > MAX_OFFSET) {
-      dx = (dx / dist) * MAX_OFFSET;
-      dy = (dy / dist) * MAX_OFFSET;
+    if (dist > CAPTURE_R) {
+      dx = (dx / dist) * CAPTURE_R;
+      dy = (dy / dist) * CAPTURE_R;
     }
-    knob2D.current.x = dx;
-    knob2D.current.y = dy;
 
-    const nx  = dx / MAX_OFFSET;
-    const ny  = dy / MAX_OFFSET;
+    const nx  = THREE.MathUtils.clamp(dx / OUTER_R, -1, 1);
+    const ny  = THREE.MathUtils.clamp(dy / OUTER_R, -1, 1);
     const mag = Math.hypot(nx, ny);
     touchInput.joystickX = mag < DEADZONE ? 0 : nx;
     touchInput.joystickY = mag < DEADZONE ? 0 : ny;
-  };
+  }, [camera, gl, dragNDC, dragRay, dragPlane, tmpHit, tmpLocal]);
+
+  const release = useCallback(() => {
+    if (!activeRef.current) return;
+    activeRef.current         = false;
+    pointerId.current         = null;
+    touchInput.joystickActive = false;
+    touchInput.joystickX      = 0;
+    touchInput.joystickY      = 0;
+  }, []);
+
+  // While dragging, listen at the window level so the gesture survives the
+  // finger leaving the dial / canvas / browser chrome (e.g. pull-to-refresh).
+  useEffect(() => {
+    if (!enabled) return;
+    const onMove = (e) => {
+      if (!activeRef.current || e.pointerId !== pointerId.current) return;
+      writeFromClient(e.clientX, e.clientY);
+    };
+    const onUp = (e) => {
+      if (e.pointerId !== pointerId.current) return;
+      release();
+    };
+    window.addEventListener("pointermove",   onMove, { passive: true });
+    window.addEventListener("pointerup",     onUp,   { passive: true });
+    window.addEventListener("pointercancel", onUp,   { passive: true });
+    return () => {
+      window.removeEventListener("pointermove",   onMove);
+      window.removeEventListener("pointerup",     onUp);
+      window.removeEventListener("pointercancel", onUp);
+    };
+  }, [enabled, writeFromClient, release]);
+
+  if (!enabled) return null;
 
   const onPointerDown = (e) => {
     e.stopPropagation();
     activeRef.current = true;
     pointerId.current = e.pointerId;
     touchInput.joystickActive = true;
-    gl.domElement.setPointerCapture?.(e.pointerId);
-    updateFromEvent(e);
-  };
-
-  const onPointerMove = (e) => {
-    if (!activeRef.current || e.pointerId !== pointerId.current) return;
-    e.stopPropagation();
-    updateFromEvent(e);
-  };
-
-  const onPointerUp = (e) => {
-    if (e.pointerId !== pointerId.current) return;
-    e.stopPropagation();
-    gl.domElement.releasePointerCapture?.(e.pointerId);
-    activeRef.current         = false;
-    pointerId.current         = null;
-    touchInput.joystickActive = false;
-    touchInput.joystickX      = 0;
-    touchInput.joystickY      = 0;
-    knob2D.current            = { x: 0, y: 0 };
+    writeFromClient(e.clientX, e.clientY);
   };
 
   return (
     <group ref={groupRef}>
-      {/* Soft glow base disc (slightly below the ring) */}
-      <mesh position={[0, 0, -0.005]} renderOrder={1}>
-        <circleGeometry args={[RING_OUTER * 1.05, 48]} />
+      {/* Outer ring outline */}
+      <mesh renderOrder={2}>
+        <ringGeometry args={[OUTER_R - RING_W, OUTER_R, 96]} />
         <meshBasicMaterial
-          color="#0c1426"
+          ref={outerMatRef}
+          color="#ffffff"
           transparent
           opacity={0.55}
           depthWrite={false}
-        />
-      </mesh>
-
-      {/* Outer ring */}
-      <mesh position={[0, 0, 0.001]} renderOrder={2}>
-        <ringGeometry args={[RING_INNER, RING_OUTER, 64]} />
-        <meshStandardMaterial
-          color="#1f2a44"
-          metalness={0.6}
-          roughness={0.35}
-          emissive="#3b82f6"
-          emissiveIntensity={0.18}
-        />
-      </mesh>
-
-      {/* Bright outline on the outside of the ring */}
-      <mesh position={[0, 0, 0.002]} renderOrder={3}>
-        <ringGeometry args={[RING_OUTER - 0.04, RING_OUTER, 64]} />
-        <meshBasicMaterial
-          color="#7dd3fc"
-          transparent
-          opacity={0.8}
           toneMapped={false}
+          side={THREE.DoubleSide}
         />
       </mesh>
 
-      {/* Forward arrow tick marks at N/E/S/W. The "forward" (camera-away)
-          direction is local +Y, so the angle π/2 dot is the bright gold one. */}
-      {[0, Math.PI / 2, Math.PI, -Math.PI / 2].map((ang, i) => {
-        const isForward = i === 1;
-        return (
-          <mesh
-            key={i}
-            position={[
-              Math.cos(ang) * (RING_INNER - 0.13),
-              Math.sin(ang) * (RING_INNER - 0.13),
-              0.003,
-            ]}
-            renderOrder={3}
-          >
-            <circleGeometry args={[isForward ? 0.085 : 0.07, 16]} />
-            <meshBasicMaterial
-              color={isForward ? "#fde68a" : "#7dd3fc"}
-              transparent
-              opacity={isForward ? 0.95 : 0.5}
-              toneMapped={false}
-            />
-          </mesh>
-        );
-      })}
-
-      {/* Invisible capture disc — catches all pointer events for the dial */}
-      <mesh
-        ref={captureRef}
-        position={[0, 0, 0.05]}
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onPointerLeave={(e) => {
-          if (activeRef.current && e.pointerId === pointerId.current) onPointerUp(e);
-        }}
-      >
-        <circleGeometry args={[RING_OUTER * 1.15, 32]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
-      </mesh>
-
-      {/* Knob — metallic sphere that hovers above the ring */}
-      <mesh ref={knobRef} position={[0, 0, HOVER_Y]} castShadow>
-        <sphereGeometry args={[KNOB_R, 24, 24]} />
-        <meshStandardMaterial
-          color="#e2e8f0"
-          metalness={0.85}
-          roughness={0.22}
-          emissive="#7dd3fc"
-          emissiveIntensity={0.35}
-        />
-      </mesh>
-
-      {/* Tiny halo under the knob */}
-      <mesh position={[0, 0, 0.012]} renderOrder={2}>
-        <circleGeometry args={[KNOB_R * 1.4, 32]} />
+      {/* Inner ring outline */}
+      <mesh position={[0, 0, 0.001]} renderOrder={2}>
+        <ringGeometry args={[INNER_R - RING_W * 0.8, INNER_R, 80]} />
         <meshBasicMaterial
-          color="#7dd3fc"
+          ref={innerMatRef}
+          color="#ffffff"
           transparent
-          opacity={0.18}
+          opacity={0.32}
           depthWrite={false}
           toneMapped={false}
+          side={THREE.DoubleSide}
         />
+      </mesh>
+
+      {/* Sweep arc — rotates around the dial's local +Z to point at touch.
+          Geometry centred on +X (theta=0); rotation.z aligns it with the
+          input vector. */}
+      <group ref={arcRef}>
+        <mesh position={[0, 0, 0.002]} renderOrder={3}>
+          <ringGeometry
+            args={[INNER_R + 0.04, OUTER_R - 0.02, 48, 1,
+                   -ARC_SPREAD / 2, ARC_SPREAD]}
+          />
+          <meshBasicMaterial
+            ref={arcMatRef}
+            color="#ffffff"
+            transparent
+            opacity={0}
+            depthWrite={false}
+            toneMapped={false}
+            side={THREE.DoubleSide}
+          />
+        </mesh>
+      </group>
+
+      {/* Capture disc — invisible. Only fires onPointerDown; the rest of the
+          drag is handled by window-level listeners (see useEffect above). */}
+      <mesh position={[0, 0, 0.05]} onPointerDown={onPointerDown}>
+        <circleGeometry args={[CAPTURE_R, 48]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
     </group>
   );
