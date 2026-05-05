@@ -20,22 +20,18 @@ function House({ color = "#f472b6", glowColor = "#ec4899" }) {
   });
   return (
     <group>
-      {/* Body */}
       <mesh position={[0, 1.5, 0]} castShadow receiveShadow>
         <boxGeometry args={[3.2, 3.0, 2.8]} />
         <meshStandardMaterial color="#fde8f0" roughness={0.7} metalness={0.0} />
       </mesh>
-      {/* Roof */}
       <mesh position={[0, 3.5, 0]} castShadow>
         <coneGeometry args={[2.4, 1.8, 4, 1]} />
         <meshStandardMaterial color={color} roughness={0.5} metalness={0.1} />
       </mesh>
-      {/* Door */}
       <mesh position={[0, 0.75, 1.41]} castShadow>
         <boxGeometry args={[0.7, 1.5, 0.08]} />
         <meshStandardMaterial color="#92400e" roughness={0.8} metalness={0.1} />
       </mesh>
-      {/* Windows */}
       <group ref={winRef}>
         {[[-0.95, 1.8, 1.41],[0.95, 1.8, 1.41]].map(([x, y, z], i) => (
           <mesh key={i} position={[x, y, z]}>
@@ -47,12 +43,10 @@ function House({ color = "#f472b6", glowColor = "#ec4899" }) {
           </mesh>
         ))}
       </group>
-      {/* Chimney */}
       <mesh position={[0.9, 4.0, -0.4]} castShadow>
         <boxGeometry args={[0.4, 1.0, 0.4]} />
         <meshStandardMaterial color="#b45309" roughness={0.9} metalness={0.0} />
       </mesh>
-      {/* Ground glow */}
       <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, 0.02, 0]}>
         <ringGeometry args={[1.8, 2.2, 32]} />
         <meshBasicMaterial color={glowColor} transparent opacity={0.18} side={THREE.DoubleSide} depthWrite={false} />
@@ -62,7 +56,7 @@ function House({ color = "#f472b6", glowColor = "#ec4899" }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// SCHOOL BUILDING — used for Thor Heyerdahl Gymnasium
+// SCHOOL BUILDING
 // ─────────────────────────────────────────────────────────────────────────────
 function SchoolBuilding({ color = "#a78bfa", glowColor = "#7c3aed" }) {
   const winsRef = useRef();
@@ -83,34 +77,28 @@ function SchoolBuilding({ color = "#a78bfa", glowColor = "#7c3aed" }) {
 
   return (
     <group>
-      {/* Main block */}
       <mesh position={[0, 2.5, 0]} castShadow receiveShadow>
         <boxGeometry args={[6.0, 5.0, 4.0]} />
         <meshStandardMaterial color="#e0e7ff" roughness={0.6} metalness={0.1} />
       </mesh>
-      {/* Roof parapet */}
       <mesh position={[0, 5.15, 0]} castShadow>
         <boxGeometry args={[6.3, 0.3, 4.3]} />
         <meshStandardMaterial color={color} roughness={0.5} metalness={0.2} />
       </mesh>
-      {/* Side wing */}
       <mesh position={[4.2, 1.8, 0]} castShadow receiveShadow>
         <boxGeometry args={[2.4, 3.6, 3.5]} />
         <meshStandardMaterial color="#c7d2fe" roughness={0.65} metalness={0.08} />
       </mesh>
-      {/* Entrance canopy */}
       <mesh position={[0, 1.2, 2.6]} castShadow>
         <boxGeometry args={[2.0, 0.18, 1.0]} />
         <meshStandardMaterial color={color} roughness={0.4} metalness={0.3} />
       </mesh>
-      {/* Canopy supports */}
       {[[-0.85], [0.85]].map(([x], i) => (
         <mesh key={i} position={[x, 0.6, 2.95]} castShadow>
           <cylinderGeometry args={[0.06, 0.06, 1.2, 6]} />
           <meshStandardMaterial color="#6d28d9" roughness={0.5} metalness={0.5} />
         </mesh>
       ))}
-      {/* Windows */}
       <group ref={winsRef}>
         {winPositions.map(([x, y, z], i) => (
           <mesh key={i} position={[x, y, z]}>
@@ -122,12 +110,10 @@ function SchoolBuilding({ color = "#a78bfa", glowColor = "#7c3aed" }) {
           </mesh>
         ))}
       </group>
-      {/* Flag pole */}
       <mesh position={[-3.5, 6.5, 0]} castShadow>
         <cylinderGeometry args={[0.05, 0.05, 4.0, 6]} />
         <meshStandardMaterial color="#9ca3af" roughness={0.4} metalness={0.8} />
       </mesh>
-      {/* Flag */}
       <mesh position={[-2.65, 8.0, 0]}>
         <boxGeometry args={[1.7, 0.9, 0.04]} />
         <meshStandardMaterial
@@ -135,7 +121,6 @@ function SchoolBuilding({ color = "#a78bfa", glowColor = "#7c3aed" }) {
           roughness={0.8} metalness={0.0} side={THREE.DoubleSide}
         />
       </mesh>
-      {/* Ground glow */}
       <mesh rotation={[-Math.PI/2, 0, 0]} position={[0, 0.02, 0]}>
         <ringGeometry args={[3.2, 3.6, 48]} />
         <meshBasicMaterial color={glowColor} transparent opacity={0.16} side={THREE.DoubleSide} depthWrite={false} />
@@ -145,7 +130,7 @@ function SchoolBuilding({ color = "#a78bfa", glowColor = "#7c3aed" }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GENERIC BEACON — sphere / diamond / box fallback for non-GLB landmarks
+// GENERIC BEACON
 // ─────────────────────────────────────────────────────────────────────────────
 function ProceduralLandmark({ color = "#22d3ee", shape = "box" }) {
   const meshRef = useRef();
@@ -177,7 +162,7 @@ function ProceduralLandmark({ color = "#22d3ee", shape = "box" }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GLB loader — shared for HAW, Designa, Yek Döner
+// GLB loader
 // ─────────────────────────────────────────────────────────────────────────────
 function GltfLandmark({ url, scale = 1, glossy = true }) {
   const { scene } = useGLTF(url);
@@ -202,11 +187,12 @@ function GltfLandmark({ url, scale = 1, glossy = true }) {
 
 useGLTF.preload("/haw-logo-transformed.glb");
 useGLTF.preload("/designa-logo-transformed.glb");
-useGLTF.preload("/yekdoener-transformed.glb");
+// FIX #3: correct filename casing — must match exact filename in /public
+useGLTF.preload("/yek-doener-transformed.glb");
 
 // ─────────────────────────────────────────────────────────────────────────────
-// CLICK ZONE — invisible box that catches pointer events for the whole building
-// height param = how tall the click target should be (above ground)
+// CLICK ZONE
+// FIX #4: use opacity={0} instead of visible={false} so raycaster still hits it
 // ─────────────────────────────────────────────────────────────────────────────
 function ClickZone({ halfExtents, clickHeight, onClick }) {
   return (
@@ -217,7 +203,8 @@ function ClickZone({ halfExtents, clickHeight, onClick }) {
       onPointerOut={()  => (document.body.style.cursor = "auto")}
     >
       <boxGeometry args={[halfExtents[0] * 2, clickHeight, halfExtents[2] * 2]} />
-      <meshBasicMaterial visible={false} />
+      {/* FIX #4: transparent + opacity 0 instead of visible={false} */}
+      <meshBasicMaterial transparent opacity={0} depthWrite={false} />
     </mesh>
   );
 }
@@ -256,7 +243,6 @@ export default function Landmark({
     }
   });
 
-  // Click height = 2× the collider half-extent in Y so the whole building is hittable
   const clickHeight = colliderHalfExtents[1] * 4;
 
   const renderVisual = () => {
@@ -283,7 +269,6 @@ export default function Landmark({
 
   return (
     <group position={position} rotation={rotation}>
-      {/* Pulsing ground ring */}
       <mesh ref={ringRef} rotation={[-Math.PI/2, 0, 0]} position={[0, 0.02, 0]}>
         <ringGeometry args={[
           Math.max(sensorHalfExtents[0], sensorHalfExtents[2]) - 0.3,
@@ -293,13 +278,11 @@ export default function Landmark({
         <meshBasicMaterial color={color} transparent opacity={0.28} side={THREE.DoubleSide} depthWrite={false} />
       </mesh>
 
-      {/* Vertical light beacon */}
       <mesh ref={beaconRef} position={[0, 5, 0]}>
         <cylinderGeometry args={[0.06, 0.5, 10, 16, 1, true]} />
         <meshBasicMaterial color={color} transparent opacity={0.15} depthWrite={false} side={THREE.DoubleSide} />
       </mesh>
 
-      {/* Physics collider + proximity sensor */}
       <RigidBody type="fixed" colliders={false} friction={0.4} restitution={0.1}>
         <CuboidCollider args={colliderHalfExtents} position={[0, colliderHalfExtents[1], 0]} />
         <CuboidCollider
@@ -316,7 +299,6 @@ export default function Landmark({
 
         {renderVisual()}
 
-        {/* Invisible click catcher covering the full building height */}
         <ClickZone
           halfExtents={colliderHalfExtents}
           clickHeight={clickHeight}

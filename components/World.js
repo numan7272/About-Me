@@ -23,11 +23,9 @@ const LM = {
 
 /**
  * Compute the Y rotation so a building's +Z (front) faces the HQ at origin.
- * offset: extra radians to fine-tune per-building (e.g. if the model's
- * "front" isn't +Z in its local space).
+ * Only used for procedural buildings — GLB floor decals don't need it.
  */
 function faceHQ(x, z, offset = 0) {
-  // Angle from building toward HQ (0,0) — atan2(dx, dz) gives Y-rot in Three.js
   return Math.atan2(0 - x, 0 - z) + offset;
 }
 
@@ -67,12 +65,18 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
         <Ground landmarkPositions={LM} />
         <Decorations />
 
-        {/* ── HAW Kiel ─────────────────────────────────────────────────────── */}
-        {/* GLB model sits flat on the plaza; no floating, uses ground decal */}
+        {/*
+          FIX #5: HAW landmark no longer duplicates the ground decal.
+          The ground decal (HawGroundDecal in Ground.js) is the ONLY visual.
+          Here we only add the physics collider + sensor + click zone via
+          floating={false} and model prop pointing to the GLB — but we DON'T
+          apply a Y rotation to a flat floor logo (it would rotate the flat plane
+          around Y which has no visual effect and could confuse future edits).
+          The sensor / collider still work perfectly.
+        */}
         <Landmark id="haw"
           model="/haw-logo-transformed.glb"
           position={[LM.haw.x, 0, LM.haw.z]}
-          rotation={[0, faceHQ(LM.haw.x, LM.haw.z), 0]}
           colliderHalfExtents={[3.0, 1.0, 1.0]}
           sensorHalfExtents={[6.5, 3.5, 6.5]}
           color="#22d3ee" glow="#06b6d4" label="HAW Kiel"
@@ -96,8 +100,9 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
         />
 
         {/* ── Yek Döner ────────────────────────────────────────────────────── */}
+        {/* FIX #3: corrected model filename to match /public exactly */}
         <Landmark id="kebab"
-          model="/yekdoener-transformed.glb"
+          model="/yek-doener-transformed.glb"
           glossy={false} floating={false}
           position={[LM.kebab.x, 0, LM.kebab.z]}
           rotation={[0, faceHQ(LM.kebab.x, LM.kebab.z), 0]}
@@ -121,7 +126,6 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
         />
 
         {/* ── Homebase HQ ──────────────────────────────────────────────────── */}
-        {/* No rotation needed — it IS the HQ, faces +Z by default */}
         <Landmark id="homebase"
           proceduralShape="house"
           position={[LM.homebase.x, 0, LM.homebase.z]}

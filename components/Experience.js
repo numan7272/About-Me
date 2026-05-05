@@ -58,37 +58,34 @@ export const LANDMARKS = {
     color: "#a78bfa",
     accent: "#7c3aed",
   },
+  // FIX #1: Correct homebase data (was placeholder text)
   homebase: {
     id: "homebase",
-    title: "Home",
-    subtitle: "Personal Projects & Self-Learning",
+    title: "Cybersecurity & Development HQ",
+    subtitle: "Independent Projects & Certifications",
     timeframe: "Ongoing",
-    text: "At home I build my own projects from scratch to learn: full-stack apps, security tools, and small automation scripts. Every project teaches me something I can't learn in a classroom.",
+    text: "Building full-stack applications like scheduling assistants and threat intelligence dashboards. Currently completing the Google Cybersecurity Professional Certificate and documenting my learning track on GitHub.",
     skills: ["Python & FastAPI", "React / Next.js", "Docker", "Kali Linux", "OSINT"],
     color: "#f472b6",
     accent: "#ec4899",
   },
 };
 
-const INITIAL_CAMERA = { fov: 42, position: [14, 18, 14], near: 0.5, far: 300 };
+// FIX #9: fov 50 for better overview of the 130-unit island
+const INITIAL_CAMERA = { fov: 50, position: [14, 18, 14], near: 0.5, far: 300 };
 
 export default function Experience() {
   const [activeId, setActiveId] = useState(null);
   const followModeRef = useRef(true);
   const orbitRef      = useRef(null);
 
-  // Proximity trigger (driving near)
-  const handleEnter = useCallback((id) => setActiveId(id), []);
-  const handleExit  = useCallback(
+  const handleEnter     = useCallback((id) => setActiveId(id), []);
+  const handleExit      = useCallback(
     (id) => setActiveId((cur) => (cur === id ? null : cur)),
     [],
   );
-
-  // Click trigger (clicking on the building)
   const handleClickOpen = useCallback((id) => setActiveId(id), []);
-
-  // Close via InfoCard X button
-  const handleClose = useCallback(() => setActiveId(null), []);
+  const handleClose     = useCallback(() => setActiveId(null), []);
 
   const activeCard = useMemo(
     () => (activeId ? LANDMARKS[activeId] : null),
@@ -114,6 +111,14 @@ export default function Experience() {
           <span className="md:hidden">Tap the pads to drive — or tap a building</span>
         </div>
       </div>
+
+      {/* Zentrieren button */}
+      <button
+        className="pointer-events-auto absolute bottom-8 left-1/2 z-30 -translate-x-1/2 rounded-full border border-white/15 bg-black/40 px-5 py-2 text-[12px] text-white/80 backdrop-blur-md transition hover:bg-white/10 hover:text-white"
+        onClick={() => { followModeRef.current = true; }}
+      >
+        Zentrieren
+      </button>
 
       <KeyboardControls map={KEY_MAP}>
         <Canvas

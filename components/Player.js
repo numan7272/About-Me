@@ -13,8 +13,8 @@ const ACCEL      = 6;
 const TURN_SPEED = 2.6;
 
 // ─── Smoke Particles ─────────────────────────────────────────────────────────
-// Small grey sphere puffs recycled via a flat-array pool. Single instanced
-// draw call. No black — pure mid-grey, small scale.
+// FIX #6: SphereGeometry(0.5, 8, 8) — 8 segments for a proper round sphere silhouette
+// FIX #2 (smoke color init): initialise instanceColor with transparent grey, not black
 const SMOKE_COUNT = 32;
 
 function SmokeParticles({ playerRef }) {
@@ -34,8 +34,8 @@ function SmokeParticles({ playerRef }) {
   const sc   = useRef(new Float32Array(SMOKE_COUNT));
 
   const dummy   = useMemo(() => new THREE.Object3D(), []);
-  // Sphere geometry — small (r=0.5 base, scaled per-particle to ~0.08–0.18)
-  const instGeo = useMemo(() => new THREE.SphereGeometry(0.5, 6, 6), []);
+  // FIX #6: 8×8 segments — round sphere, not a jagged polygon
+  const instGeo = useMemo(() => new THREE.SphereGeometry(0.5, 8, 8), []);
   const instMat = useMemo(() => new THREE.MeshBasicMaterial({
     color: 0xffffff,
     transparent: true,
@@ -51,16 +51,17 @@ function SmokeParticles({ playerRef }) {
     const inst = instRef.current;
     if (!inst) return;
     life.current.fill(0);
-    const black = new THREE.Color(0, 0, 0);
+    // FIX #2: init color as very dark grey (not pure black which looks bad at any alpha)
+    const initGrey = new THREE.Color(0.08, 0.08, 0.08);
     for (let i = 0; i < SMOKE_COUNT; i++) {
       dummy.position.set(0, -999, 0);
       dummy.scale.setScalar(0.001);
       dummy.updateMatrix();
       inst.setMatrixAt(i, dummy.matrix);
-      inst.setColorAt(i, black);
+      inst.setColorAt(i, initGrey);
     }
     inst.instanceMatrix.needsUpdate = true;
-    inst.instanceColor.needsUpdate  = true;
+    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
   }, [dummy]);
 
   useFrame((_, delta) => {
@@ -75,7 +76,6 @@ function SmokeParticles({ playerRef }) {
     let speed = 0;
     if (body) { const v = body.linvel(); speed = Math.hypot(v.x, v.z); }
 
-    // Emit one sphere puff every 0.04 s while moving
     if (speed > 0.5 && t > nextEmit.current && body) {
       nextEmit.current = t + 0.04;
       const i  = pool.current % SMOKE_COUNT;
@@ -90,7 +90,6 @@ function SmokeParticles({ playerRef }) {
       py.current[i] = 0.15 + Math.random()*0.08;
       pz.current[i] = pos.z + tmpB.z + (Math.random()-0.5)*0.18;
 
-      // Tiny velocity: slight upward drift + tiny spread
       vx.current[i] = (Math.random()-0.5)*0.18;
       vy.current[i] = 0.28 + Math.random()*0.22;
       vz.current[i] = (Math.random()-0.5)*0.18;
@@ -98,7 +97,7 @@ function SmokeParticles({ playerRef }) {
       const lifeT    = 0.5 + Math.random()*0.35;
       life.current[i] = lifeT;
       maxL.current[i] = lifeT;
-      // Sphere radius 0.09 – 0.16 (small and subtle)
+      // FIX #6: small spheres, radius 0.09–0.16
       sc.current[i]   = 0.09 + Math.random()*0.07;
     }
 
@@ -108,13 +107,13 @@ function SmokeParticles({ playerRef }) {
         dummy.scale.setScalar(0.001);
         dummy.updateMatrix();
         inst.setMatrixAt(i, dummy.matrix);
-        inst.setColorAt(i, tmpC.set(0, 0, 0));
+        // Park hidden particles as transparent, not black
+        inst.setColorAt(i, tmpC.set(0.08, 0.08, 0.08));
         continue;
       }
 
       life.current[i] -= dt;
 
-      // Light air drag + gentle upward float
       vx.current[i] *= 1 - 0.5*dt;
       vz.current[i] *= 1 - 0.5*dt;
       vy.current[i] -= 0.08*dt;
@@ -122,10 +121,8 @@ function SmokeParticles({ playerRef }) {
       py.current[i] += vy.current[i]*dt;
       pz.current[i] += vz.current[i]*dt;
 
-      const frac = Math.max(0, life.current[i] / maxL.current[i]);
-      // Grow slightly as it ages, stay small overall
+      const frac  = Math.max(0, life.current[i] / maxL.current[i]);
       const scale = sc.current[i] * (1 + (1-frac)*0.9);
-      // Fade in first 15% of life, then fade out
       const alpha = (frac < 0.15 ? frac/0.15 : frac) * 0.52;
 
       dummy.position.set(px.current[i], py.current[i], pz.current[i]);
@@ -133,8 +130,7 @@ function SmokeParticles({ playerRef }) {
       dummy.updateMatrix();
       inst.setMatrixAt(i, dummy.matrix);
 
-      // Pure mid-grey, no rotation needed for spheres
-      // Premultiply by alpha so BasicMaterial fakes transparency
+      // Pure mid-grey: 0.72–0.80 range, premultiplied by alpha
       const g = (0.72 + frac*0.08) * alpha;
       inst.setColorAt(i, tmpC.set(g, g, g));
     }
@@ -244,16 +240,16 @@ function SkidMarks({ playerRef }) {
   useEffect(() => {
     const inst = instRef.current;
     if (!inst) return;
-    const black = new THREE.Color(0, 0, 0);
+    const initC = new THREE.Color(0.08, 0.08, 0.08);
     for (let i = 0; i < SKID_MAX; i++) {
       dummy.position.set(0, -999, 0);
       dummy.scale.setScalar(0.001);
       dummy.updateMatrix();
       inst.setMatrixAt(i, dummy.matrix);
-      inst.setColorAt(i, black);
+      inst.setColorAt(i, initC);
     }
     inst.instanceMatrix.needsUpdate = true;
-    inst.instanceColor.needsUpdate  = true;
+    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
   }, [dummy]);
 
   useFrame((state) => {
@@ -286,7 +282,7 @@ function SkidMarks({ playerRef }) {
       inst.setColorAt(i, tmpC.set(v, v, v * 1.05));
 
       inst.instanceMatrix.needsUpdate = true;
-      inst.instanceColor.needsUpdate  = true;
+      if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
     }
   });
 
