@@ -295,10 +295,12 @@ function SkidMarks({ playerRef }) {
 }
 
 // ─── Grass Trail ─────────────────────────────────────────────────────────────
-// Flat dirt-patch instances laid down behind the bike whenever it's rolling
-// on the meadow (i.e. anywhere off the paved roads).  Looks like crushed-grass
-// tracks fading into the field. Recycles oldest entries once full.
-const TRAIL_MAX = 90;
+// Bruno-Simon-style soft tire tracks — two thin parallel strips per drop,
+// pale crushed-grass colour, that fade out over a couple of seconds. The
+// per-instance birth-time is read each frame to lerp the colour toward
+// transparent; once it's old, the slot is recycled.
+const TRAIL_MAX  = 220;             // 110 drops × 2 strips
+const TRAIL_LIFE = 4.5;             // seconds before a drop fully fades
 
 // Road segments duplicated from Decorations.js — the grass trail is suppressed
 // on tarmac because tracks would read as litter on a paved road.
@@ -338,79 +340,114 @@ function GrassTrail({ playerRef }) {
   const dummy    = useMemo(() => new THREE.Object3D(), []);
   const tmpQ     = useMemo(() => new THREE.Quaternion(), []);
   const tmpE     = useMemo(() => new THREE.Euler(), []);
-  const tmpC     = useMemo(() => new THREE.Color(), []);
+  const tmpRight = useMemo(() => new THREE.Vector3(), []);
+
   const trailGeo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
+
+  // Pale crushed-grass colour, set once on the material so every strip
+  // shares it. Fade is done by shrinking the instance scale to zero over
+  // its lifetime — Three's MeshBasicMaterial with vertexColors only
+  // updates RGB, not alpha, so an RGB-fade would end at solid black.
   const trailMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: 0xffffff,
+    color: 0xeaf0d0,
     transparent: true,
-    opacity: 1.0,
+    opacity: 0.7,
     depthWrite: false,
     side: THREE.DoubleSide,
-    vertexColors: true,
+    polygonOffset: true,
+    polygonOffsetFactor: -3,
+    polygonOffsetUnits: -3,
   }), []);
 
   const nextDrop = useRef(0);
   const headIdx  = useRef(0);
+  // Per-slot bookkeeping. We rebuild each instance's matrix every frame
+  // based on stored pos+yaw + the current age factor.
+  const birth      = useMemo(() => new Float32Array(TRAIL_MAX), []);
+  const slotX      = useMemo(() => new Float32Array(TRAIL_MAX), []);
+  const slotZ      = useMemo(() => new Float32Array(TRAIL_MAX), []);
+  const slotYaw    = useMemo(() => new Float32Array(TRAIL_MAX), []);
+  const slotLength = useMemo(() => new Float32Array(TRAIL_MAX), []);
 
   useEffect(() => {
     const inst = instRef.current;
     if (!inst) return;
-    const dim = new THREE.Color(0, 0, 0);
     for (let i = 0; i < TRAIL_MAX; i++) {
+      birth[i] = -1e6;             // already-expired sentinel
       dummy.position.set(0, -999, 0);
       dummy.scale.setScalar(0.001);
       dummy.updateMatrix();
       inst.setMatrixAt(i, dummy.matrix);
-      inst.setColorAt(i, dim);
     }
     inst.instanceMatrix.needsUpdate = true;
-    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
-  }, [dummy]);
+  }, [dummy, birth]);
 
   useFrame((state) => {
     const inst = instRef.current;
     const body = playerRef.current;
-    if (!inst || !body) return;
+    if (!inst) return;
 
+    const t = state.clock.getElapsedTime();
+
+    // ── Fade pass: shrink each live strip's width to zero as it ages.
+    // Once age exceeds TRAIL_LIFE, the slot has scale 0.001 and isn't
+    // rendered (BasicMaterial respects scale → it just disappears).
+    let dirty = false;
+    for (let i = 0; i < TRAIL_MAX; i++) {
+      if (birth[i] < -1e5) continue;
+      const age = t - birth[i];
+      if (age > TRAIL_LIFE) {
+        // Park it off-screen and mark it as expired so we stop touching it.
+        dummy.position.set(0, -999, 0);
+        dummy.scale.setScalar(0.001);
+        dummy.updateMatrix();
+        inst.setMatrixAt(i, dummy.matrix);
+        birth[i] = -1e6;
+        dirty = true;
+        continue;
+      }
+      const k    = 1 - age / TRAIL_LIFE;
+      const ease = k * k;            // quadratic ease-out
+      dummy.position.set(slotX[i], 0.014, slotZ[i]);
+      dummy.rotation.set(-Math.PI / 2, 0, slotYaw[i]);
+      dummy.scale.set(0.18 * ease, slotLength[i], 1);
+      dummy.updateMatrix();
+      inst.setMatrixAt(i, dummy.matrix);
+      dirty = true;
+    }
+    if (dirty) inst.instanceMatrix.needsUpdate = true;
+
+    // ── Emission: drop a new pair of strips if rolling fast on grass.
+    if (!body) return;
     const vel   = body.linvel();
     const speed = Math.hypot(vel.x, vel.z);
-    const t     = state.clock.getElapsedTime();
     if (speed < 1.2) return;
 
     const pos = body.translation();
     if (isOnTarmac(pos.x, pos.z)) return;
-    // Only leave tracks on the meadow — sand prints would look out of
-    // place on the beach and the trail isn't supposed to extend off the
-    // visible island.
-    if (!isInGrass(pos.x, pos.z)) return;
+    if (!isInGrass(pos.x, pos.z))  return;
 
-    // Drop a patch every 0.06 s of grass-rolling — gives a continuous trail
-    // at top speed without exhausting the 90-slot pool too quickly.
     if (t < nextDrop.current) return;
     nextDrop.current = t + 0.06;
 
     const r2 = body.rotation();
     tmpQ.set(r2.x, r2.y, r2.z, r2.w);
     tmpE.setFromQuaternion(tmpQ, "YXZ");
+    const yaw = tmpE.y;
 
-    const i = headIdx.current % TRAIL_MAX;
-    headIdx.current++;
+    // Bike right (Up × Forward) for the L/R wheel offset
+    tmpRight.set(Math.cos(yaw), 0, -Math.sin(yaw));
+    const TRACK_HALF = 0.32;
+    for (let side = -1; side <= 1; side += 2) {
+      const i = headIdx.current % TRAIL_MAX;
+      headIdx.current++;
 
-    dummy.position.set(pos.x, 0.014, pos.z);
-    dummy.rotation.set(-Math.PI / 2, 0, tmpE.y);
-    // Wider than skid marks (the bike is rolling, not sliding) and a bit
-    // shorter so trail patches read as discrete crushed-grass prints.
-    dummy.scale.set(0.55 + Math.random() * 0.18, 0.7 + Math.random() * 0.25, 1);
-    dummy.updateMatrix();
-    inst.setMatrixAt(i, dummy.matrix);
-
-    // Earthy dark olive — variation per patch so the trail isn't a uniform
-    // stripe. Pre-multiplied by a low alpha-equivalent for depthWrite=false.
-    const v = 0.10 + Math.random() * 0.05;
-    inst.setColorAt(i, tmpC.set(v * 0.95, v * 1.05, v * 0.55));
-
-    inst.instanceMatrix.needsUpdate = true;
-    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
+      slotX[i]      = pos.x + tmpRight.x * TRACK_HALF * side;
+      slotZ[i]      = pos.z + tmpRight.z * TRACK_HALF * side;
+      slotYaw[i]    = yaw;
+      slotLength[i] = 0.95 + Math.random() * 0.12;
+      birth[i]      = t;
+    }
   });
 
   return (

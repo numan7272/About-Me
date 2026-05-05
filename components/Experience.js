@@ -10,6 +10,7 @@ import InfoCard from "./InfoCard";
 import SocialDock from "./SocialDock";
 import MiniMap from "./Hud/MiniMap";
 import SpeedHud from "./Hud/SpeedHud";
+import StartScreen from "./StartScreen";
 
 const KEY_MAP = [
   { name: "forward",  keys: ["ArrowUp",   "KeyW", "KeyZ"] },
@@ -154,6 +155,10 @@ export default function Experience() {
 
       <InfoCard card={activeCard} onClose={handleClose} />
       <SocialDock />
+
+      {/* Click-to-start overlay — fades out on the first user interaction,
+          so the Canvas is already warm by the time the player engages. */}
+      <StartScreen />
     </main>
   );
 }

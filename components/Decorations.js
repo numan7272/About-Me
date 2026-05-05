@@ -41,8 +41,8 @@ const GRASS_VERT = /* glsl */`
     #include <begin_vertex>
 
     // Normalised height of this vertex inside the local cone (0 = root, 1 = tip)
-    // Cone height is 0.95 (see geometry args below); normalize against that.
-    float tipFactor = smoothstep(0.0, 1.0, (position.y + 0.001) / 0.95);
+    // Cone height is 1.05 (see geometry args below); normalize against that.
+    float tipFactor = smoothstep(0.0, 1.0, (position.y + 0.001) / 1.05);
 
     // Combine two sine waves with different frequencies — natural-feeling sway
     float wave  = sin(uTime * 1.6 + instanceSway) * 0.55
@@ -67,17 +67,20 @@ const GRASS_FRAG = /* glsl */`
   varying float vSway;
 
   void main() {
-    // Per-blade hue jitter so a field of 5500 doesn't look like one solid mat.
-    // sin(vSway) ∈ [-1, 1] — mapped to a small saturation/value wobble.
+    // Per-blade hue jitter so a field of 9000 blades doesn't read as one
+    // solid mat — sin(vSway) ∈ [-1, 1] mapped to a small wobble in
+    // saturation/value space.
     float jitter = 0.5 + 0.5 * sin(vSway * 3.71);
 
-    // Root colour: deep moss; tip colour: sun-bleached straw with a hint of green.
-    vec3 root = mix(vec3(0.10, 0.30, 0.13), vec3(0.14, 0.38, 0.17), jitter);
-    vec3 tip  = mix(vec3(0.42, 0.78, 0.30), vec3(0.66, 0.86, 0.36), jitter);
+    // Root: deep moss-shadow. Tip: saturated lime-green with a yellow
+    // edge for blades that catch the sun. Slightly more saturated than
+    // before to push the "Bruno Simon-style cartoon meadow" palette.
+    vec3 root = mix(vec3(0.07, 0.26, 0.10), vec3(0.12, 0.34, 0.14), jitter);
+    vec3 tip  = mix(vec3(0.46, 0.84, 0.26), vec3(0.74, 0.92, 0.32), jitter);
 
     vec3 col = mix(root, tip, vTip);
-    // Tiny vertical AO so the field reads as volumetric rather than flat
-    col *= mix(0.78, 1.0, vTip);
+    // Stronger vertical AO darkens the base so the field reads volumetric
+    col *= mix(0.62, 1.0, vTip);
 
     gl_FragColor = vec4(col, 1.0);
     #include <fog_fragment>
@@ -87,7 +90,8 @@ const GRASS_FRAG = /* glsl */`
 const ISLAND_HALF  = 68;           // sampling bounds; the polygon-fit test
                                     // (isInGrass) trims candidates beyond
                                     // the actual irregular coastline.
-const GRASS_COUNT  = 5500;
+const GRASS_COUNT  = 9000;          // denser meadow — closer to the Bruno-
+                                    // Simon spiky-grass density
 
 function GrassField() {
   const meshRef   = useRef();
@@ -182,9 +186,9 @@ function GrassField() {
       frustumCulled={false}
       receiveShadow
     >
-      {/* 3-sided cone = 3 low-poly triangles per blade. Taller (0.95) +
-          slightly skinnier than before for a thicker, more pasture feel. */}
-      <coneGeometry args={[0.085, 0.95, 3]} />
+      {/* 3-sided pyramid blade — narrower base + taller tip for the
+          spikier, denser look from the Bruno Simon screenshots. */}
+      <coneGeometry args={[0.055, 1.05, 3]} />
       <primitive object={material} attach="material" />
     </instancedMesh>
   );
@@ -683,37 +687,32 @@ const TREES_RAW = [
   [-22, 0, -10], [ 10, 0, -22], [-12, 0,  15],
 ];
 
-// Hand-placed lamp slots — many overlap roads/plazas. The filter at the
-// bottom of this file removes any that fall on a path.
+// Lamp posts — only ones lining the road network make sense. The "outer
+// ring" lamps that used to sit between landmarks and the coast were
+// removed; isolated lamps in the middle of nowhere read as random clutter
+// rather than civic infrastructure.
 const LAMPS_RAW = [
-  // Along north-south spine
-  [  0, 0,  18], [  0, 0, -18],
-  [  0, 0,  30], [  0, 0, -30],
-  // East-west spine
-  [ 18, 0,   0], [-18, 0,   0],
-  [ 30, 0,   0], [-30, 0,   0],
-  // Quad corners
-  [ 20, 0,  20], [-20, 0, -20],
-  [ 20, 0, -20], [-20, 0,  20],
-  // Outer ring of lamps — well clear of every road
-  [-46, 0,   0], [ 46, 0,   0],
-  [  0, 0,  46], [  0, 0, -46],
-  [ 32, 0,  32], [-32, 0, -32],
+  // Along the spokes radiating from HQ
+  [  0, 0,  16], [  0, 0, -16],
+  [ 16, 0,   0], [-16, 0,   0],
+  // Mid-spoke pairs, just on the grass beside each road
+  [-15, 0, -14], [ 17, 0,  -9],
+  [  3, 0,  16], [-14, 0,  13],
+  // Plaza approach lamps — placed at the junctions
+  [-31, 0, -28], [ 34, 0, -18],
+  [  6, 0,  32], [-28, 0,  26],
 ];
 
+// Houses — only the inland ones near roads remain. Edge houses near the
+// coastline were removed because they read as random debris on the new
+// natural island silhouette.
 const HOUSES = [
-  { pos: [-52, 0,  -5], rot: 0.4,        pi: 0, sc: 1.1,  v: 0 },
-  { pos: [ 52, 0,  28], rot: -0.3,       pi: 1, sc: 0.9,  v: 2 },
-  { pos: [ 52, 0, -38], rot: 0.8,        pi: 2, sc: 1.0,  v: 1 },
-  { pos: [-52, 0,  55], rot: -0.6,       pi: 3, sc: 1.2,  v: 0 },
-  { pos: [ 18, 0,  55], rot: 1.1,        pi: 4, sc: 0.85, v: 2 },
-  { pos: [-18, 0, -55], rot: -0.9,       pi: 5, sc: 1.05, v: 1 },
-  { pos: [ 55, 0,  -5], rot: 0.2,        pi: 0, sc: 0.95, v: 2 },
-  { pos: [-55, 0,  25], rot: 0.6,        pi: 2, sc: 1.15, v: 0 },
-  { pos: [  5, 0, -56], rot: -0.4,       pi: 3, sc: 0.9,  v: 1 },
-  { pos: [-40, 0,  -8], rot: 0.7,        pi: 5, sc: 0.8,  v: 2 },
-  { pos: [ 40, 0,  10], rot: -0.5,       pi: 1, sc: 1.0,  v: 0 },
-  { pos: [-12, 0,  52], rot: 0.3,        pi: 4, sc: 1.1,  v: 1 },
+  { pos: [-26, 0,  -8], rot: 0.4,  pi: 0, sc: 1.0,  v: 0 },
+  { pos: [ 28, 0,   8], rot: -0.3, pi: 1, sc: 0.95, v: 2 },
+  { pos: [-22, 0,  18], rot: 0.7,  pi: 2, sc: 1.0,  v: 1 },
+  { pos: [ 22, 0, -22], rot: -0.5, pi: 3, sc: 1.05, v: 2 },
+  { pos: [-14, 0, -28], rot: 1.1,  pi: 4, sc: 0.9,  v: 1 },
+  { pos: [ 14, 0,  28], rot: 0.2,  pi: 5, sc: 1.0,  v: 0 },
 ];
 
 const ROCKS = [
