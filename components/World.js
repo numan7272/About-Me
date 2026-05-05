@@ -19,6 +19,8 @@ import Decorations from "./Decorations";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Landmark world positions — spread across a 120×120 unit island
+// These are the single source of truth: Ground.js reads them via props
+// so that road segments always line up exactly with the landmarks.
 // ─────────────────────────────────────────────────────────────────────────────
 const LM = {
   haw:        { x: -38, z: -35 },
@@ -31,14 +33,12 @@ const LM = {
 export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
   const playerRef = useRef(null);
 
-  // Stable Vector2 for ChromaticAberration — must NOT be re-created each render
-  // or postprocessing will throw a uniform lookup error.
   const caOffset = useMemo(() => new Vector2(0.0005, 0.0005), []);
 
   return (
     <Suspense fallback={null}>
 
-      {/* ── Background colour — NO <fog> (incompatible with postprocessing RenderPass) */}
+      {/* Background — NO <fog> (incompatible with postprocessing RenderPass) */}
       <color attach="background" args={["#8ec8e8"]} />
 
       <Sky
@@ -52,13 +52,9 @@ export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
         mieDirectionalG={0.9}
       />
 
-      {/* ── Lighting ─────────────────────────────────────────────────────── */}
+      {/* ── Lighting ───────────────────────────────────────────────────────── */}
       <ambientLight intensity={0.45} color="#ddeeff" />
-
-      <hemisphereLight
-        args={["#c8e8ff", "#3d6b44", 0.55]}
-        position={[0, 50, 0]}
-      />
+      <hemisphereLight args={["#c8e8ff", "#3d6b44", 0.55]} position={[0, 50, 0]} />
 
       <directionalLight
         position={[45, 65, 30]}
@@ -76,23 +72,10 @@ export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
         shadow-bias={-0.0003}
         shadow-normalBias={0.06}
       />
-
-      <directionalLight
-        position={[-30, 25, -25]}
-        intensity={0.5}
-        color="#a8c8ff"
-        castShadow={false}
-      />
-
-      <directionalLight
-        position={[0, -8, 0]}
-        intensity={0.18}
-        color="#a8d8a0"
-        castShadow={false}
-      />
+      <directionalLight position={[-30, 25, -25]} intensity={0.5} color="#a8c8ff" castShadow={false} />
+      <directionalLight position={[0, -8, 0]} intensity={0.18} color="#a8d8a0" castShadow={false} />
 
       <SoftShadows size={28} samples={12} focus={0.55} />
-
       <ContactShadows
         position={[0, 0.015, 0]}
         opacity={0.28}
@@ -115,6 +98,8 @@ export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
 
       {/* ── Physics world ────────────────────────────────────────────────────── */}
       <Physics gravity={[0, -18, 0]}>
+
+        {/* Pass the same LM object to Ground so roads align with landmarks */}
         <Ground landmarkPositions={LM} />
         <Decorations />
 
@@ -172,33 +157,33 @@ export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
           onExit={onExit}
         />
 
-        {/* 4 · High School */}
+        {/* 4 · High School — SchoolBuilding procedural shape */}
         <Landmark
           id="highschool"
-          proceduralShape="diamond"
+          proceduralShape="school"
           position={[LM.highschool.x, 0, LM.highschool.z]}
           rotation={[0, Math.PI * 0.08, 0]}
-          colliderHalfExtents={[2.2, 2.2, 2.2]}
-          sensorHalfExtents={[6.0, 4.0, 6.0]}
+          colliderHalfExtents={[3.5, 3.0, 2.2]}
+          sensorHalfExtents={[6.5, 4.0, 6.5]}
           color="#a78bfa"
           glow="#7c3aed"
           label="Thor Heyerdahl"
-          modelYOffset={2.0}
+          modelYOffset={0}
           onEnter={onEnter}
           onExit={onExit}
         />
 
-        {/* 5 · Homebase HQ */}
+        {/* 5 · Homebase HQ — House procedural shape */}
         <Landmark
           id="homebase"
-          proceduralShape="sphere"
+          proceduralShape="house"
           position={[LM.homebase.x, 0, LM.homebase.z]}
-          colliderHalfExtents={[1.8, 1.8, 1.8]}
+          colliderHalfExtents={[2.0, 2.5, 1.6]}
           sensorHalfExtents={[6.0, 4.0, 6.0]}
           color="#f472b6"
           glow="#ec4899"
           label="HQ"
-          modelYOffset={1.5}
+          modelYOffset={0}
           onEnter={onEnter}
           onExit={onExit}
         />
@@ -206,11 +191,10 @@ export default function World({ onEnter, onExit, followModeRef, orbitRef }) {
         <Player playerRef={playerRef} followModeRef={followModeRef} />
       </Physics>
 
-      {/* ── Post-processing ───────────────────────────────────────────────────
-        NOTE: <fog> must NOT be used alongside this EffectComposer.
-        Three.js refreshFogUniforms() dereferences a uniform that the
-        postprocessing RenderPass does not initialise, causing a crash.
-        Atmospheric depth is handled by the Sky component instead.
+      {/* ── Post-processing ────────────────────────────────────────────────────
+        NOTE: <fog> must NOT be used alongside EffectComposer.
+        Three.js refreshFogUniforms() crashes the postprocessing RenderPass.
+        Use <Sky> + background color for atmosphere instead.
       */}
       <EffectComposer multisampling={0} disableNormalPass>
         <Bloom
