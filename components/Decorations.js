@@ -8,6 +8,8 @@ import * as THREE from "three";
 import { isInGrass } from "@/lib/islandShape";
 import { bikeState } from "@/lib/bikeStore";
 import { trackState } from "@/lib/trackTexture";
+import { sharedUniforms } from "@/lib/sharedUniforms";
+import { quality } from "@/lib/quality";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Seeded pseudo-random helper — deterministic so the layout never re-shuffles.
@@ -33,15 +35,17 @@ function seededRng(seed) {
 // ─────────────────────────────────────────────────────────────────────────────
 
 const GRASS_VERT = /* glsl */`
-  attribute vec3  iPos;            // per-instance world XZ + scale (in y)
-  attribute float aHash;           // per-instance 0..1 hash for jitter
+  attribute vec3  iPos;             // per-instance world XZ + scale (in y)
+  attribute float aHash;            // per-instance 0..1 hash for jitter
 
   uniform float     uTime;
-  uniform vec2      uWindDir;
+  uniform vec2      uWindDir;       // base drift direction
   uniform float     uWindStrength;
-  uniform sampler2D uTrackTex;     // off-screen render of bike trail
+  uniform sampler2D uWindNoiseTex;  // procedural noise — direction varies per location
+  uniform float     uWindNoiseScale;
+  uniform sampler2D uTrackTex;      // off-screen render of bike trail
   uniform float     uTrackWorldSize;
-  uniform float     uTrackHas;     // 0 if no texture available, 1 if ready
+  uniform float     uTrackHas;      // 0 if no texture available, 1 if ready
 
   varying float vTip;
   varying float vHash;
@@ -53,25 +57,30 @@ const GRASS_VERT = /* glsl */`
 
     // ── Track flatten: sample the off-screen track texture at this
     // blade's world position and squash the blade height by however
-    // bright the texture is at that pixel. Brighter = more recent
-    // bike pass = flatter blade. We don't go all the way to zero so
-    // tracked spots still have a thin stubble of grass.
+    // bright the texture is at that pixel.
     vec2 trackUv = vec2(iPos.x, iPos.z) / uTrackWorldSize + 0.5;
     float track  = uTrackHas * texture2D(uTrackTex, trackUv).r;
     float flatten = 1.0 - track * 0.85;
 
-    // Wind layer 1 — traveling gust plane wave
-    float gustPhase = (iPos.x * uWindDir.x + iPos.z * uWindDir.y) * 0.18 - uTime * 1.2;
-    float gust      = sin(gustPhase) * 0.55 + 0.55;
+    // ── Wind: sample a procedural 2D noise texture at this blade's
+    // world position offset by uTime * uWindDir. The R/G channels
+    // encode wind X/Z direction as 0..1, decoded back to -1..1 here.
+    // This produces spatially-varying, smoothly-flowing wind — the
+    // pattern reads as gusts curling across the meadow rather than
+    // every blade swaying on the same sine.
+    vec2 noiseUv = vec2(iPos.x, iPos.z) * uWindNoiseScale
+                 + uWindDir * uTime * 0.06;
+    vec4 noise   = texture2D(uWindNoiseTex, noiseUv);
+    vec2 windVec = noise.rg * 2.0 - 1.0;          // -1..1
 
-    // Wind layer 2 — per-blade hashed sway
+    // Per-blade hashed sub-sway so neighbours don't all move in lockstep
     float personal = sin(uTime * 1.7 + aHash * 6.2832) * 0.35;
 
-    float sway = (gust + personal) * uWindStrength;
-    local.x += sway * tip * uWindDir.x;
-    local.z += sway * tip * uWindDir.y;
+    // Combine: spatial-noise direction modulated by per-blade phase
+    float sway = (length(windVec) * 1.4 + personal) * uWindStrength;
+    local.x += sway * tip * windVec.x;
+    local.z += sway * tip * windVec.y;
 
-    // Per-instance scale stored in iPos.y; flatten applied to height
     float scale = iPos.y;
     local.x *= scale;
     local.z *= scale;
@@ -111,22 +120,20 @@ const GRASS_FRAG = /* glsl */`
 `;
 
 const ISLAND_HALF = 68;            // sampling bounds; isInGrass trims to coast
-const GRASS_COUNT = 12000;          // dense across the whole meadow
 
-function GrassField({ dayRef }) {
+function GrassField() {
   const meshRef = useRef();
-  const matRef  = useRef();
-  const timeRef = useRef(0);
 
   // Pre-compute every blade's anchor + scale + hash. Module-level deps
-  // are stable so this runs once.
+  // are stable so this runs once. Density depends on the device tier.
   const { iPos, hashes, count } = useMemo(() => {
+    const target = quality.grassCount;
     const rng = seededRng(0xdeadbeef);
     const positions = [];
     const hashList  = [];
     let placed   = 0;
     let attempts = 0;
-    while (placed < GRASS_COUNT && attempts < GRASS_COUNT * 6) {
+    while (placed < target && attempts < target * 6) {
       attempts++;
       const x = (rng() - 0.5) * (ISLAND_HALF * 2 - 4);
       const z = (rng() - 0.5) * (ISLAND_HALF * 2 - 4);
@@ -158,48 +165,34 @@ function GrassField({ dayRef }) {
     geom.setAttribute("aHash",  new THREE.InstancedBufferAttribute(hashes, 1));
   }, [iPos, hashes, count]);
 
-  useFrame((_, delta) => {
-    timeRef.current += delta;
-    const m = matRef.current;
-    if (!m) return;
-    m.uniforms.uTime.value = timeRef.current;
-    if (dayRef?.current) {
-      m.uniforms.uDayWeight.value = dayRef.current.dayWeight ?? 1;
-    }
-    // Late-binding: TrackTexture creates the render target in a
-    // useMemo, so the first few frames may run before its texture is
-    // available. Once it's set, we keep the uniform synced. uTrackHas
-    // = 0 until it's there so the shader doesn't read undefined.
-    if (trackState.texture) {
-      m.uniforms.uTrackTex.value = trackState.texture;
-      m.uniforms.uTrackHas.value = 1;
-    }
-  });
-
+  // The material reuses sharedUniforms by reference — no per-frame
+  // updates needed here, World.js ticks them once for all materials.
   const material = useMemo(
     () =>
       new THREE.ShaderMaterial({
         vertexShader:   GRASS_VERT,
         fragmentShader: GRASS_FRAG,
         uniforms: {
-          uTime:           { value: 0 },
-          uWindDir:        { value: new THREE.Vector2(0.65, 0.76) },
-          uWindStrength:   { value: 0.18 },
+          // shared with every other wind/day/track-aware material
+          uTime:           sharedUniforms.uTime,
+          uWindDir:        sharedUniforms.uWindDir,
+          uWindStrength:   sharedUniforms.uWindStrength,
+          uWindNoiseTex:   sharedUniforms.uWindNoiseTex,
+          uWindNoiseScale: sharedUniforms.uWindNoiseScale,
+          uDayWeight:      sharedUniforms.uDayWeight,
+          uTrackTex:       sharedUniforms.uTrackTex,
+          uTrackWorldSize: sharedUniforms.uTrackWorldSize,
+          uTrackHas:       sharedUniforms.uTrackHas,
+          // material-specific: blade colour palette
           uTipColorA:      { value: new THREE.Color(0.46, 0.84, 0.26) },
           uTipColorB:      { value: new THREE.Color(0.74, 0.92, 0.32) },
           uRootColorA:     { value: new THREE.Color(0.07, 0.26, 0.10) },
           uRootColorB:     { value: new THREE.Color(0.12, 0.34, 0.14) },
-          uDayWeight:      { value: 1.0 },
-          uTrackTex:       { value: null },
-          uTrackWorldSize: { value: trackState.worldSize },
-          uTrackHas:       { value: 0 },
         },
         side: THREE.DoubleSide,
       }),
     [],
   );
-
-  useEffect(() => { matRef.current = material; }, [material]);
 
   return (
     <instancedMesh
@@ -1240,7 +1233,7 @@ export default function Decorations({ dayRef, rainEnabled = false }) {
   return (
     <group>
       {/* Static-placement grass field with track-flatten via shader */}
-      <GrassField dayRef={dayRef} />
+      <GrassField />
 
       {/* Drifting cloud shadows on the meadow */}
       <CloudShadows dayRef={dayRef} />

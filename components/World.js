@@ -20,6 +20,11 @@ import EasterEggs from "./EasterEggs";
 import TrackTexture from "./TrackTexture";
 
 import { sample as sampleDayCycle } from "@/lib/dayCycle";
+import { sharedUniforms } from "@/lib/sharedUniforms";
+import { getWindNoiseTexture } from "@/lib/windNoise";
+import { trackState } from "@/lib/trackTexture";
+import { bikeState } from "@/lib/bikeStore";
+import { quality } from "@/lib/quality";
 
 // ─── Landmark positions (single source of truth) ─────────────────────────────
 const LM = {
@@ -32,6 +37,40 @@ const LM = {
 
 function faceHQ(x, z, offset = 0) {
   return Math.atan2(0 - x, 0 - z) + offset;
+}
+
+/**
+ * Single per-frame tick that updates every shared shader uniform.
+ *
+ * In Bruno's folio-2025 the equivalent of this is the central
+ * Materials.js + main game tick: every shader that cares about time,
+ * wind, day-cycle or the track texture references the SAME uniform
+ * objects, and one tick updates them for everyone. We do the same —
+ * after this useFrame runs, every grass blade / water ripple / cloud
+ * shadow already sees the new values on its next draw call.
+ */
+function SharedUniformsTick({ dayRef }) {
+  // Inject the wind-noise texture into the shared uniform once, on mount.
+  useMemo(() => {
+    sharedUniforms.uWindNoiseTex.value = getWindNoiseTexture();
+    sharedUniforms.uTrackWorldSize.value = trackState.worldSize;
+  }, []);
+
+  useFrame((_, delta) => {
+    sharedUniforms.uTime.value += delta;
+    sharedUniforms.uPlayerPos.value.set(bikeState.x, 0, bikeState.z);
+    if (dayRef.current) {
+      sharedUniforms.uDayWeight.value = dayRef.current.dayWeight ?? 1;
+    }
+    // TrackTexture creates the render target asynchronously in a
+    // useMemo — once ready, route it to the shared uniform so grass
+    // (and any future track-aware shader) sees it.
+    if (trackState.texture) {
+      sharedUniforms.uTrackTex.value = trackState.texture;
+      sharedUniforms.uTrackHas.value = 1;
+    }
+  });
+  return null;
 }
 
 /**
@@ -110,7 +149,7 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
       <directionalLight
         ref={sunRef}
         position={[45,65,30]} intensity={2.6} color="#fff4d6" castShadow
-        shadow-mapSize-width={2048} shadow-mapSize-height={2048}
+        shadow-mapSize-width={quality.shadowMap} shadow-mapSize-height={quality.shadowMap}
         shadow-camera-near={0.5} shadow-camera-far={250}
         shadow-camera-left={-70} shadow-camera-right={70}
         shadow-camera-top={70} shadow-camera-bottom={-70}
@@ -134,6 +173,10 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
       />
 
       <FollowCamera targetRef={playerRef} followModeRef={followModeRef} orbitRef={orbitRef} />
+
+      {/* Single per-frame tick that updates every shared uniform — every
+          wind/day/track-aware shader picks up the new values for free. */}
+      <SharedUniformsTick dayRef={dayRef} />
 
       {/* Water surrounding the floating island — no physics, purely visual */}
       <Water dayRef={dayRef} />
@@ -233,19 +276,22 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
 
       <EffectComposer multisampling={0}>
         {/* SSAO pass — soft contact shadows where geometry meets the
-            ground, makes the bike + buildings feel grounded. */}
-        <SSAO
-          blendFunction={BlendFunction.MULTIPLY}
-          samples={16}
-          radius={4}
-          intensity={20}
-          luminanceInfluence={0.7}
-          worldDistanceThreshold={0.5}
-          worldDistanceFalloff={0.1}
-          worldProximityThreshold={6}
-          worldProximityFalloff={2}
-          fade={0.02}
-        />
+            ground, makes the bike + buildings feel grounded. Skipped on
+            low-tier devices where the extra G-buffer pass is too costly. */}
+        {quality.ssaoEnabled && (
+          <SSAO
+            blendFunction={BlendFunction.MULTIPLY}
+            samples={16}
+            radius={4}
+            intensity={20}
+            luminanceInfluence={0.7}
+            worldDistanceThreshold={0.5}
+            worldDistanceFalloff={0.1}
+            worldProximityThreshold={6}
+            worldProximityFalloff={2}
+            fade={0.02}
+          />
+        )}
         <Bloom intensity={0.65} luminanceThreshold={0.82} luminanceSmoothing={0.5} mipmapBlur />
         <ChromaticAberration offset={caOffset} radialModulation={false} modulationOffset={0} />
         <Vignette eskil={false} offset={0.2} darkness={0.55} />
