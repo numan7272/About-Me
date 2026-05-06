@@ -178,8 +178,9 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
           wind/day/track-aware shader picks up the new values for free. */}
       <SharedUniformsTick dayRef={dayRef} />
 
-      {/* Water surrounding the floating island — no physics, purely visual */}
-      <Water dayRef={dayRef} />
+      {/* Water surrounding the floating island — no physics, purely
+          visual.  Reads uTime + uDayWeight from shared uniforms now. */}
+      <Water />
 
       {/* Off-screen track-texture pipeline. Renders the bike's recent
           path into a render target every frame; the grass shader reads
@@ -274,7 +275,13 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
         opacity={0.4}
       />
 
-      <EffectComposer multisampling={0}>
+      {/* multisampling: 4 anti-aliases triangle edges before the
+          postprocessing chain runs — the grass + bike + everything
+          else come out of the geometry pass with smooth silhouettes
+          instead of stair-stepped triangle edges. Costs ~25% on the
+          render-target memory + bandwidth, fine on desktop, may need
+          tuning on low-tier mobile. */}
+      <EffectComposer multisampling={quality.tier === "low" ? 0 : 4}>
         {/* SSAO pass — soft contact shadows where geometry meets the
             ground, makes the bike + buildings feel grounded. Skipped on
             low-tier devices where the extra G-buffer pass is too costly. */}

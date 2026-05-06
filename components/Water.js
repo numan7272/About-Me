@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useRef } from "react";
-import { useFrame } from "@react-three/fiber";
+import { useMemo } from "react";
 import * as THREE from "three";
+
+import { sharedUniforms } from "@/lib/sharedUniforms";
 
 /**
  * Bruno-Simon-style flat water surface.
@@ -93,20 +94,21 @@ const WATER_FRAG = /* glsl */ `
   }
 `;
 
-export default function Water({ dayRef }) {
-  const matRef = useRef(null);
-
+// Water no longer needs a per-frame useFrame — its uTime + uDayWeight
+// uniforms reference the shared registry that World.js's
+// SharedUniformsTick updates once for every wind/day-aware shader.
+export default function Water() {
   const material = useMemo(
     () =>
       new THREE.ShaderMaterial({
         vertexShader:   WATER_VERT,
         fragmentShader: WATER_FRAG,
         uniforms: {
-          uTime:      { value: 0 },
+          uTime:      sharedUniforms.uTime,        // shared
+          uDayWeight: sharedUniforms.uDayWeight,   // shared
           uShallow:   { value: new THREE.Color("#5fb1d8") },
           uDeep:      { value: new THREE.Color("#16365e") },
           uFoamColor: { value: new THREE.Color("#f3faff") },
-          uDayWeight: { value: 1.0 },
         },
         transparent: true,
         depthWrite:  false,
@@ -114,14 +116,6 @@ export default function Water({ dayRef }) {
       }),
     [],
   );
-  matRef.current = material;
-
-  useFrame((_, dt) => {
-    matRef.current.uniforms.uTime.value += dt;
-    if (dayRef?.current) {
-      matRef.current.uniforms.uDayWeight.value = dayRef.current.dayWeight ?? 1;
-    }
-  });
 
   return (
     <mesh

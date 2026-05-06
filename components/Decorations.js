@@ -136,15 +136,23 @@ const GRASS_FRAG = /* glsl */`
     col *= mix(0.55, 1.0, vTip);                     // base AO
     col = mix(col * vec3(0.18, 0.24, 0.42), col, uDayWeight);
 
-    gl_FragColor = vec4(col, 1.0);
+    // Soft tip — fade alpha in the topmost ~12% of the blade so the
+    // pointed silhouette dissolves instead of ending in a hard edge.
+    // Combined with multisampling on the composer, this rounds the
+    // visible tip without us needing per-vertex AA.
+    float tipAlpha = 1.0 - smoothstep(0.88, 1.0, vTip);
+    if (tipAlpha < 0.05) discard;
+    gl_FragColor = vec4(col, tipAlpha);
   }
 `;
 
 const ISLAND_HALF = 68;             // sampling bounds; isInGrass trims to coast
 
 // Blade dimensions — calibrated against Bruno's folio-2025 Grass.js.
-const BLADE_WIDTH  = 0.075;
-const BLADE_HEIGHT = 0.42;
+// Smaller than before so individual triangles disappear into the
+// crowd at typical camera distances.
+const BLADE_WIDTH  = 0.052;
+const BLADE_HEIGHT = 0.32;
 
 // bladeShape encodes per-vertex offsets for a single triangle:
 //   vertex 0 → tip:        ( 0,  1)
@@ -222,6 +230,10 @@ function GrassField() {
           uRootColorB:     { value: new THREE.Color(0.12, 0.34, 0.14) },
         },
         side: THREE.DoubleSide,
+        transparent: true,           // soft-tip alpha needs blending
+        depthWrite: true,            // keep opaque-style depth so blades
+                                     // occlude each other correctly
+        alphaTest:  0.05,            // discard fully-transparent fragments
       }),
     [],
   );
