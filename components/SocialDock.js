@@ -20,7 +20,7 @@ const LINKS = [
   },
   {
     label: "Email",
-    href: "mailto:numan@example.com",
+    href: "mailto:numan.yesil72@gmail.com",
     icon: Mail,
     hoverColor: "#22d3ee",
     hoverGlow: "rgba(34, 211, 238, 0.55)",
@@ -78,16 +78,6 @@ export default function SocialDock() {
                 </span>
               </motion.a>
             ))}
-
-            <span aria-hidden className="mx-1 h-5 w-px bg-white/10" />
-
-            <div className="mr-2 flex items-center gap-1.5 px-1 text-[10px] font-medium uppercase tracking-[0.18em] text-zinc-500">
-              <span className="relative inline-flex h-1.5 w-1.5">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/70" />
-                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-400" />
-              </span>
-              Available
-            </div>
           </div>
         </div>
       </motion.nav>

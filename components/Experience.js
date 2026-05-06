@@ -11,6 +11,10 @@ import SocialDock from "./SocialDock";
 import MiniMap from "./Hud/MiniMap";
 import SpeedHud from "./Hud/SpeedHud";
 import StartScreen from "./StartScreen";
+import DiscoveryHud from "./DiscoveryHud";
+import PhotoMode from "./PhotoMode";
+import AudioManager, { playClick } from "./AudioManager";
+import useDiscoveries from "@/lib/useDiscoveries";
 
 const KEY_MAP = [
   { name: "forward",  keys: ["ArrowUp",   "KeyW", "KeyZ"] },
@@ -123,51 +127,44 @@ export const EASTER_EGGS = {
 const INITIAL_CAMERA = { fov: 50, position: [14, 18, 14], near: 0.5, far: 300 };
 
 export default function Experience() {
-  const [activeId, setActiveId] = useState(null);
+  const [activeId,    setActiveId]    = useState(null);
+  const [photoMode,   setPhotoMode]   = useState(false);
   const followModeRef = useRef(true);
   const orbitRef      = useRef(null);
+
+  const discoveries = useDiscoveries();
 
   const handleEnter     = useCallback((id) => setActiveId(id), []);
   const handleExit      = useCallback(
     (id) => setActiveId((cur) => (cur === id ? null : cur)),
     [],
   );
-  const handleClickOpen = useCallback((id) => setActiveId(id), []);
+  // Opening any card plays a UI click. Easter-egg ids also mark the
+  // discovery so the tracker badge ticks up + the toast fires.
+  const handleClickOpen = useCallback((id) => {
+    setActiveId(id);
+    playClick();
+    if (id in EASTER_EGGS) discoveries.markDiscovered(id);
+  }, [discoveries]);
   const handleClose     = useCallback(() => setActiveId(null), []);
+
+  const enterPhoto = useCallback(() => {
+    setPhotoMode(true);
+    setActiveId(null);          // close any open card so the screenshot is clean
+  }, []);
+  const exitPhoto  = useCallback(() => setPhotoMode(false), []);
 
   const activeCard = useMemo(
     () => (activeId ? (LANDMARKS[activeId] ?? EASTER_EGGS[activeId] ?? null) : null),
     [activeId],
   );
 
+  // Photo mode hides every UI overlay so the screenshot only contains the
+  // 3D world. We just toggle a className on a wrapper around the HUDs.
+  const hudVisibility = photoMode ? "opacity-0 pointer-events-none" : "opacity-100";
+
   return (
     <main className="relative h-[100dvh] w-screen overflow-hidden bg-black select-none">
-
-      {/* Hint bar */}
-      <div className="pointer-events-none absolute left-1/2 top-5 z-30 -translate-x-1/2 text-center">
-        <div className="text-[10px] uppercase tracking-[0.32em] text-zinc-400/80">
-          Numan&apos;s Roadmap
-        </div>
-        <div className="mt-1 text-[12px] text-zinc-300/80">
-          <span className="hidden md:inline">
-            Drive with{" "}
-            <kbd className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px]">W A S D</kbd>
-            {" / "}
-            <kbd className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px]">↑ ← ↓ →</kbd>
-            {" — or click any building"}
-          </span>
-          <span className="md:hidden">Drag the dial next to the bike — or tap a building</span>
-        </div>
-      </div>
-
-      {/* Recenter button — sits above the social dock so they never collide */}
-      <button
-        className="pointer-events-auto absolute left-1/2 z-30 -translate-x-1/2 rounded-full border border-white/15 bg-black/40 px-5 py-2 text-[12px] text-white/80 backdrop-blur-md transition hover:bg-white/10 hover:text-white
-                   bottom-20 md:bottom-20"
-        onClick={() => { followModeRef.current = true; }}
-      >
-        Recenter
-      </button>
 
       <KeyboardControls map={KEY_MAP}>
         <Canvas
@@ -177,7 +174,10 @@ export default function Experience() {
             antialias: true,
             powerPreference: "high-performance",
             stencil: false,
-            // Cinematic color pipeline — tone mapping happens in the renderer
+            // preserveDrawingBuffer is required for canvas.toDataURL() to
+            // return the current frame instead of an empty image — Photo
+            // mode relies on this when grabbing screenshots.
+            preserveDrawingBuffer: true,
             toneMapping: THREE.ACESFilmicToneMapping,
             toneMappingExposure: 1.05,
             outputColorSpace: THREE.SRGBColorSpace,
@@ -195,15 +195,62 @@ export default function Experience() {
         </Canvas>
       </KeyboardControls>
 
-      {/* HUD overlays */}
-      <MiniMap activeId={activeId} />
-      <SpeedHud />
+      {/* All HUD overlays go inside this wrapper so photo mode can hide
+          them in one shot via the opacity class. The Canvas above sits
+          behind so the screenshot never picks up any UI chrome. */}
+      <div className={`absolute inset-0 transition-opacity duration-300 ${hudVisibility}`}>
+        {/* Hint bar */}
+        <div className="pointer-events-none absolute left-1/2 top-5 z-30 -translate-x-1/2 text-center">
+          <div className="text-[10px] uppercase tracking-[0.32em] text-zinc-400/80">
+            Numan&apos;s Roadmap
+          </div>
+          <div className="mt-1 text-[12px] text-zinc-300/80">
+            <span className="hidden md:inline">
+              Drive with{" "}
+              <kbd className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px]">W A S D</kbd>
+              {" / "}
+              <kbd className="rounded border border-white/15 bg-white/5 px-1.5 py-0.5 text-[10px]">↑ ← ↓ →</kbd>
+              {" — or click any building"}
+            </span>
+            <span className="md:hidden">Drag the dial next to the bike — or tap a building</span>
+          </div>
+        </div>
 
-      <InfoCard card={activeCard} onClose={handleClose} />
-      <SocialDock />
+        {/* Recenter button */}
+        <button
+          className="pointer-events-auto absolute left-1/2 z-30 -translate-x-1/2 rounded-full border border-white/15 bg-black/40 px-5 py-2 text-[12px] text-white/80 backdrop-blur-md transition hover:bg-white/10 hover:text-white
+                     bottom-20 md:bottom-20"
+          onClick={() => { followModeRef.current = true; }}
+        >
+          Recenter
+        </button>
 
-      {/* Click-to-start overlay — fades out on the first user interaction,
-          so the Canvas is already warm by the time the player engages. */}
+        <MiniMap activeId={activeId} />
+        <SpeedHud />
+
+        {/* Discovery tracker badge + unlock toast */}
+        <DiscoveryHud
+          count={discoveries.count}
+          total={discoveries.total}
+          allFound={discoveries.allFound}
+          justUnlocked={discoveries.justUnlocked}
+          onToastDone={discoveries.clearJustUnlocked}
+        />
+
+        <InfoCard card={activeCard} onClose={handleClose} />
+        <SocialDock />
+
+        {/* Audio mute button — also bootstraps the audio system */}
+        <AudioManager />
+      </div>
+
+      {/* Photo mode lives outside the HUD wrapper so its own button +
+          screenshot pill stay visible while the HUDs are hidden. */}
+      <PhotoMode enabled={photoMode} onEnter={enterPhoto} onExit={exitPhoto} />
+
+      {/* Click-to-start overlay — fades out on the first user
+          interaction. Stays outside the HUD wrapper so it can't be
+          accidentally hidden by photo mode. */}
       <StartScreen />
     </main>
   );
