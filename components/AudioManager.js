@@ -87,6 +87,26 @@ export default function AudioManager() {
     wheelsRef.current  = make("/wheels.mp3",  { loop: true,  volume: 0.0  });
     clickRef.current   = make("/click.mp3",   { loop: false, volume: 0.55 });
 
+    // Self-healing safety: a real UI-click sample is ~50–200 ms. If the
+    // file at /click.mp3 turns out to be longer than 1.5 s — usually a
+    // sign it was uploaded by mistake instead of an actual click — we
+    // disable the click track so it can't ring out behind the player.
+    // The mute button + ambient + wheels keep working as normal.
+    if (clickRef.current) {
+      const c = clickRef.current;
+      const onMeta = () => {
+        if (Number.isFinite(c.duration) && c.duration > 1.5) {
+          console.warn(
+            `[audio] /click.mp3 is ${c.duration.toFixed(1)}s (expected <0.5s) — disabling click sfx`,
+          );
+          try { c.pause(); } catch { /* noop */ }
+          clickRef.current = null;
+        }
+        c.removeEventListener("loadedmetadata", onMeta);
+      };
+      c.addEventListener("loadedmetadata", onMeta);
+    }
+
     return () => {
       [ambientRef, wheelsRef, clickRef].forEach((r) => {
         if (r.current) {
@@ -148,7 +168,7 @@ export default function AudioManager() {
       stopTimer = window.setTimeout(() => {
         try { a.pause(); a.currentTime = 0; } catch { /* noop */ }
         stopTimer = null;
-      }, 700);
+      }, 400);
     };
     window.addEventListener("ui:click", onClick);
     return () => {
