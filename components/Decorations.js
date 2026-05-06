@@ -52,8 +52,10 @@ const GRASS_VERT = /* glsl */`
 
   void main() {
     // Local blade vertex (tapered ribbon). tipFactor = 0 at root, 1 at tip.
+    // Divisor matches BLADE_HEIGHT in the JS geometry so the upper verts
+    // (which sit at 0.40 m) read as tip = 1.0.
     vec3 local = position;
-    float tip  = smoothstep(0.0, 1.0, (local.y + 0.001) / 0.55);
+    float tip  = smoothstep(0.0, 1.0, (local.y + 0.001) / 0.40);
 
     // Camera-facing rotation (Bruno's trick): each blade rotates around
     // its base so the flat ribbon faces the camera. With a small
@@ -135,37 +137,61 @@ const ISLAND_HALF = 68;            // sampling bounds; isInGrass trims to coast
 // Blade dimensions — calibrated against Bruno's folio-2025 Grass.js
 // (height 0.6, width 0.1 at base). My earlier 1.05 m height made blades
 // read as spears jutting out of the ground.
-const BLADE_HEIGHT = 0.55;
-const BLADE_BASE_W = 0.085;
-const BLADE_MID_W  = 0.045;
+const BLADE_HEIGHT = 0.40;
+const BLADE_BASE_W = 0.110;
+const BLADE_LOWMID_W = 0.090;
+const BLADE_MIDHI_W  = 0.055;
+const BLADE_UPPER_W  = 0.025;
 
 /**
- * Custom blade geometry — 5 vertices forming a tapered ribbon:
+ * Custom blade geometry — 7 vertices forming a leaf-shaped tapered ribbon:
  *
- *         tip
- *        /   \
- *      ml --- mr        (mid, ~half base width)
- *      /       \
- *    bl ------- br      (base)
+ *           tip
+ *          /   \
+ *        ul --- ur          80% — narrow neck
+ *       /         \
+ *     ml --------- mr       55% — main body
+ *      \           /
+ *       ll ----- lr         15% — slightly bowed lower
+ *         \     /
+ *          bl - br          0%  — base, full width
  *
- * The mid vertices act as a hinge — the wind shader bends the upper
- * half (mid + tip) more than the base via tipFactor.
+ * The slight outward bow at lower-mid + smooth taper toward the tip
+ * gives a real grass-blade silhouette instead of a sharp triangle.
+ * Five triangles total. The mid-vertices are the wind-shader's hinge
+ * points — the upper section bends most via tipFactor.
  */
 const bladeGeometry = (() => {
+  const H = BLADE_HEIGHT;
   const positions = new Float32Array([
     // bl, br — base, full width
-    -BLADE_BASE_W, 0.00, 0,
-     BLADE_BASE_W, 0.00, 0,
-    // ml, mr — mid, half base width
-    -BLADE_MID_W,  BLADE_HEIGHT * 0.55, 0,
-     BLADE_MID_W,  BLADE_HEIGHT * 0.55, 0,
+    -BLADE_BASE_W,    0.00 * H, 0,
+     BLADE_BASE_W,    0.00 * H, 0,
+    // ll, lr — lower-mid, slightly narrower (gives the soft outward curl
+    //                                        at the base)
+    -BLADE_LOWMID_W,  0.18 * H, 0,
+     BLADE_LOWMID_W,  0.18 * H, 0,
+    // ml, mr — main body
+    -BLADE_MIDHI_W,   0.55 * H, 0,
+     BLADE_MIDHI_W,   0.55 * H, 0,
+    // ul, ur — upper neck
+    -BLADE_UPPER_W,   0.85 * H, 0,
+     BLADE_UPPER_W,   0.85 * H, 0,
     // tip
-     0.000,        BLADE_HEIGHT, 0,
+     0.000,           1.00 * H, 0,
   ]);
   const indices = [
-    0, 1, 3,    // bl, br, mr — lower-right
-    0, 3, 2,    // bl, mr, ml — lower-left
-    2, 3, 4,    // ml, mr, tip — upper triangle
+    // base section
+    0, 1, 3,
+    0, 3, 2,
+    // lower mid section
+    2, 3, 5,
+    2, 5, 4,
+    // upper mid section
+    4, 5, 7,
+    4, 7, 6,
+    // tip cap
+    6, 7, 8,
   ];
   const g = new THREE.BufferGeometry();
   g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
