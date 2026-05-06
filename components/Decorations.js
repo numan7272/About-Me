@@ -80,7 +80,14 @@ const GRASS_VERT = /* glsl */`
 
   void main() {
     vec3 base = position;                    // world XZ + Y=0
-    float scale = 0.7 + aHash * 0.55;        // per-blade size variation
+
+    // Wide scale range biased toward shorter blades — the meadow has
+    // mostly knee-high grass with occasional tall outliers.
+    //   pow(aHash, 1.3) * 1.6 + 0.4  →  ~70% of blades fall under
+    //   scale 1.0, but ~10% extend past 1.5 (and a few past 1.8) so
+    //   the field has visible texture variation rather than uniform
+    //   chevrons.
+    float scale = 0.40 + pow(aHash, 1.3) * 1.60;
 
     // Per-vertex local offset: side along ±X (multiplied by width),
     // up along Y (multiplied by height). aShape.y is also our tipFactor.
@@ -116,9 +123,19 @@ const GRASS_VERT = /* glsl */`
     // (aShape.y is 0 at base, 1 at tip).
     vec2 tipPush = sway * aShape.y * uBladeHeight * windVec;
 
-    vec3 offset = vec3(sideXZ.x + tipPush.x,
+    // Static lean — bake a per-blade tilt into the tip so blades aren't
+    // all standing perfectly upright at rest.  Direction from another
+    // hash mapping, magnitude scales with blade height. Real grass
+    // never stands soldier-straight; this gives the relaxed messy
+    // look from the reference photo.
+    float leanA   = aHash * 11.13;                       // de-correlate from rotY
+    vec2  leanDir = vec2(sin(leanA), cos(leanA));
+    float leanAmt = (aHash - 0.5) * 0.35 * uBladeHeight * scale;
+    vec2  leanXZ  = leanDir * leanAmt * aShape.y;
+
+    vec3 offset = vec3(sideXZ.x + tipPush.x + leanXZ.x,
                        h * flatten,
-                       sideXZ.y + tipPush.y);
+                       sideXZ.y + tipPush.y + leanXZ.y);
 
     gl_Position = projectionMatrix * viewMatrix * vec4(base + offset, 1.0);
 
@@ -146,6 +163,14 @@ const GRASS_FRAG = /* glsl */`
     vec3 root = mix(uRootColorA, uRootColorB, jitter);
     vec3 tip  = mix(uTipColorA,  uTipColorB,  jitter);
 
+    // ~20% of blades pick a yellow-green tip — adds the hay/sun-bleached
+    // streaks you see in real meadows next to deeper greens. Step
+    // function on a hash gate keeps the rest of the field on the
+    // standard palette.
+    float yellowGate = step(0.78, fract(vHash * 13.7));
+    vec3  yellowTip  = vec3(0.88, 0.94, 0.34);
+    tip = mix(tip, yellowTip, yellowGate);
+
     vec3 col = mix(root, tip, vTip);
     col *= mix(0.55, 1.0, vTip);                     // base AO
     col = mix(col * vec3(0.18, 0.24, 0.42), col, uDayWeight);
@@ -153,28 +178,27 @@ const GRASS_FRAG = /* glsl */`
     // ── Leaf-shape alpha cutout ─────────────────────────────────────
     // The triangle has aShape spanning -1..1 horizontally, 0..1
     // vertically.  Combined with the wind+camera-facing transform
-    // it's a flat camera-facing triangle.  To make it READ as a
-    // grass blade rather than a sharp triangle, we fade alpha:
-    //  • horizontally → softer outer 15% of the width (sideAlpha)
-    //  • vertically near the tip → softer top 15% of the height
-    // Then alphaTest discards the bits beyond the fade. MSAA does
-    // the actual edge anti-aliasing for us; this just reshapes the
-    // silhouette into a leaf instead of a triangle.
+    // it's a flat camera-facing triangle.  To read as a grass blade
+    // rather than a sharp triangle, fade alpha:
+    //  • horizontally → softer outer ~10% of the width (sideAlpha)
+    //  • vertically near the tip → softer top ~12% of the height
+    // Threshold lowered to 0.10 (was 0.18) so the thinner blades
+    // don't end up almost-empty after the cut.
     float sideAlpha = 1.0 - abs(vSide);              // 1 centre → 0 edges
-    float tipAlpha  = 1.0 - smoothstep(0.85, 1.0, vTip);
+    float tipAlpha  = 1.0 - smoothstep(0.88, 1.0, vTip);
     float alpha     = sideAlpha * tipAlpha;
-    if (alpha < 0.18) discard;
+    if (alpha < 0.10) discard;
     gl_FragColor = vec4(col, 1.0);                   // opaque inside cut
   }
 `;
 
 const ISLAND_HALF = 68;             // sampling bounds; isInGrass trims to coast
 
-// Blade dimensions — calibrated against Bruno's folio-2025 Grass.js.
-// Smaller than before so individual triangles disappear into the
-// crowd at typical camera distances.
-const BLADE_WIDTH  = 0.052;
-const BLADE_HEIGHT = 0.32;
+// Blade dimensions — thinner + taller than before so the silhouette
+// matches the long, flexible blades in the reference photo. Per-blade
+// scale will produce a wide range of heights from the base value.
+const BLADE_WIDTH  = 0.034;
+const BLADE_HEIGHT = 0.46;
 
 // bladeShape encodes per-vertex offsets for a single triangle:
 //   vertex 0 → tip:        ( 0,  1)
@@ -190,9 +214,11 @@ const BLADE_SHAPE = [
 
 function GrassField() {
   // Build the whole field as a flat (non-instanced) BufferGeometry —
-  // 3 * N vertices total, each storing the blade's world XZ anchor in
-  // its position, plus per-vertex aShape and aHash attributes. The
-  // shader fans those into the final triangle.
+  // 3 * N vertices total. Placement uses CLUSTER ANCHORS rather than
+  // random scatter: each accepted anchor emits 3-7 blades within a
+  // tight radius, which gives the meadow visible tufts the way real
+  // grass clumps from a single root system instead of standing in
+  // one-per-square-foot rows.
   const geometry = useMemo(() => {
     const target = quality.grassCount;
     const rng = seededRng(0xdeadbeef);
@@ -201,23 +227,35 @@ function GrassField() {
     const hashes = [];
 
     let placed = 0;
-    let attempts = 0;
-    while (placed < target && attempts < target * 6) {
-      attempts++;
-      const x = (rng() - 0.5) * (ISLAND_HALF * 2 - 4);
-      const z = (rng() - 0.5) * (ISLAND_HALF * 2 - 4);
-      if (!isInGrass(x, z)) continue;
-      if (isOnRoad(x, z))   continue;
-      if (isInPlaza(x, z))  continue;
+    let anchorAttempts = 0;
+    const maxAttempts = Math.max(2000, target * 2);
 
-      const h = rng();
-      // 3 verts per blade, all anchored at the same world XZ.
-      for (let v = 0; v < 3; v++) {
-        pos.push(x, 0, z);
-        shape.push(BLADE_SHAPE[v][0], BLADE_SHAPE[v][1]);
-        hashes.push(h);
+    while (placed < target && anchorAttempts < maxAttempts) {
+      anchorAttempts++;
+      const ax = (rng() - 0.5) * (ISLAND_HALF * 2 - 4);
+      const az = (rng() - 0.5) * (ISLAND_HALF * 2 - 4);
+      if (!isInGrass(ax, az)) continue;
+      if (isOnRoad(ax, az))   continue;
+      if (isInPlaza(ax, az))  continue;
+
+      // Cluster size 3-7, leaning a bit toward the smaller end so most
+      // tufts read as a few-blade clump rather than a bouquet.
+      const clusterSize = 3 + Math.floor(rng() * 5);
+      for (let c = 0; c < clusterSize && placed < target; c++) {
+        // Inside-cluster offset, biased toward the centre via sqrt.
+        // Tight radius (~0.18 m) keeps the tuft visually coherent.
+        const angle = rng() * Math.PI * 2;
+        const dist  = Math.sqrt(rng()) * 0.18;
+        const bx    = ax + Math.cos(angle) * dist;
+        const bz    = az + Math.sin(angle) * dist;
+        const h     = rng();
+        for (let v = 0; v < 3; v++) {
+          pos.push(bx, 0, bz);
+          shape.push(BLADE_SHAPE[v][0], BLADE_SHAPE[v][1]);
+          hashes.push(h);
+        }
+        placed++;
       }
-      placed++;
     }
 
     const g = new THREE.BufferGeometry();
