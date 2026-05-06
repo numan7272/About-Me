@@ -128,18 +128,33 @@ export default function AudioManager() {
   }, []);
 
   // UI click — listen for the global `ui:click` event and play the
-  // one-shot. Reset currentTime so rapid clicks all fire.
+  // one-shot. Reset currentTime so rapid clicks all fire. We also clamp
+  // the playback to 700 ms via a setTimeout: if the user accidentally
+  // dropped a long file in /click.mp3, this stops it from ringing out
+  // forever. A real ~50 ms click finishes well before the timeout.
   useEffect(() => {
+    let stopTimer = null;
     const onClick = () => {
       const a = clickRef.current;
       if (!a) return;
+      if (stopTimer) {
+        window.clearTimeout(stopTimer);
+        stopTimer = null;
+      }
       try {
         a.currentTime = 0;
         a.play().catch(() => { /* blocked, ignore */ });
       } catch { /* noop */ }
+      stopTimer = window.setTimeout(() => {
+        try { a.pause(); a.currentTime = 0; } catch { /* noop */ }
+        stopTimer = null;
+      }, 700);
     };
     window.addEventListener("ui:click", onClick);
-    return () => window.removeEventListener("ui:click", onClick);
+    return () => {
+      window.removeEventListener("ui:click", onClick);
+      if (stopTimer) window.clearTimeout(stopTimer);
+    };
   }, []);
 
   // Wheel volume modulation — drive the looping track from bikeState.speed.

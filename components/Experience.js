@@ -197,8 +197,12 @@ export default function Experience() {
 
       {/* All HUD overlays go inside this wrapper so photo mode can hide
           them in one shot via the opacity class. The Canvas above sits
-          behind so the screenshot never picks up any UI chrome. */}
-      <div className={`absolute inset-0 transition-opacity duration-300 ${hudVisibility}`}>
+          behind so the screenshot never picks up any UI chrome.
+          pointer-events-none on the wrapper itself is critical — without
+          it the empty regions of this full-screen <div> would swallow
+          touches that should reach the in-Canvas joystick. Each child
+          opts back in to events with `pointer-events-auto` where needed. */}
+      <div className={`pointer-events-none absolute inset-0 transition-opacity duration-300 ${hudVisibility}`}>
         {/* Hint bar */}
         <div className="pointer-events-none absolute left-1/2 top-5 z-30 -translate-x-1/2 text-center">
           <div className="text-[10px] uppercase tracking-[0.32em] text-zinc-400/80">
