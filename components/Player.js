@@ -418,7 +418,7 @@ function GrassTrail({ playerRef }) {
       // depthTest:false this is purely belt-and-braces.
       dummy.position.set(slotX[i], 0.05, slotZ[i]);
       dummy.rotation.set(-Math.PI / 2, 0, slotYaw[i]);
-      dummy.scale.set(0.18 * ease, slotLength[i], 1);
+      dummy.scale.set(0.26 * ease, slotLength[i], 1);
       dummy.updateMatrix();
       inst.setMatrixAt(i, dummy.matrix);
       dirty = true;
@@ -443,18 +443,22 @@ function GrassTrail({ playerRef }) {
     tmpE.setFromQuaternion(tmpQ, "YXZ");
     const yaw = tmpE.y;
 
-    tmpRight.set(Math.cos(yaw), 0, -Math.sin(yaw));
-    const TRACK_HALF = 0.32;
-    for (let side = -1; side <= 1; side += 2) {
-      const i = headIdx.current % TRAIL_MAX;
-      headIdx.current++;
+    // Single strip directly behind the back wheel — one tire track,
+    // not two. The bike's local +Z is its forward; the back wheel sits
+    // ~0.85 m behind the body centre, so we offset the drop along the
+    // negative-forward direction.
+    const BACK_OFFSET = 0.85;
+    const fwdX = Math.sin(yaw);
+    const fwdZ = Math.cos(yaw);
 
-      slotX[i]      = pos.x + tmpRight.x * TRACK_HALF * side;
-      slotZ[i]      = pos.z + tmpRight.z * TRACK_HALF * side;
-      slotYaw[i]    = yaw;
-      slotLength[i] = 0.95 + Math.random() * 0.12;
-      birth[i]      = t;
-    }
+    const i = headIdx.current % TRAIL_MAX;
+    headIdx.current++;
+
+    slotX[i]      = pos.x - fwdX * BACK_OFFSET;
+    slotZ[i]      = pos.z - fwdZ * BACK_OFFSET;
+    slotYaw[i]    = yaw;
+    slotLength[i] = 0.85 + Math.random() * 0.12;
+    birth[i]      = t;
   });
 
   // renderOrder: -5 keeps the strips behind the bike & landmarks (which

@@ -2,7 +2,6 @@
 
 import { useMemo, useRef, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
-import { Line } from "@react-three/drei";
 import { RigidBody, CuboidCollider } from "@react-three/rapier";
 import * as THREE from "three";
 
@@ -215,57 +214,98 @@ function GrassField({ dayRef }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WIND STREAKS — Bruno-Simon style.
+// WIND STREAKS — Bruno-Simon-style progress-based "draw + erase".
 //
-// Each streak is a CatmullRom-spline through alternating high/low handles,
-// rendered as a thick line via drei's <Line>. Different handle counts and
-// amplitudes per streak produce naturally irregular shapes (no two look
-// alike). The streaks drift along the wind vector and wrap around the
-// player so they're always visible in the viewport.
+// Mirrors his folio-2025 WindLines.js pattern: each streak is a
+// TubeGeometry built from a CatmullRomCurve3 through alternating
+// high/low handles, with a custom shader that uses the along-tube UV
+// coordinate plus a `uProgress` uniform to make a finite "ribbon
+// window" travel from one end to the other. The visible window has a
+// soft head and a fading tail, so each line draws itself in and erases
+// behind itself like a flowing pen stroke.
 //
-// The curve geometry itself is static per-streak — it's the *position*
-// that animates. Reads as flowing wind because the eye follows the
-// translating curves, which is exactly how Bruno's portfolio handles it.
+// Streaks sit just above the meadow (tire height) — the user wanted
+// them low and subtle, not high in the air.
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STREAK_COUNT  = 22;
-const STREAK_RADIUS = 32;
-const STREAK_SPEED  = 4.0;
+const STREAK_COUNT  = 14;
+const STREAK_RADIUS = 28;
+const STREAK_HEIGHT = 0.55;     // tire height
+const STREAK_BAND   = 0.45;     // ±vertical wobble around STREAK_HEIGHT
 
-function buildStreakPoints(length, handleCount, amplitude, divisions = 30) {
+function buildStreakCurve(length, handleCount, amplitude) {
   const halfExtent = length / 2;
   const handleSpan = length / (handleCount - 1);
   const handles = [];
   for (let i = 0; i < handleCount; i++) {
     handles.push(new THREE.Vector3(
       0,
-      (i % 2) - 0.5 * amplitude,                    // alternating Y
+      (i % 2) - 0.5 * amplitude,
       -halfExtent + i * handleSpan,
     ));
   }
-  const curve = new THREE.CatmullRomCurve3(handles);
-  return curve.getPoints(divisions);
+  return new THREE.CatmullRomCurve3(handles);
 }
+
+const STREAK_VERT = /* glsl */`
+  varying float vRatio;
+  void main() {
+    // TubeGeometry's uv.x runs 0..1 along the tube length. We forward it
+    // to the fragment shader so the draw/erase animation can reference
+    // each fragment's position along the line.
+    vRatio = uv.x;
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+  }
+`;
+const STREAK_FRAG = /* glsl */`
+  precision mediump float;
+  uniform float uProgress;
+  uniform float uTailLen;
+  uniform vec3  uColor;
+  uniform float uOpacity;
+  varying float vRatio;
+  void main() {
+    // distFromHead = how far behind the current draw head this fragment is
+    float dist = uProgress - vRatio;
+    if (dist < 0.0)        discard;        // not drawn yet
+    if (dist > uTailLen)   discard;        // already faded out
+    // Linear fade: full alpha at the head, 0 at the tail end. Smoothstep
+    // at the very head edge softens the appear-from-nothing transition.
+    float alpha = 1.0 - dist / uTailLen;
+    alpha *= smoothstep(0.0, 0.05, dist);  // very subtle fade-in at head
+    gl_FragColor = vec4(uColor, alpha * uOpacity);
+  }
+`;
 
 function WindStreaks() {
   const groupRefs = useRef([]);
-  const wind  = useMemo(() => new THREE.Vector2(0.65, 0.76).normalize(), []);
-  const angle    = useMemo(() => Math.atan2(wind.x, wind.y), [wind]);
-  const lateralX = useMemo(() => -wind.y, [wind]);
-  const lateralZ = useMemo(() =>  wind.x, [wind]);
+  const matRefs   = useRef([]);
+  const wind      = useMemo(() => new THREE.Vector2(0.62, 0.78).normalize(), []);
+  const angle     = useMemo(() => Math.atan2(wind.x, wind.y), [wind]);
+  const lateralX  = useMemo(() => -wind.y, [wind]);
+  const lateralZ  = useMemo(() =>  wind.x, [wind]);
 
-  // Each streak gets its own pre-computed curve plus drift parameters.
+  // Each streak's static parameters: a unique curve (geometry stays the
+  // same, only the progress animation moves) + drift offsets so the
+  // streaks don't overlap each other.
   const streaks = useMemo(() => {
     const rng = seededRng(0xc0fee_b00);
     return Array.from({ length: STREAK_COUNT }, () => {
-      const length      = 5.0 + rng() * 5.0;
-      const handleCount = 4 + Math.floor(rng() * 3);   // 4..6 handles
-      const amplitude   = 0.5 + rng() * 1.0;           // tall waves
+      const length      = 4.5 + rng() * 4.0;
+      const handleCount = 4 + Math.floor(rng() * 3);
+      // Lower amplitude → flatter, more subtle ribbons (the user
+      // specifically asked for the wind effects to be quieter).
+      const amplitude   = 0.30 + rng() * 0.45;
+      const curve       = buildStreakCurve(length, handleCount, amplitude);
       return {
-        points:  buildStreakPoints(length, handleCount, amplitude),
-        lateral: (rng() - 0.5) * STREAK_RADIUS * 1.6,
-        height:  1.8 + rng() * 5.5,
-        offset:  rng() * STREAK_RADIUS * 2,
+        // 36 segments along, 6 around → smooth curve, ~6 px thick visually
+        geom:        new THREE.TubeGeometry(curve, 36, 0.025, 6, false),
+        lateral:     (rng() - 0.5) * STREAK_RADIUS * 1.6,
+        heightDelta: (rng() - 0.5) * STREAK_BAND,
+        offset:      rng() * STREAK_RADIUS * 2,
+        // Per-streak animation parameters
+        duration:    2.5 + rng() * 1.6,         // seconds for one full draw
+        phase:       rng() * 2.5,
       };
     });
   }, []);
@@ -273,16 +313,30 @@ function WindStreaks() {
   useFrame((state) => {
     const t = state.clock.getElapsedTime();
     for (let i = 0; i < streaks.length; i++) {
-      const g = groupRefs.current[i];
-      if (!g) continue;
       const s = streaks[i];
-      const along = ((s.offset + t * STREAK_SPEED) % (STREAK_RADIUS * 2)) - STREAK_RADIUS;
-      g.position.set(
-        bikeState.x + wind.x * along + lateralX * s.lateral,
-        s.height,
-        bikeState.z + wind.y * along + lateralZ * s.lateral,
-      );
-      g.rotation.y = angle;
+      const g = groupRefs.current[i];
+      const m = matRefs.current[i];
+
+      // Drifting position around the player along the wind vector
+      if (g) {
+        const along = ((s.offset + t * 1.6) % (STREAK_RADIUS * 2)) - STREAK_RADIUS;
+        g.position.set(
+          bikeState.x + wind.x * along + lateralX * s.lateral,
+          STREAK_HEIGHT + s.heightDelta,
+          bikeState.z + wind.y * along + lateralZ * s.lateral,
+        );
+        g.rotation.y = angle;
+      }
+
+      // Draw/erase animation: progress wraps from 0 to 1 + tailLen so the
+      // entire ribbon disappears before the next draw starts. The +tailLen
+      // overrun is what makes the ribbon "erase" itself completely at the
+      // end of each cycle instead of snapping back to the start.
+      if (m) {
+        const tailLen = m.uniforms.uTailLen.value;
+        const cycle   = ((t + s.phase) / s.duration) % 1;
+        m.uniforms.uProgress.value = cycle * (1 + tailLen);
+      }
     }
   });
 
@@ -293,15 +347,22 @@ function WindStreaks() {
           key={i}
           ref={(el) => { groupRefs.current[i] = el; }}
         >
-          <Line
-            points={s.points}
-            color="white"
-            lineWidth={2.4}              /* pixels — same look at any zoom */
-            transparent
-            opacity={0.55}
-            depthWrite={false}
-            toneMapped={false}
-          />
+          <mesh geometry={s.geom}>
+            <shaderMaterial
+              ref={(el) => { matRefs.current[i] = el; }}
+              vertexShader={STREAK_VERT}
+              fragmentShader={STREAK_FRAG}
+              uniforms={{
+                uProgress: { value: 0 },
+                uTailLen:  { value: 0.32 },
+                uColor:    { value: new THREE.Color(1, 1, 1) },
+                uOpacity:  { value: 0.55 },
+              }}
+              transparent
+              depthWrite={false}
+              toneMapped={false}
+            />
+          </mesh>
         </group>
       ))}
     </group>
