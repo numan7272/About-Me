@@ -75,6 +75,7 @@ const GRASS_VERT = /* glsl */`
   uniform float     uBladeHeight;
 
   varying float vTip;
+  varying float vSide;
   varying float vHash;
 
   void main() {
@@ -122,6 +123,7 @@ const GRASS_VERT = /* glsl */`
     gl_Position = projectionMatrix * viewMatrix * vec4(base + offset, 1.0);
 
     vTip  = aShape.y;
+    vSide = aShape.x;          // -1 (left edge) … 0 (centre) … 1 (right edge)
     vHash = aHash;
   }
 `;
@@ -136,6 +138,7 @@ const GRASS_FRAG = /* glsl */`
   uniform float uDayWeight;
 
   varying float vTip;
+  varying float vSide;          // -1 (edge) … 0 (centre) … 1 (edge)
   varying float vHash;
 
   void main() {
@@ -147,13 +150,21 @@ const GRASS_FRAG = /* glsl */`
     col *= mix(0.55, 1.0, vTip);                     // base AO
     col = mix(col * vec3(0.18, 0.24, 0.42), col, uDayWeight);
 
-    // Soft tip — fade alpha in the topmost ~12% of the blade so the
-    // pointed silhouette dissolves instead of ending in a hard edge.
-    // Combined with multisampling on the composer, this rounds the
-    // visible tip without us needing per-vertex AA.
-    float tipAlpha = 1.0 - smoothstep(0.88, 1.0, vTip);
-    if (tipAlpha < 0.05) discard;
-    gl_FragColor = vec4(col, tipAlpha);
+    // ── Leaf-shape alpha cutout ─────────────────────────────────────
+    // The triangle has aShape spanning -1..1 horizontally, 0..1
+    // vertically.  Combined with the wind+camera-facing transform
+    // it's a flat camera-facing triangle.  To make it READ as a
+    // grass blade rather than a sharp triangle, we fade alpha:
+    //  • horizontally → softer outer 15% of the width (sideAlpha)
+    //  • vertically near the tip → softer top 15% of the height
+    // Then alphaTest discards the bits beyond the fade. MSAA does
+    // the actual edge anti-aliasing for us; this just reshapes the
+    // silhouette into a leaf instead of a triangle.
+    float sideAlpha = 1.0 - abs(vSide);              // 1 centre → 0 edges
+    float tipAlpha  = 1.0 - smoothstep(0.85, 1.0, vTip);
+    float alpha     = sideAlpha * tipAlpha;
+    if (alpha < 0.18) discard;
+    gl_FragColor = vec4(col, 1.0);                   // opaque inside cut
   }
 `;
 
@@ -240,11 +251,17 @@ function GrassField() {
           uRootColorA:     { value: new THREE.Color(0.07, 0.26, 0.10) },
           uRootColorB:     { value: new THREE.Color(0.12, 0.34, 0.14) },
         },
-        side: THREE.DoubleSide,
-        transparent: true,           // soft-tip alpha needs blending
-        depthWrite: true,            // keep opaque-style depth so blades
-                                     // occlude each other correctly
-        alphaTest:  0.05,            // discard fully-transparent fragments
+        // FrontSide: every blade is camera-facing in the vertex shader,
+        // so we never need to render the back face. Halves the
+        // overdraw versus DoubleSide.
+        side: THREE.FrontSide,
+        // Pure alpha cutout — the fragment shader discards anything
+        // outside the leaf-shape silhouette and writes opaque pixels
+        // for the rest. transparent:false avoids the depth-sort
+        // weirdness we'd get with semi-transparent grass; MSAA on the
+        // composer handles edge anti-aliasing of the cut shape.
+        transparent: false,
+        depthWrite:  true,
       }),
     [],
   );
