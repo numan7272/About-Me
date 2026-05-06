@@ -555,11 +555,37 @@ function CloudShadows({ dayRef }) {
 // island reads as a real woodland rather than a stamp duplicated 21 times.
 // ─────────────────────────────────────────────────────────────────────────────
 
+/**
+ * Per-tree wind sway. Returns a ref the caller mounts on the canopy
+ * group; the canopy then rocks subtly along the shared wind vector
+ * with a per-tree phase derived from its world position so adjacent
+ * trees aren't in lockstep.
+ */
+function useCanopySway(position, amount = 0.04) {
+  const ref = useRef();
+  // Phase keyed off position so two trees in the same spot would still
+  // sway differently if they existed (but the sum of x+z gives a stable
+  // unique phase per slot).
+  const phase = (position[0] * 0.31 + position[2] * 0.27) % 6.2832;
+  useFrame(() => {
+    if (!ref.current) return;
+    const t   = sharedUniforms.uTime.value;
+    const wd  = sharedUniforms.uWindDir.value;
+    const env = 0.4 + Math.sin(t * 0.3 + phase) * 0.3;   // gentle gust envelope
+    const wave = Math.sin(t * 1.2 + phase) * env;
+    // Tilt along the wind direction.  Roll = wind X, pitch = wind Z.
+    ref.current.rotation.z = -wave * wd.x * amount;
+    ref.current.rotation.x =  wave * wd.y * amount;
+  });
+  return ref;
+}
+
 // 1) FIR — original stacked-cone shape. Tall, layered, spruce-like.
 function FirTree({ position, scale = 1, hueShift = 0, rotY = 0 }) {
   const c1 = new THREE.Color(`hsl(${135 + hueShift}, 50%, 27%)`).getStyle();
   const c2 = new THREE.Color(`hsl(${130 + hueShift}, 55%, 35%)`).getStyle();
   const c3 = new THREE.Color(`hsl(${125 + hueShift}, 58%, 42%)`).getStyle();
+  const swayRef = useCanopySway(position, 0.045);
   return (
     <RigidBody type="fixed" colliders={false} position={position}>
       <CuboidCollider args={[0.2 * scale, 0.7 * scale, 0.2 * scale]} position={[0, 0.7 * scale, 0]} />
@@ -568,18 +594,22 @@ function FirTree({ position, scale = 1, hueShift = 0, rotY = 0 }) {
           <cylinderGeometry args={[0.12, 0.16, 1.1, 7]} />
           <meshStandardMaterial color="#6b4226" roughness={0.96} />
         </mesh>
-        <mesh castShadow position={[0, 1.65, 0]}>
-          <coneGeometry args={[0.75, 1.6, 7]} />
-          <meshStandardMaterial color={c1} roughness={0.88} />
-        </mesh>
-        <mesh castShadow position={[0, 2.5, 0]}>
-          <coneGeometry args={[0.52, 1.2, 7]} />
-          <meshStandardMaterial color={c2} roughness={0.85} />
-        </mesh>
-        <mesh castShadow position={[0, 3.1, 0]}>
-          <coneGeometry args={[0.3, 0.85, 6]} />
-          <meshStandardMaterial color={c3} roughness={0.82} />
-        </mesh>
+        {/* Canopy group sways as one — pivot at the trunk top so the
+            bottom of the foliage stays fixed and only the tip wags. */}
+        <group ref={swayRef} position={[0, 1.1, 0]}>
+          <mesh castShadow position={[0, 0.55, 0]}>
+            <coneGeometry args={[0.75, 1.6, 7]} />
+            <meshStandardMaterial color={c1} roughness={0.88} />
+          </mesh>
+          <mesh castShadow position={[0, 1.4, 0]}>
+            <coneGeometry args={[0.52, 1.2, 7]} />
+            <meshStandardMaterial color={c2} roughness={0.85} />
+          </mesh>
+          <mesh castShadow position={[0, 2.0, 0]}>
+            <coneGeometry args={[0.3, 0.85, 6]} />
+            <meshStandardMaterial color={c3} roughness={0.82} />
+          </mesh>
+        </group>
       </group>
     </RigidBody>
   );
@@ -588,6 +618,7 @@ function FirTree({ position, scale = 1, hueShift = 0, rotY = 0 }) {
 // 2) PINE — taller and skinnier, single tall cone canopy. Reads as cypress.
 function PineTree({ position, scale = 1, hueShift = 0, rotY = 0 }) {
   const c = new THREE.Color(`hsl(${145 + hueShift}, 45%, 28%)`).getStyle();
+  const swayRef = useCanopySway(position, 0.035);
   return (
     <RigidBody type="fixed" colliders={false} position={position}>
       <CuboidCollider args={[0.18 * scale, 0.85 * scale, 0.18 * scale]} position={[0, 0.85 * scale, 0]} />
@@ -596,14 +627,16 @@ function PineTree({ position, scale = 1, hueShift = 0, rotY = 0 }) {
           <cylinderGeometry args={[0.09, 0.13, 1.1, 6]} />
           <meshStandardMaterial color="#5a3a22" roughness={0.96} />
         </mesh>
-        <mesh castShadow position={[0, 2.4, 0]}>
-          <coneGeometry args={[0.55, 3.2, 8]} />
-          <meshStandardMaterial color={c} roughness={0.85} />
-        </mesh>
-        <mesh castShadow position={[0, 3.7, 0]}>
-          <coneGeometry args={[0.28, 0.9, 6]} />
-          <meshStandardMaterial color={c} roughness={0.82} />
-        </mesh>
+        <group ref={swayRef} position={[0, 1.1, 0]}>
+          <mesh castShadow position={[0, 1.3, 0]}>
+            <coneGeometry args={[0.55, 3.2, 8]} />
+            <meshStandardMaterial color={c} roughness={0.85} />
+          </mesh>
+          <mesh castShadow position={[0, 2.6, 0]}>
+            <coneGeometry args={[0.28, 0.9, 6]} />
+            <meshStandardMaterial color={c} roughness={0.82} />
+          </mesh>
+        </group>
       </group>
     </RigidBody>
   );
@@ -613,6 +646,7 @@ function PineTree({ position, scale = 1, hueShift = 0, rotY = 0 }) {
 function BushTree({ position, scale = 1, hueShift = 0, rotY = 0 }) {
   const c1 = new THREE.Color(`hsl(${110 + hueShift}, 48%, 32%)`).getStyle();
   const c2 = new THREE.Color(`hsl(${100 + hueShift}, 52%, 40%)`).getStyle();
+  const swayRef = useCanopySway(position, 0.06);   // bushy trees sway most
   return (
     <RigidBody type="fixed" colliders={false} position={position}>
       <CuboidCollider args={[0.25 * scale, 0.55 * scale, 0.25 * scale]} position={[0, 0.55 * scale, 0]} />
@@ -621,18 +655,20 @@ function BushTree({ position, scale = 1, hueShift = 0, rotY = 0 }) {
           <cylinderGeometry args={[0.16, 0.20, 0.8, 7]} />
           <meshStandardMaterial color="#7a4a28" roughness={0.95} />
         </mesh>
-        <mesh castShadow position={[0, 1.2, 0]}>
-          <icosahedronGeometry args={[0.95, 0]} />
-          <meshStandardMaterial color={c1} roughness={0.85} flatShading />
-        </mesh>
-        <mesh castShadow position={[0.45, 1.55, 0.15]}>
-          <icosahedronGeometry args={[0.55, 0]} />
-          <meshStandardMaterial color={c2} roughness={0.82} flatShading />
-        </mesh>
-        <mesh castShadow position={[-0.3, 1.7, -0.2]}>
-          <icosahedronGeometry args={[0.45, 0]} />
-          <meshStandardMaterial color={c2} roughness={0.82} flatShading />
-        </mesh>
+        <group ref={swayRef} position={[0, 0.8, 0]}>
+          <mesh castShadow position={[0, 0.4, 0]}>
+            <icosahedronGeometry args={[0.95, 0]} />
+            <meshStandardMaterial color={c1} roughness={0.85} flatShading />
+          </mesh>
+          <mesh castShadow position={[0.45, 0.75, 0.15]}>
+            <icosahedronGeometry args={[0.55, 0]} />
+            <meshStandardMaterial color={c2} roughness={0.82} flatShading />
+          </mesh>
+          <mesh castShadow position={[-0.3, 0.9, -0.2]}>
+            <icosahedronGeometry args={[0.45, 0]} />
+            <meshStandardMaterial color={c2} roughness={0.82} flatShading />
+          </mesh>
+        </group>
       </group>
     </RigidBody>
   );
@@ -946,18 +982,39 @@ function FlowerPatch({ position, seed = 1 }) {
   const rng = useMemo(() => seededRng(seed), [seed]);
   const blooms = useMemo(
     () => Array.from({ length: 5 + Math.floor(rng() * 4) }, () => ({
-      x:    (rng() - 0.5) * 0.9,
-      z:    (rng() - 0.5) * 0.9,
-      h:    0.18 + rng() * 0.18,
-      hue:  FLOWER_HUES[Math.floor(rng() * FLOWER_HUES.length)],
-      size: 0.07 + rng() * 0.04,
+      x:     (rng() - 0.5) * 0.9,
+      z:     (rng() - 0.5) * 0.9,
+      h:     0.18 + rng() * 0.18,
+      hue:   FLOWER_HUES[Math.floor(rng() * FLOWER_HUES.length)],
+      size:  0.07 + rng() * 0.04,
+      // Per-bloom sway phase so a clump doesn't bob in unison
+      phase: rng() * 6.2832,
     })),
     [rng],
   );
+  // One ref per bloom for the wind-driven tilt
+  const bloomRefs = useRef([]);
+  useFrame(() => {
+    const t  = sharedUniforms.uTime.value;
+    const wd = sharedUniforms.uWindDir.value;
+    for (let i = 0; i < blooms.length; i++) {
+      const ref = bloomRefs.current[i];
+      if (!ref) continue;
+      const b = blooms[i];
+      const wave = Math.sin(t * 1.6 + b.phase) * 0.08;
+      // Tilt the bloom group at its base — stem + blossom tip together
+      ref.rotation.z = -wave * wd.x;
+      ref.rotation.x =  wave * wd.y;
+    }
+  });
   return (
     <group position={position}>
       {blooms.map((b, i) => (
-        <group key={i} position={[b.x, 0, b.z]}>
+        <group
+          key={i}
+          position={[b.x, 0, b.z]}
+          ref={(el) => { bloomRefs.current[i] = el; }}
+        >
           {/* Stem */}
           <mesh castShadow position={[0, b.h / 2, 0]}>
             <cylinderGeometry args={[0.012, 0.018, b.h, 5]} />
