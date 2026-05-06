@@ -53,12 +53,15 @@ const GRASS_VERT = /* glsl */`
   void main() {
     // Local blade vertex (tapered ribbon). tipFactor = 0 at root, 1 at tip.
     vec3 local = position;
-    float tip  = smoothstep(0.0, 1.0, (local.y + 0.001) / 1.05);
+    float tip  = smoothstep(0.0, 1.0, (local.y + 0.001) / 0.55);
 
-    // Per-blade Y-axis rotation so blades don't all face the same way —
-    // crucial for the field to read as natural rather than as a stamped
-    // grid.  aHash maps to 0..2π.
-    float rotY = aHash * 6.2832;
+    // Camera-facing rotation (Bruno's trick): each blade rotates around
+    // its base so the flat ribbon faces the camera. With a small
+    // per-blade jitter (aHash) so blades aren't all in lock-step. Far
+    // better than fixed-rotation flat blades — those go invisible when
+    // viewed edge-on, which is what made the field look like spears.
+    vec3 toCam = cameraPosition - vec3(iPos.x, 0.0, iPos.z);
+    float rotY = atan(toCam.x, toCam.z) + (aHash - 0.5) * 1.4;
     float cR   = cos(rotY);
     float sR   = sin(rotY);
     local.xz   = mat2(cR, -sR, sR, cR) * local.xz;
@@ -129,30 +132,35 @@ const GRASS_FRAG = /* glsl */`
 
 const ISLAND_HALF = 68;            // sampling bounds; isInGrass trims to coast
 
+// Blade dimensions — calibrated against Bruno's folio-2025 Grass.js
+// (height 0.6, width 0.1 at base). My earlier 1.05 m height made blades
+// read as spears jutting out of the ground.
+const BLADE_HEIGHT = 0.55;
+const BLADE_BASE_W = 0.085;
+const BLADE_MID_W  = 0.045;
+
 /**
  * Custom blade geometry — 5 vertices forming a tapered ribbon:
  *
  *         tip
  *        /   \
- *      ml --- mr        (mid, half base width)
+ *      ml --- mr        (mid, ~half base width)
  *      /       \
  *    bl ------- br      (base)
  *
- * Two triangles for the lower half (so the mid vertices can bend
- * independently of the base) plus one triangle for the upper half
- * (mid → tip). The shader's tipFactor reads each vertex's y/1.05 so
- * mid bends ~50% as much as the tip and the base stays planted.
+ * The mid vertices act as a hinge — the wind shader bends the upper
+ * half (mid + tip) more than the base via tipFactor.
  */
 const bladeGeometry = (() => {
   const positions = new Float32Array([
     // bl, br — base, full width
-    -0.045, 0.00, 0,
-     0.045, 0.00, 0,
-    // ml, mr — mid, ~half width
-    -0.024, 0.55, 0,
-     0.024, 0.55, 0,
+    -BLADE_BASE_W, 0.00, 0,
+     BLADE_BASE_W, 0.00, 0,
+    // ml, mr — mid, half base width
+    -BLADE_MID_W,  BLADE_HEIGHT * 0.55, 0,
+     BLADE_MID_W,  BLADE_HEIGHT * 0.55, 0,
     // tip
-     0.000, 1.05, 0,
+     0.000,        BLADE_HEIGHT, 0,
   ]);
   const indices = [
     0, 1, 3,    // bl, br, mr — lower-right
