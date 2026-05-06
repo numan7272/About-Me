@@ -4,7 +4,8 @@ import { Suspense, useRef, useMemo } from "react";
 import { Environment, SoftShadows, ContactShadows, Sparkles } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Physics } from "@react-three/rapier";
-import { EffectComposer, Bloom, Vignette, ChromaticAberration, SSAO, BlendFunction } from "@react-three/postprocessing";
+import { EffectComposer, Bloom, Vignette, ChromaticAberration, SSAO } from "@react-three/postprocessing";
+import { BlendFunction } from "postprocessing";
 import { Vector2, Fog, Color } from "three";
 
 import Ground from "./Ground";
