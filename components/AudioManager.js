@@ -85,7 +85,13 @@ export default function AudioManager() {
     };
 
     ambientRef.current = make("/ambient.mp3", { loop: true,  volume: 0.22 });
-    wheelsRef.current  = make("/wheels.mp3",  { loop: true,  volume: 0.0  });
+    // wheels.mp3 disabled: the user reported a click-like sound looping
+    // on PC that stopped when they started driving. Most likely the
+    // wheels track being modulated at near-zero volume produced an
+    // audible click artefact at frame boundaries on some browsers.
+    // Drop it for now — ambient remains; users can re-enable wheels by
+    // restoring the make() call here.
+    wheelsRef.current  = null;
     clickRef.current   = make("/click.mp3",   { loop: false, volume: 0.55 });
 
     // Self-healing safety: a real UI-click sample is ~50–200 ms. If the

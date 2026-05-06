@@ -4,7 +4,7 @@ import { Suspense, useRef, useMemo } from "react";
 import { Environment, SoftShadows, ContactShadows, Sparkles } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Physics } from "@react-three/rapier";
-import { EffectComposer, Bloom, ChromaticAberration, SSAO } from "@react-three/postprocessing";
+import { EffectComposer, Bloom, ChromaticAberration, SSAO, DepthOfField } from "@react-three/postprocessing";
 import { BlendFunction } from "postprocessing";
 import { Vector2, Fog, Color } from "three";
 
@@ -310,7 +310,24 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
             fade={0.02}
           />
         )}
-        <Bloom intensity={0.65} luminanceThreshold={0.82} luminanceSmoothing={0.5} mipmapBlur />
+        {/* Depth of field — gives the scene a "toy-world" focus where
+            the bike + landmarks stay sharp and the foreground +
+            distant horizon blur. Skipped on low-tier devices.
+            focusDistance/focalLength are normalised; bokehScale
+            controls blur strength. */}
+        {quality.tier !== "low" && (
+          <DepthOfField
+            focusDistance={0.018}
+            focalLength={0.045}
+            bokehScale={2.4}
+            height={480}
+          />
+        )}
+        {/* Bloom — luminance threshold tightened so only emissive
+            highlights (lamp bulbs, LEDs, easter-egg halos) bloom.
+            Material colours stay clean instead of all-bright pixels
+            getting the soft glow. */}
+        <Bloom intensity={0.85} luminanceThreshold={0.92} luminanceSmoothing={0.4} mipmapBlur />
         <ChromaticAberration offset={caOffset} radialModulation={false} modulationOffset={0} />
         {/* Custom cinematic pass: saturation + contrast + day-tinted
             vignette + film grain. Replaces the built-in <Vignette> —

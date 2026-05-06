@@ -211,14 +211,19 @@ export default function MobileControls() {
 
   return (
     <group ref={groupRef}>
-      {/* Outer ring outline */}
-      <mesh renderOrder={2}>
+      {/* Outer ring outline. depthTest: false + a high renderOrder
+          forces the dial to draw on top of the road / curb / dash
+          decals; without it the road's polygon-offset trick wins the
+          depth comparison and the dial vanishes whenever the bike
+          rolls over tarmac. */}
+      <mesh renderOrder={50}>
         <ringGeometry args={[OUTER_R - RING_W, OUTER_R, 96]} />
         <meshBasicMaterial
           ref={outerMatRef}
           color="#ffffff"
           transparent
           opacity={0.55}
+          depthTest={false}
           depthWrite={false}
           toneMapped={false}
           side={THREE.DoubleSide}
@@ -226,24 +231,23 @@ export default function MobileControls() {
       </mesh>
 
       {/* Inner ring outline */}
-      <mesh position={[0, 0, 0.001]} renderOrder={2}>
+      <mesh position={[0, 0, 0.001]} renderOrder={51}>
         <ringGeometry args={[INNER_R - RING_W * 0.8, INNER_R, 80]} />
         <meshBasicMaterial
           ref={innerMatRef}
           color="#ffffff"
           transparent
           opacity={0.32}
+          depthTest={false}
           depthWrite={false}
           toneMapped={false}
           side={THREE.DoubleSide}
         />
       </mesh>
 
-      {/* Sweep arc — rotates around the dial's local +Z to point at touch.
-          Geometry centred on +X (theta=0); rotation.z aligns it with the
-          input vector. */}
+      {/* Sweep arc — rotates around the dial's local +Z to point at touch. */}
       <group ref={arcRef}>
-        <mesh position={[0, 0, 0.002]} renderOrder={3}>
+        <mesh position={[0, 0, 0.002]} renderOrder={52}>
           <ringGeometry
             args={[INNER_R + 0.04, OUTER_R - 0.02, 48, 1,
                    -ARC_SPREAD / 2, ARC_SPREAD]}
@@ -253,6 +257,7 @@ export default function MobileControls() {
             color="#ffffff"
             transparent
             opacity={0}
+            depthTest={false}
             depthWrite={false}
             toneMapped={false}
             side={THREE.DoubleSide}
@@ -260,11 +265,13 @@ export default function MobileControls() {
         </mesh>
       </group>
 
-      {/* Capture disc — invisible. Only fires onPointerDown; the rest of the
-          drag is handled by window-level listeners (see useEffect above). */}
-      <mesh position={[0, 0, 0.05]} onPointerDown={onPointerDown}>
+      {/* Capture disc — invisible. Only fires onPointerDown; the rest
+          of the drag is handled by window-level listeners (see
+          useEffect above). renderOrder bumped to match the visible
+          rings so it doesn't get obscured either. */}
+      <mesh position={[0, 0, 0.05]} renderOrder={53} onPointerDown={onPointerDown}>
         <circleGeometry args={[CAPTURE_R, 48]} />
-        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        <meshBasicMaterial transparent opacity={0} depthTest={false} depthWrite={false} />
       </mesh>
     </group>
   );
