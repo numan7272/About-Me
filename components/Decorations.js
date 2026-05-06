@@ -2,6 +2,7 @@
 
 import { useMemo, useRef, useEffect } from "react";
 import { useFrame } from "@react-three/fiber";
+import { Line } from "@react-three/drei";
 import { RigidBody, CuboidCollider } from "@react-three/rapier";
 import * as THREE from "three";
 
@@ -192,131 +193,96 @@ function GrassField({ dayRef }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WIND STREAKS — drifting white traces in the air, irregular curves not
-// straight lines. The plane geometry has 32 segments along its length, and
-// the vertex shader displaces each segment with two-octave sine noise so
-// each streak reads as a flowing handwritten swirl rather than a stick.
+// WIND STREAKS — Bruno-Simon style.
+//
+// Each streak is a CatmullRom-spline through alternating high/low handles,
+// rendered as a thick line via drei's <Line>. Different handle counts and
+// amplitudes per streak produce naturally irregular shapes (no two look
+// alike). The streaks drift along the wind vector and wrap around the
+// player so they're always visible in the viewport.
+//
+// The curve geometry itself is static per-streak — it's the *position*
+// that animates. Reads as flowing wind because the eye follows the
+// translating curves, which is exactly how Bruno's portfolio handles it.
 // ─────────────────────────────────────────────────────────────────────────────
-
-const STREAK_VERT = /* glsl */`
-  attribute float aPhase;
-  attribute float aAmp;
-  uniform float uTime;
-
-  void main() {
-    vec3 p = position;
-    // p.x runs -0.5..0.5 along the streak's length; p.y is the thin
-    // ribbon thickness. We bend the ribbon vertically + laterally with
-    // two crossing sines so it looks calligraphic and unique per phase.
-    float along = (p.x + 0.5);                 // 0..1 along length
-    float wave1 = sin(along * 9.0  + aPhase + uTime * 0.6);
-    float wave2 = sin(along * 18.0 + aPhase * 1.7 - uTime * 0.9);
-    float disp  = (wave1 * 0.6 + wave2 * 0.4) * aAmp;
-    p.y += disp;
-    p.z += sin(along * 13.0 + aPhase * 0.8 + uTime * 0.4) * aAmp * 0.45;
-
-    // Fade to zero at both ends — gives the streak a tapered look.
-    float endFade = smoothstep(0.0, 0.12, along) * smoothstep(0.0, 0.12, 1.0 - along);
-    p.y *= endFade;
-    p.z *= endFade;
-
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
-  }
-`;
-const STREAK_FRAG = /* glsl */`
-  precision highp float;
-  uniform vec3 uColor;
-  uniform float uOpacity;
-  void main() {
-    gl_FragColor = vec4(uColor, uOpacity);
-  }
-`;
 
 const STREAK_COUNT  = 22;
 const STREAK_RADIUS = 32;
-const STREAK_SPEED  = 4.5;
+const STREAK_SPEED  = 4.0;
+
+function buildStreakPoints(length, handleCount, amplitude, divisions = 30) {
+  const halfExtent = length / 2;
+  const handleSpan = length / (handleCount - 1);
+  const handles = [];
+  for (let i = 0; i < handleCount; i++) {
+    handles.push(new THREE.Vector3(
+      0,
+      (i % 2) - 0.5 * amplitude,                    // alternating Y
+      -halfExtent + i * handleSpan,
+    ));
+  }
+  const curve = new THREE.CatmullRomCurve3(handles);
+  return curve.getPoints(divisions);
+}
 
 function WindStreaks() {
-  const ref   = useRef();
-  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const groupRefs = useRef([]);
   const wind  = useMemo(() => new THREE.Vector2(0.65, 0.76).normalize(), []);
-
-  // Per-streak base params (offset, height, length). Stored once.
-  const { seeds, phases, amps } = useMemo(() => {
-    const rng = seededRng(0xc0fee_b00);
-    const ss = [];
-    const ph = new Float32Array(STREAK_COUNT);
-    const am = new Float32Array(STREAK_COUNT);
-    for (let i = 0; i < STREAK_COUNT; i++) {
-      ss.push({
-        lateral: (rng() - 0.5) * STREAK_RADIUS * 1.6,
-        height:  1.5 + rng() * 5.5,
-        length:  4.5 + rng() * 5.0,
-        offset:  rng() * STREAK_RADIUS * 2,
-      });
-      ph[i] = rng() * Math.PI * 2;
-      am[i] = 0.20 + rng() * 0.45;          // wave amplitude
-    }
-    return { seeds: ss, phases: ph, amps: am };
-  }, []);
-
-  const geom = useMemo(() => new THREE.PlaneGeometry(1, 0.06, 32, 1), []);
-  const mat  = useMemo(() => new THREE.ShaderMaterial({
-    vertexShader:   STREAK_VERT,
-    fragmentShader: STREAK_FRAG,
-    uniforms: {
-      uTime:    { value: 0 },
-      uColor:   { value: new THREE.Color(1, 1, 1) },
-      uOpacity: { value: 0.55 },
-    },
-    transparent: true,
-    depthWrite:  false,
-    blending:    THREE.AdditiveBlending,
-    side: THREE.DoubleSide,
-  }), []);
-
   const angle    = useMemo(() => Math.atan2(wind.x, wind.y), [wind]);
   const lateralX = useMemo(() => -wind.y, [wind]);
   const lateralZ = useMemo(() =>  wind.x, [wind]);
 
-  useEffect(() => {
-    if (!ref.current) return;
-    ref.current.geometry.setAttribute(
-      "aPhase",
-      new THREE.InstancedBufferAttribute(phases, 1),
-    );
-    ref.current.geometry.setAttribute(
-      "aAmp",
-      new THREE.InstancedBufferAttribute(amps, 1),
-    );
-  }, [phases, amps]);
+  // Each streak gets its own pre-computed curve plus drift parameters.
+  const streaks = useMemo(() => {
+    const rng = seededRng(0xc0fee_b00);
+    return Array.from({ length: STREAK_COUNT }, () => {
+      const length      = 5.0 + rng() * 5.0;
+      const handleCount = 4 + Math.floor(rng() * 3);   // 4..6 handles
+      const amplitude   = 0.5 + rng() * 1.0;           // tall waves
+      return {
+        points:  buildStreakPoints(length, handleCount, amplitude),
+        lateral: (rng() - 0.5) * STREAK_RADIUS * 1.6,
+        height:  1.8 + rng() * 5.5,
+        offset:  rng() * STREAK_RADIUS * 2,
+      };
+    });
+  }, []);
 
   useFrame((state) => {
-    const inst = ref.current;
-    if (!inst) return;
     const t = state.clock.getElapsedTime();
-    mat.uniforms.uTime.value = t;
-    for (let i = 0; i < STREAK_COUNT; i++) {
-      const s = seeds[i];
+    for (let i = 0; i < streaks.length; i++) {
+      const g = groupRefs.current[i];
+      if (!g) continue;
+      const s = streaks[i];
       const along = ((s.offset + t * STREAK_SPEED) % (STREAK_RADIUS * 2)) - STREAK_RADIUS;
-      const x = bikeState.x + wind.x * along + lateralX * s.lateral;
-      const z = bikeState.z + wind.y * along + lateralZ * s.lateral;
-      dummy.position.set(x, s.height, z);
-      dummy.rotation.set(0, angle, 0);
-      dummy.scale.set(s.length, 1, 1);
-      dummy.updateMatrix();
-      inst.setMatrixAt(i, dummy.matrix);
+      g.position.set(
+        bikeState.x + wind.x * along + lateralX * s.lateral,
+        s.height,
+        bikeState.z + wind.y * along + lateralZ * s.lateral,
+      );
+      g.rotation.y = angle;
     }
-    inst.instanceMatrix.needsUpdate = true;
   });
 
   return (
-    <instancedMesh
-      ref={ref}
-      args={[geom, mat, STREAK_COUNT]}
-      frustumCulled={false}
-      renderOrder={2}
-    />
+    <group renderOrder={2}>
+      {streaks.map((s, i) => (
+        <group
+          key={i}
+          ref={(el) => { groupRefs.current[i] = el; }}
+        >
+          <Line
+            points={s.points}
+            color="white"
+            lineWidth={2.4}              /* pixels — same look at any zoom */
+            transparent
+            opacity={0.55}
+            depthWrite={false}
+            toneMapped={false}
+          />
+        </group>
+      ))}
+    </group>
   );
 }
 
