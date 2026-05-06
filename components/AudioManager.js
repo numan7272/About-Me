@@ -7,12 +7,13 @@ import { bikeState } from "@/lib/bikeStore";
 /**
  * Three-track audio layer for the portfolio.
  *
- * Tracks (drop these MP3 / OGG files into /public/audio/):
- *   - ambient.mp3 → looped meadow wind / distant birds (very low volume)
- *   - wheels.mp3  → looped tire-on-asphalt loop, volume scaled by speed
- *   - click.mp3   → one-shot UI click; played on the `ui:click` window
- *                   event so any component can trigger it without prop-
- *                   drilling.
+ * Tracks (drop these files into /public/ at the project root — Next.js
+ * serves /public/foo.mp3 at the URL /foo.mp3):
+ *   - /ambient.mp3 → looped meadow wind / distant birds (very low volume)
+ *   - /wheels.mp3  → looped tire-on-asphalt loop, volume scaled by speed
+ *   - /click.mp3   → one-shot UI click; played on the `ui:click` window
+ *                    event so any component can trigger it without prop-
+ *                    drilling.
  *
  * Missing files don't crash anything — load errors are caught and
  * logged, and the affected track is just disabled.
@@ -82,9 +83,9 @@ export default function AudioManager() {
       }
     };
 
-    ambientRef.current = make("/audio/ambient.mp3", { loop: true,  volume: 0.22 });
-    wheelsRef.current  = make("/audio/wheels.mp3",  { loop: true,  volume: 0.0  });
-    clickRef.current   = make("/audio/click.mp3",   { loop: false, volume: 0.55 });
+    ambientRef.current = make("/ambient.mp3", { loop: true,  volume: 0.22 });
+    wheelsRef.current  = make("/wheels.mp3",  { loop: true,  volume: 0.0  });
+    clickRef.current   = make("/click.mp3",   { loop: false, volume: 0.55 });
 
     return () => {
       [ambientRef, wheelsRef, clickRef].forEach((r) => {
