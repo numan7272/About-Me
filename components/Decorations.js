@@ -34,20 +34,24 @@ function seededRng(seed) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GRASS FIELD — Bruno Simon's exact approach.
+// GRASS FIELD — Bruno-style flat-triangle blades arranged in a CROSS
+// pattern so each "blade" is two perpendicular triangles instead of
+// one billboard.
 //
-// Each blade is a single triangle with 3 vertices, all stored at the
-// same world XZ (the blade's anchor). A per-vertex `aShape` attribute
-// gives one of three offsets:
-//   (0, 1)   → tip (centered, full height)
-//   (1, 0)   → base-right (full width offset, ground)
-//   (-1, 0)  → base-left
-// The vertex shader multiplies these by uBladeWidth / uBladeHeight,
-// rotates the side offset to face the camera, and adds wind sway.
+// Pure camera-facing billboards collapse to invisible lines when the
+// camera looks down their face axis (top-down view).  By giving each
+// blade two triangles at 90° to each other, *some* face is always at
+// a visible angle no matter where the camera sits — the meadow stays
+// dense from any angle.
 //
-// Not InstancedMesh — flat BufferGeometry with 3*N vertices total, like
-// Bruno's Grass.js. Memory is fine (3 × N × 6 floats for everything),
-// and the shader is much simpler than packing per-instance attributes.
+// Layout per blade (6 verts, 2 triangles):
+//   plane A:  tip(0,1,0)  → base-right(1,0,0)  → base-left(-1,0,0)
+//   plane B:  tip(0,1,0)  → base-front(0,0,1)  → base-back(0,0,-1)
+//
+// aShape is now vec3 = (sideX, height, sideZ); the vertex shader
+// rotates the (sideX, sideZ) pair around Y by a per-blade random
+// angle, then adds height directly. Both planes share the same
+// rotation so they stay perpendicular.
 //
 // Density much higher than before: Bruno runs 78k blades over a 280²
 // area; we scale to 30-50k for our smaller play area.
@@ -55,12 +59,14 @@ function seededRng(seed) {
 
 const GRASS_VERT = /* glsl */`
   // Per-vertex attributes:
-  //   position : the blade's anchor (worldX, 0, worldZ) — same for all 3
-  //              vertices of a triangle.
-  //   aShape   : (-1..1, 0..1) — vertex 0 is tip (0, 1), vertex 1 is
-  //              base-right (1, 0), vertex 2 is base-left (-1, 0).
-  //   aHash    : per-blade random 0..1 (same value 3× in a row).
-  attribute vec2  aShape;
+  //   position : the blade's anchor (worldX, 0, worldZ) — same for
+  //              all 6 vertices of one blade (2 perpendicular tris).
+  //   aShape   : (sideX, height, sideZ).  Plane A vertices have
+  //              sideZ = 0; plane B vertices have sideX = 0. The
+  //              tip vertex of each plane has sideX = sideZ = 0
+  //              and height = 1.
+  //   aHash    : per-blade random 0..1 (same value 6× in a row).
+  attribute vec3  aShape;
   attribute float aHash;
 
   uniform float     uTime;
@@ -81,28 +87,23 @@ const GRASS_VERT = /* glsl */`
   void main() {
     vec3 base = position;                    // world XZ + Y=0
 
-    // Wide scale range biased toward shorter blades — the meadow has
-    // mostly knee-high grass with occasional tall outliers.
-    //   pow(aHash, 1.3) * 1.6 + 0.4  →  ~70% of blades fall under
-    //   scale 1.0, but ~10% extend past 1.5 (and a few past 1.8) so
-    //   the field has visible texture variation rather than uniform
-    //   chevrons.
+    // Wide scale range biased toward shorter blades.
     float scale = 0.40 + pow(aHash, 1.3) * 1.60;
 
-    // Per-vertex local offset: side along ±X (multiplied by width),
-    // up along Y (multiplied by height). aShape.y is also our tipFactor.
-    float w = aShape.x * uBladeWidth  * scale;
-    float h = aShape.y * uBladeHeight * scale;
+    // Local 2D offset — side magnitudes for the two perpendicular planes
+    // come straight from aShape.xz; height from aShape.y.
+    float w  = aShape.x * uBladeWidth  * scale;   // plane A side
+    float d  = aShape.z * uBladeWidth  * scale;   // plane B side
+    float h  = aShape.y * uBladeHeight * scale;
 
-    // Camera-facing rotation around Y. Each blade points its flat side
-    // at the camera, with a small per-blade jitter so the field isn't
-    // stamped. ±0.6 rad is enough randomness without losing the
-    // benefit of facing-the-camera (which avoids edge-on invisibility).
-    vec3 toCam = cameraPosition - base;
-    float rotY = atan(toCam.x, toCam.z) + (aHash - 0.5) * 1.2;
+    // Per-blade fixed Y rotation (NOT camera-facing). With cross-pattern
+    // both planes get rotated together, staying perpendicular. Random
+    // rotation per blade means a top-down view still sees one face of
+    // every blade because they're not all aligned with one axis.
+    float rotY = aHash * 6.2832;
     float cR   = cos(rotY);
     float sR   = sin(rotY);
-    vec2 sideXZ = vec2(cR * w, sR * w);
+    vec2 rotXZ = mat2(cR, -sR, sR, cR) * vec2(w, d);
 
     // Track flatten — sample the off-screen render of the bike's path
     // and squash the height factor where the bike has been.
@@ -124,23 +125,23 @@ const GRASS_VERT = /* glsl */`
     vec2 tipPush = sway * aShape.y * uBladeHeight * windVec;
 
     // Static lean — bake a per-blade tilt into the tip so blades aren't
-    // all standing perfectly upright at rest.  Direction from another
-    // hash mapping, magnitude scales with blade height. Real grass
-    // never stands soldier-straight; this gives the relaxed messy
-    // look from the reference photo.
-    float leanA   = aHash * 11.13;                       // de-correlate from rotY
+    // all standing perfectly upright at rest.
+    float leanA   = aHash * 11.13;
     vec2  leanDir = vec2(sin(leanA), cos(leanA));
     float leanAmt = (aHash - 0.5) * 0.35 * uBladeHeight * scale;
     vec2  leanXZ  = leanDir * leanAmt * aShape.y;
 
-    vec3 offset = vec3(sideXZ.x + tipPush.x + leanXZ.x,
+    vec3 offset = vec3(rotXZ.x + tipPush.x + leanXZ.x,
                        h * flatten,
-                       sideXZ.y + tipPush.y + leanXZ.y);
+                       rotXZ.y + tipPush.y + leanXZ.y);
 
     gl_Position = projectionMatrix * viewMatrix * vec4(base + offset, 1.0);
 
     vTip  = aShape.y;
-    vSide = aShape.x;          // -1 (left edge) … 0 (centre) … 1 (right edge)
+    // For the leaf-shape cutout: the "side coordinate" is whichever of
+    // sideX or sideZ is non-zero. Since the other is exactly 0, summing
+    // their absolute values gives the correct value for both planes.
+    vSide = abs(aShape.x) + abs(aShape.z);
     vHash = aHash;
   }
 `;
@@ -155,7 +156,7 @@ const GRASS_FRAG = /* glsl */`
   uniform float uDayWeight;
 
   varying float vTip;
-  varying float vSide;          // -1 (edge) … 0 (centre) … 1 (edge)
+  varying float vSide;          // 0 (centre / tip) … 1 (base edge)
   varying float vHash;
 
   void main() {
@@ -184,7 +185,7 @@ const GRASS_FRAG = /* glsl */`
     //  • vertically near the tip → softer top ~12% of the height
     // Threshold lowered to 0.10 (was 0.18) so the thinner blades
     // don't end up almost-empty after the cut.
-    float sideAlpha = 1.0 - abs(vSide);              // 1 centre → 0 edges
+    float sideAlpha = 1.0 - vSide;                   // 1 centre → 0 edges
     float tipAlpha  = 1.0 - smoothstep(0.88, 1.0, vTip);
     float alpha     = sideAlpha * tipAlpha;
     if (alpha < 0.10) discard;
@@ -200,16 +201,26 @@ const ISLAND_HALF = 68;             // sampling bounds; isInGrass trims to coast
 const BLADE_WIDTH  = 0.034;
 const BLADE_HEIGHT = 0.46;
 
-// bladeShape encodes per-vertex offsets for a single triangle:
-//   vertex 0 → tip:        ( 0,  1)
-//   vertex 1 → base-right: ( 1,  0)
-//   vertex 2 → base-left:  (-1,  0)
-// The vertex shader multiplies these by uBladeWidth/Height and rotates
-// the side offset around Y to face the camera. Bruno's exact pattern.
+// bladeShape encodes per-vertex offsets for a CROSS-PATTERN blade:
+// six vertices forming two perpendicular triangles. Each entry is
+// (sideX, height, sideZ).
+//   plane A — extends along ±X, sideZ = 0:
+//     0 tip          ( 0, 1, 0)
+//     1 base-right   ( 1, 0, 0)
+//     2 base-left    (-1, 0, 0)
+//   plane B — extends along ±Z, sideX = 0:
+//     3 tip          ( 0, 1, 0)   ← same point in space as v0
+//     4 base-front   ( 0, 0, 1)
+//     5 base-back    ( 0, 0,-1)
+// The shared rotation in the vertex shader keeps both planes
+// perpendicular to each other regardless of the per-blade Y angle.
 const BLADE_SHAPE = [
-  [0,  1],
-  [1,  0],
-  [-1, 0],
+  [ 0, 1,  0],
+  [ 1, 0,  0],
+  [-1, 0,  0],
+  [ 0, 1,  0],
+  [ 0, 0,  1],
+  [ 0, 0, -1],
 ];
 
 function GrassField() {
@@ -249,9 +260,12 @@ function GrassField() {
         const bx    = ax + Math.cos(angle) * dist;
         const bz    = az + Math.sin(angle) * dist;
         const h     = rng();
-        for (let v = 0; v < 3; v++) {
+        // 6 verts per blade (2 perpendicular triangles), all anchored
+        // at the same world XZ. The shape attribute differentiates
+        // them; the shader rotates and offsets accordingly.
+        for (let v = 0; v < 6; v++) {
           pos.push(bx, 0, bz);
-          shape.push(BLADE_SHAPE[v][0], BLADE_SHAPE[v][1]);
+          shape.push(BLADE_SHAPE[v][0], BLADE_SHAPE[v][1], BLADE_SHAPE[v][2]);
           hashes.push(h);
         }
         placed++;
@@ -260,7 +274,7 @@ function GrassField() {
 
     const g = new THREE.BufferGeometry();
     g.setAttribute("position", new THREE.Float32BufferAttribute(pos,    3));
-    g.setAttribute("aShape",   new THREE.Float32BufferAttribute(shape,  2));
+    g.setAttribute("aShape",   new THREE.Float32BufferAttribute(shape,  3));
     g.setAttribute("aHash",    new THREE.Float32BufferAttribute(hashes, 1));
     return g;
   }, []);
