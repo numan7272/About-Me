@@ -17,6 +17,7 @@ import Water from "./Water";
 import Birds from "./Birds";
 import MobileControls from "./MobileControls";
 import EasterEggs from "./EasterEggs";
+import TrackTexture from "./TrackTexture";
 
 import { sample as sampleDayCycle } from "@/lib/dayCycle";
 
@@ -135,7 +136,12 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
       <FollowCamera targetRef={playerRef} followModeRef={followModeRef} orbitRef={orbitRef} />
 
       {/* Water surrounding the floating island — no physics, purely visual */}
-      <Water />
+      <Water dayRef={dayRef} />
+
+      {/* Off-screen track-texture pipeline. Renders the bike's recent
+          path into a render target every frame; the grass shader reads
+          that texture and squashes blades where the bike has been. */}
+      <TrackTexture />
 
       {/* Flock of birds circling overhead */}
       <Birds />

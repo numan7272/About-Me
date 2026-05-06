@@ -8,6 +8,7 @@ import * as THREE from "three";
 
 import { isInGrass } from "@/lib/islandShape";
 import { bikeState } from "@/lib/bikeStore";
+import { trackState } from "@/lib/trackTexture";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Seeded pseudo-random helper — deterministic so the layout never re-shuffles.
@@ -36,9 +37,12 @@ const GRASS_VERT = /* glsl */`
   attribute vec3  iPos;            // per-instance world XZ + scale (in y)
   attribute float aHash;           // per-instance 0..1 hash for jitter
 
-  uniform float uTime;
-  uniform vec2  uWindDir;
-  uniform float uWindStrength;
+  uniform float     uTime;
+  uniform vec2      uWindDir;
+  uniform float     uWindStrength;
+  uniform sampler2D uTrackTex;     // off-screen render of bike trail
+  uniform float     uTrackWorldSize;
+  uniform float     uTrackHas;     // 0 if no texture available, 1 if ready
 
   varying float vTip;
   varying float vHash;
@@ -48,24 +52,31 @@ const GRASS_VERT = /* glsl */`
     vec3 local = position;
     float tip  = smoothstep(0.0, 1.0, (local.y + 0.001) / 1.05);
 
-    // Wind layer 1 — traveling gust plane wave: rolls across the field
-    // along uWindDir, syncing neighbouring blades into visible ripples.
+    // ── Track flatten: sample the off-screen track texture at this
+    // blade's world position and squash the blade height by however
+    // bright the texture is at that pixel. Brighter = more recent
+    // bike pass = flatter blade. We don't go all the way to zero so
+    // tracked spots still have a thin stubble of grass.
+    vec2 trackUv = vec2(iPos.x, iPos.z) / uTrackWorldSize + 0.5;
+    float track  = uTrackHas * texture2D(uTrackTex, trackUv).r;
+    float flatten = 1.0 - track * 0.85;
+
+    // Wind layer 1 — traveling gust plane wave
     float gustPhase = (iPos.x * uWindDir.x + iPos.z * uWindDir.y) * 0.18 - uTime * 1.2;
     float gust      = sin(gustPhase) * 0.55 + 0.55;
 
-    // Wind layer 2 — per-blade hashed sway, keeps adjacent blades out of
-    // perfect sync so the field doesn't look like a sheet of fabric.
+    // Wind layer 2 — per-blade hashed sway
     float personal = sin(uTime * 1.7 + aHash * 6.2832) * 0.35;
 
     float sway = (gust + personal) * uWindStrength;
     local.x += sway * tip * uWindDir.x;
     local.z += sway * tip * uWindDir.y;
 
-    // Per-instance scale stored in iPos.y. Width and length together.
+    // Per-instance scale stored in iPos.y; flatten applied to height
     float scale = iPos.y;
     local.x *= scale;
     local.z *= scale;
-    local.y *= scale;
+    local.y *= scale * flatten;
 
     vec3 worldPos = vec3(iPos.x + local.x, local.y, iPos.z + local.z);
     gl_Position = projectionMatrix * viewMatrix * vec4(worldPos, 1.0);
@@ -156,6 +167,14 @@ function GrassField({ dayRef }) {
     if (dayRef?.current) {
       m.uniforms.uDayWeight.value = dayRef.current.dayWeight ?? 1;
     }
+    // Late-binding: TrackTexture creates the render target in a
+    // useMemo, so the first few frames may run before its texture is
+    // available. Once it's set, we keep the uniform synced. uTrackHas
+    // = 0 until it's there so the shader doesn't read undefined.
+    if (trackState.texture) {
+      m.uniforms.uTrackTex.value = trackState.texture;
+      m.uniforms.uTrackHas.value = 1;
+    }
   });
 
   const material = useMemo(
@@ -164,14 +183,17 @@ function GrassField({ dayRef }) {
         vertexShader:   GRASS_VERT,
         fragmentShader: GRASS_FRAG,
         uniforms: {
-          uTime:          { value: 0 },
-          uWindDir:       { value: new THREE.Vector2(0.65, 0.76) },
-          uWindStrength:  { value: 0.18 },
-          uTipColorA:     { value: new THREE.Color(0.46, 0.84, 0.26) },
-          uTipColorB:     { value: new THREE.Color(0.74, 0.92, 0.32) },
-          uRootColorA:    { value: new THREE.Color(0.07, 0.26, 0.10) },
-          uRootColorB:    { value: new THREE.Color(0.12, 0.34, 0.14) },
-          uDayWeight:     { value: 1.0 },
+          uTime:           { value: 0 },
+          uWindDir:        { value: new THREE.Vector2(0.65, 0.76) },
+          uWindStrength:   { value: 0.18 },
+          uTipColorA:      { value: new THREE.Color(0.46, 0.84, 0.26) },
+          uTipColorB:      { value: new THREE.Color(0.74, 0.92, 0.32) },
+          uRootColorA:     { value: new THREE.Color(0.07, 0.26, 0.10) },
+          uRootColorB:     { value: new THREE.Color(0.12, 0.34, 0.14) },
+          uDayWeight:      { value: 1.0 },
+          uTrackTex:       { value: null },
+          uTrackWorldSize: { value: trackState.worldSize },
+          uTrackHas:       { value: 0 },
         },
         side: THREE.DoubleSide,
       }),
@@ -283,6 +305,72 @@ function WindStreaks() {
         </group>
       ))}
     </group>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// RAIN LINES — Bruno-Simon-style falling streaks.
+//
+// Many short vertical lines drop from the sky, wrapping around when
+// they fall below ground level. Pure cosmetic — no physics, no impact
+// on the player. Always-on at low density for atmosphere; the shader's
+// per-line phase keeps them out of sync so the rain reads as natural
+// rather than a curtain falling in unison.
+// ─────────────────────────────────────────────────────────────────────────────
+const RAIN_COUNT  = 220;
+const RAIN_RADIUS = 36;          // wrap distance from player on XZ
+const RAIN_HEIGHT = 24;          // drop height range
+const RAIN_FALL   = 16;          // m/s falling speed
+
+function RainLines() {
+  const ref     = useRef();
+  const dummy   = useMemo(() => new THREE.Object3D(), []);
+
+  // Pre-bake per-drop random offsets (XZ + initial Y phase).
+  const seeds = useMemo(() => {
+    const rng = seededRng(0xa1d_a1ff);
+    return Array.from({ length: RAIN_COUNT }, () => ({
+      x:      (rng() - 0.5) * RAIN_RADIUS * 2,
+      z:      (rng() - 0.5) * RAIN_RADIUS * 2,
+      yPhase: rng() * RAIN_HEIGHT,
+      length: 0.6 + rng() * 0.6,
+    }));
+  }, []);
+
+  const geom = useMemo(() => new THREE.PlaneGeometry(0.018, 1, 1, 1), []);
+  const mat  = useMemo(() => new THREE.MeshBasicMaterial({
+    color: 0xc8e0ff,
+    transparent: true,
+    opacity: 0.35,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    side: THREE.DoubleSide,
+    toneMapped: false,
+  }), []);
+
+  useFrame((state) => {
+    const inst = ref.current;
+    if (!inst) return;
+    const t = state.clock.getElapsedTime();
+    for (let i = 0; i < RAIN_COUNT; i++) {
+      const s = seeds[i];
+      // Falling Y wraps every RAIN_HEIGHT metres
+      const y = ((s.yPhase + RAIN_HEIGHT - t * RAIN_FALL) % RAIN_HEIGHT);
+      dummy.position.set(bikeState.x + s.x, y, bikeState.z + s.z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.set(1, s.length, 1);
+      dummy.updateMatrix();
+      inst.setMatrixAt(i, dummy.matrix);
+    }
+    inst.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh
+      ref={ref}
+      args={[geom, mat, RAIN_COUNT]}
+      frustumCulled={false}
+    />
   );
 }
 
@@ -1087,17 +1175,20 @@ function Fireflies({ anchors }) {
 // ─────────────────────────────────────────────────────────────────────────────
 // Root export
 // ─────────────────────────────────────────────────────────────────────────────
-export default function Decorations({ dayRef }) {
+export default function Decorations({ dayRef, rainEnabled = false }) {
   return (
     <group>
-      {/* Bruno-Simon-style infinity grass — follows the player */}
+      {/* Static-placement grass field with track-flatten via shader */}
       <GrassField dayRef={dayRef} />
 
       {/* Drifting cloud shadows on the meadow */}
       <CloudShadows dayRef={dayRef} />
 
-      {/* White wind streaks drifting through the air */}
+      {/* CatmullRom wind streaks drifting through the air */}
       <WindStreaks />
+
+      {/* Optional rain — currently always on at low density */}
+      {rainEnabled && <RainLines />}
 
       {/* Grassy mounds — break up the otherwise pancake-flat meadow */}
       {MOUNDS.map((m, i) => (

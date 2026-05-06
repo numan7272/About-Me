@@ -5,18 +5,19 @@ import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 
 /**
- * Bruno-Simon-style water plane.
+ * Bruno-Simon-style flat water surface.
  *
- * Completely flat — no vertex displacement, no sine-wave bobbing. The
- * surface look comes from animated procedural "current lines": thin white
- * stripes drawn in a fragment shader using polar coordinates around the
- * island, with a denser foam belt right at the shore where the lines crowd.
- * It reads like waves traced on the surface rather than a 3D sea.
+ * Multi-octave noise produces drifting current ribbons; an extra
+ * fragment-shader pass paints a foam belt that hugs the irregular
+ * island silhouette (radius taken from islandShape's outerR formula)
+ * so foam pulses where the coast actually is, not on a perfect circle.
+ *
+ * Per-frame uniforms drive subtle colour tinting from the day cycle —
+ * water reads cool at night, golden at sunset, bright teal at noon.
  */
 
 const WATER_VERT = /* glsl */ `
   varying vec3 vWorldPos;
-
   void main() {
     vec4 wp = modelMatrix * vec4(position, 1.0);
     vWorldPos = wp.xyz;
@@ -26,66 +27,73 @@ const WATER_VERT = /* glsl */ `
 
 const WATER_FRAG = /* glsl */ `
   uniform float uTime;
-  varying vec3 vWorldPos;
+  uniform vec3  uShallow;
+  uniform vec3  uDeep;
+  uniform vec3  uFoamColor;
+  uniform float uDayWeight;
+  varying vec3  vWorldPos;
 
-  // Sharp band centred on the given offset of width w — used to convert a
-  // smooth signal into a thin bright stripe.
-  float band(float v, float centre, float w) {
-    return 1.0 - smoothstep(0.0, w, abs(v - centre));
+  // Cheap procedural noise — sin layers in world space drifting along a
+  // fixed current direction. Two octaves combined give a watery,
+  // non-repeating ribbon pattern.
+  float noise2(vec2 p, float t) {
+    return sin(p.x * 0.18 + t * 0.6) * sin(p.y * 0.13 - t * 0.4)
+         + 0.5 * sin((p.x + p.y) * 0.24 + t * 0.8);
+  }
+
+  // Mirrors lib/islandShape.js outerR so foam pulses the coastline shape.
+  float outerR(float a) {
+    return 60.0
+         + sin(a * 3.0  + 0.7) * 5.5
+         + sin(a * 5.0  + 2.1) * 3.2
+         + sin(a * 7.0  + 4.3) * 1.8
+         + sin(a * 11.0 + 1.1) * 1.0;
   }
 
   void main() {
-    // Distance from island origin and angle around the centre. Used as
-    // input to two sets of stripes — radial rings and angular spokes.
     vec2  p     = vWorldPos.xz;
     float r     = length(p);
-    float angle = atan(p.y, p.x);
+    float ang   = atan(-p.y, p.x);
+    float coast = outerR(ang);
 
-    // Base water colour — a cool light teal that picks up the bloom but
-    // doesn't drown in it. Slightly darker far from the island.
-    float depth   = smoothstep(60.0, 200.0, r);
-    vec3  shallow = vec3(0.43, 0.72, 0.92);
-    vec3  deep    = vec3(0.17, 0.40, 0.65);
-    vec3  base    = mix(shallow, deep, depth);
+    // Depth-based base colour
+    float depth = smoothstep(coast, coast + 100.0, r);
+    vec3  base  = mix(uShallow, uDeep, depth);
 
-    // ── Concentric current rings sweeping outward ──────────────────────
-    // Three rings at different speeds & densities; the modulo creates a
-    // repeating pattern of bands every ~10 m. fract() means each ring is
-    // 0..1 across one band cycle; band() picks out the centre line.
-    float ring1 = band(fract(r * 0.12 - uTime * 0.06), 0.5, 0.06);
-    float ring2 = band(fract(r * 0.06 + uTime * 0.04), 0.5, 0.05);
-    float ring3 = band(fract(r * 0.20 - uTime * 0.10), 0.5, 0.04);
+    // Drifting current ribbons
+    float n  = noise2(p, uTime);
+    float n2 = noise2(p * 0.6 + vec2(uTime * 0.3, -uTime * 0.4), uTime * 0.7);
+    float ribbons = smoothstep(0.4, 0.95, abs(n + n2 * 0.5));
 
-    // ── Diagonal cross-current — gives the surface direction so it
-    // doesn't read as a perfect target. Two crossing wave fronts. ─────
-    float cross1 = band(fract(p.x * 0.06 + p.y * 0.03 - uTime * 0.18), 0.5, 0.05);
-    float cross2 = band(fract(p.x * 0.04 - p.y * 0.07 + uTime * 0.13), 0.5, 0.05);
+    // Specular-style sparkle hot spots
+    float sparkle = smoothstep(0.85, 1.0, abs(n)) * 0.7;
 
-    // ── Foam belt at the shore — extra bright, broken-up dashes ───────
-    // The band along radius ~outer-island-radius gets a denser stripe
-    // pattern that reads as breaking surf.
-    float shore     = (1.0 - smoothstep(60.0, 78.0, r)) * smoothstep(56.0, 62.0, r);
-    float foamPhase = sin(angle * 28.0 + uTime * 0.8) * 0.5 + 0.5;
-    float foam      = shore * smoothstep(0.55, 0.95, foamPhase) * 1.6;
+    // Coast foam — a band right at the actual coastline (uses outerR).
+    // The band follows the irregular silhouette, not a perfect circle.
+    float toShore  = abs(r - coast);
+    float foamBand = (1.0 - smoothstep(0.0, 3.5, toShore));
+    float foamPulse = sin(ang * 32.0 + uTime * 0.9) * 0.5 + 0.5;
+    float foam = foamBand * smoothstep(0.45, 0.95, foamPulse) * 1.2;
 
-    // Combine rings + cross currents into a single brightness term, then
-    // boost where the shore foam is.
-    float lines = max(max(ring1, ring2), max(ring3, max(cross1, cross2))) * 0.55;
-    lines       = max(lines, foam);
+    // Compose
+    float white = max(ribbons * 0.45 + sparkle, foam);
+    vec3  col   = mix(base, uFoamColor, clamp(white, 0.0, 1.0));
 
-    // White current lines blended over the base. Non-additive so the
-    // water doesn't blow out the bloom budget.
-    vec3 col = mix(base, vec3(0.96, 0.99, 1.0), clamp(lines, 0.0, 1.0));
+    // Night cool-down: tinted toward the deep colour after sunset
+    col = mix(col * vec3(0.32, 0.38, 0.55), col, uDayWeight);
 
-    // Fade off the very far horizon so the plane doesn't show its edges
+    // Fade alpha at the very edge of the plane so the ocean blends into
+    // the horizon haze and we never see the rectangle's seams.
     float farFade = 1.0 - smoothstep(180.0, 260.0, r);
-    float alpha   = mix(0.0, 0.94, smoothstep(58.0, 72.0, r)) * farFade;
+    // Inside the island silhouette the water plane is invisible (the
+    // ground is on top of it anyway, but this saves overdraw).
+    float alpha   = mix(0.0, 0.94, smoothstep(coast - 1.0, coast + 6.0, r)) * farFade;
 
     gl_FragColor = vec4(col, alpha);
   }
 `;
 
-export default function Water() {
+export default function Water({ dayRef }) {
   const matRef = useRef(null);
 
   const material = useMemo(
@@ -94,7 +102,11 @@ export default function Water() {
         vertexShader:   WATER_VERT,
         fragmentShader: WATER_FRAG,
         uniforms: {
-          uTime: { value: 0 },
+          uTime:      { value: 0 },
+          uShallow:   { value: new THREE.Color("#5fb1d8") },
+          uDeep:      { value: new THREE.Color("#16365e") },
+          uFoamColor: { value: new THREE.Color("#f3faff") },
+          uDayWeight: { value: 1.0 },
         },
         transparent: true,
         depthWrite:  false,
@@ -102,11 +114,13 @@ export default function Water() {
       }),
     [],
   );
-
   matRef.current = material;
 
   useFrame((_, dt) => {
-    if (matRef.current) matRef.current.uniforms.uTime.value += dt;
+    matRef.current.uniforms.uTime.value += dt;
+    if (dayRef?.current) {
+      matRef.current.uniforms.uDayWeight.value = dayRef.current.dayWeight ?? 1;
+    }
   });
 
   return (
