@@ -266,11 +266,16 @@ function SkidMarks({ playerRef }) {
     const t     = state.clock.getElapsedTime();
 
     if (Math.abs(angV.y) > 0.4 && speed > 1.5 && t > nextSkid.current) {
+      const pos = body.translation();
+      // Only leave skid marks on tarmac. On grass the dark patches read
+      // as solid black streaks against the bright green meadow — the
+      // user has flagged this multiple times. Skids on roads still
+      // work as intended.
+      if (!isOnTarmac(pos.x, pos.z)) return;
       nextSkid.current = t + 0.08;
       const i  = headIdx.current % SKID_MAX;
       headIdx.current++;
 
-      const pos = body.translation();
       const r2  = body.rotation();
       tmpQ.set(r2.x, r2.y, r2.z, r2.w);
       tmpE.setFromQuaternion(tmpQ, 'YXZ');

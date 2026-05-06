@@ -20,126 +20,56 @@ function seededRng(seed) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// INFINITY GRASS  (Bruno-Simon-style follow-the-player grid)
+// GRASS FIELD — static instances scattered across the inner-grass polygon.
 //
-// Instead of placing N blades at fixed world positions, we keep a fixed
-// GRID × GRID array of instances and recompute every blade's *world*
-// position in the vertex shader from a `uPlayerPos` uniform that's
-// snapped to the tile size each frame. The grid effectively orbits the
-// player, so density stays uniform under the camera while we render far
-// fewer blades than a whole-island scatter would need. Blades whose
-// computed world position falls outside the grass polygon (inside the
-// shore) get their height squashed to zero, so the meadow stops at the
-// coast naturally.
+// Earlier we tried Bruno-Simon-style "infinity grass" with a small grid
+// that follows the player.  The user disliked the visible render-radius
+// it produced — they want grass everywhere on the meadow at once.
 //
-// Wind layer 1 — per-blade sine sway driven by a hash.
-// Wind layer 2 — a "traveling gust" plane wave that moves along the
-//               wind direction and ripples the whole field in unison.
+// This version places ~12k blades once at module load, then runs them
+// through the same wind shader (traveling-gust plane wave + per-blade
+// hashed sway) so they ripple as a unit when the wind changes.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const GRASS_VERT = /* glsl */`
-  attribute float aGridX;
-  attribute float aGridZ;
-  attribute float aHash;
+  attribute vec3  iPos;            // per-instance world XZ + scale (in y)
+  attribute float aHash;           // per-instance 0..1 hash for jitter
 
   uniform float uTime;
-  uniform vec3  uPlayerPos;
-  uniform float uTileSize;
-  uniform float uGridSize;
   uniform vec2  uWindDir;
   uniform float uWindStrength;
-  uniform float uViewRadius;
 
   varying float vTip;
-  varying float vFade;
   varying float vHash;
 
-  // Simple deterministic hashes
-  float hash11(float n) { return fract(sin(n) * 43758.5453); }
-  vec2  hash22(float n) {
-    return vec2(
-      fract(sin(n * 12.9898) * 43758.5453),
-      fract(sin(n * 78.233 ) * 43758.5453)
-    );
-  }
-
-  // Mirrors lib/islandShape.js outerR + beachWidth so the grass fades
-  // out at the inner-grass polygon boundary.
-  float outerR(float a) {
-    return 60.0
-         + sin(a * 3.0  + 0.7) * 5.5
-         + sin(a * 5.0  + 2.1) * 3.2
-         + sin(a * 7.0  + 4.3) * 1.8
-         + sin(a * 11.0 + 1.1) * 1.0;
-  }
-  float beachWidth(float a) {
-    return 5.5 + sin(a * 4.0 + 1.3) * 1.6;
-  }
-
   void main() {
-    float halfGrid = uGridSize * 0.5;
-
-    // Anchor world-space tile to the player position, quantised so the
-    // grid only jumps once per tile crossing — blades stay rooted in
-    // the world, they don't drift with the bike.
-    float anchorX = floor(uPlayerPos.x / uTileSize) * uTileSize;
-    float anchorZ = floor(uPlayerPos.z / uTileSize) * uTileSize;
-
-    float tileWorldX = anchorX + (aGridX - halfGrid) * uTileSize;
-    float tileWorldZ = anchorZ + (aGridZ - halfGrid) * uTileSize;
-
-    // Per-blade jitter inside its tile so the grid doesn't read as a grid.
-    vec2  j = (hash22(tileWorldX * 12.7 + tileWorldZ * 31.1) - 0.5) * uTileSize * 0.85;
-    float worldX = tileWorldX + j.x;
-    float worldZ = tileWorldZ + j.y;
-
-    // Per-blade scale — plain hash of world position so the same world
-    // location always produces the same blade size.
-    float scale = 0.55 + hash11(worldX * 3.7 + worldZ * 11.3) * 0.85;
-
-    // Polygon fade: drops blade height to 0 as r approaches the
-    // inner-grass radius. Computed in shape-space (atan2(-z, x)).
-    float r        = length(vec2(worldX, worldZ));
-    float ang      = atan(-worldZ, worldX);
-    float innerR   = outerR(ang) - beachWidth(ang);
-    float polyFade = 1.0 - smoothstep(innerR - 1.5, innerR, r);
-
-    // View-radius fade: blades far from the player vanish so we don't
-    // pop blades into existence as the grid wraps.
-    float vd = length(vec2(worldX, worldZ) - uPlayerPos.xz);
-    float distFade = 1.0 - smoothstep(uViewRadius * 0.85, uViewRadius, vd);
-
-    float fade = polyFade * distFade;
-
-    // Local blade vertex (from the cone). Tip factor = 0 at root, 1 at tip.
+    // Local blade vertex (cone). tipFactor = 0 at root, 1 at tip.
     vec3 local = position;
-    float tip = smoothstep(0.0, 1.0, (local.y + 0.001) / 1.05);
+    float tip  = smoothstep(0.0, 1.0, (local.y + 0.001) / 1.05);
 
-    // Wind layer 2 — traveling gust wave: a plane wave along uWindDir.
-    float gustPhase = (worldX * uWindDir.x + worldZ * uWindDir.y) * 0.18 - uTime * 1.2;
+    // Wind layer 1 — traveling gust plane wave: rolls across the field
+    // along uWindDir, syncing neighbouring blades into visible ripples.
+    float gustPhase = (iPos.x * uWindDir.x + iPos.z * uWindDir.y) * 0.18 - uTime * 1.2;
     float gust      = sin(gustPhase) * 0.55 + 0.55;
 
-    // Wind layer 1 — per-blade sway, hashed phase keeps neighbours out of
-    // sync so the field doesn't move as one rigid sheet.
+    // Wind layer 2 — per-blade hashed sway, keeps adjacent blades out of
+    // perfect sync so the field doesn't look like a sheet of fabric.
     float personal = sin(uTime * 1.7 + aHash * 6.2832) * 0.35;
 
     float sway = (gust + personal) * uWindStrength;
-
     local.x += sway * tip * uWindDir.x;
     local.z += sway * tip * uWindDir.y;
 
-    // Apply height + width scale; height is multiplied by the fade
-    // factor so the blade smoothly squashes flat at the coastline.
+    // Per-instance scale stored in iPos.y. Width and length together.
+    float scale = iPos.y;
     local.x *= scale;
     local.z *= scale;
-    local.y *= scale * fade;
+    local.y *= scale;
 
-    vec3 worldPos = vec3(worldX + local.x, local.y, worldZ + local.z);
-
+    vec3 worldPos = vec3(iPos.x + local.x, local.y, iPos.z + local.z);
     gl_Position = projectionMatrix * viewMatrix * vec4(worldPos, 1.0);
 
     vTip  = tip;
-    vFade = fade;
     vHash = aHash;
   }
 `;
@@ -151,81 +81,77 @@ const GRASS_FRAG = /* glsl */`
   uniform vec3  uTipColorB;
   uniform vec3  uRootColorA;
   uniform vec3  uRootColorB;
-  uniform float uDayWeight;     // 1.0 day → 0.0 night
+  uniform float uDayWeight;
 
   varying float vTip;
-  varying float vFade;
   varying float vHash;
 
   void main() {
-    // Discard nearly-flat blades early — saves overdraw at the coast.
-    if (vFade < 0.04) discard;
-
     float jitter = 0.5 + 0.5 * sin(vHash * 17.71);
     vec3 root = mix(uRootColorA, uRootColorB, jitter);
     vec3 tip  = mix(uTipColorA,  uTipColorB,  jitter);
 
     vec3 col = mix(root, tip, vTip);
-    col *= mix(0.55, 1.0, vTip);              // base AO
-
-    // Night-shift: cool the palette down as day weight drops.
+    col *= mix(0.55, 1.0, vTip);                     // base AO
     col = mix(col * vec3(0.18, 0.24, 0.42), col, uDayWeight);
 
     gl_FragColor = vec4(col, 1.0);
   }
 `;
 
-// Grid resolution and tile size. 80×80 = 6400 blades — high density right
-// under the camera, and they're shader-positioned so we only update one
-// uniform per frame instead of touching 6400 instance matrices.
-const GRASS_GRID  = 80;
-const GRASS_TILE  = 0.32;
-const GRASS_COUNT = GRASS_GRID * GRASS_GRID;
-const GRASS_VIEW  = (GRASS_GRID * GRASS_TILE) * 0.48;   // visible radius
+const ISLAND_HALF = 68;            // sampling bounds; isInGrass trims to coast
+const GRASS_COUNT = 12000;          // dense across the whole meadow
 
 function GrassField({ dayRef }) {
   const meshRef = useRef();
   const matRef  = useRef();
   const timeRef = useRef(0);
-  const tmpVec  = useMemo(() => new THREE.Vector3(), []);
 
-  // Per-instance attributes — fixed for the lifetime of the mesh.
-  const { gridX, gridZ, hashes } = useMemo(() => {
-    const rng = seededRng(0x5eed_b1ade);
-    const gx = new Float32Array(GRASS_COUNT);
-    const gz = new Float32Array(GRASS_COUNT);
-    const hs = new Float32Array(GRASS_COUNT);
-    let i = 0;
-    for (let z = 0; z < GRASS_GRID; z++) {
-      for (let x = 0; x < GRASS_GRID; x++) {
-        gx[i] = x;
-        gz[i] = z;
-        hs[i] = rng();
-        i++;
-      }
+  // Pre-compute every blade's anchor + scale + hash. Module-level deps
+  // are stable so this runs once.
+  const { iPos, hashes, count } = useMemo(() => {
+    const rng = seededRng(0xdeadbeef);
+    const positions = [];
+    const hashList  = [];
+    let placed   = 0;
+    let attempts = 0;
+    while (placed < GRASS_COUNT && attempts < GRASS_COUNT * 6) {
+      attempts++;
+      const x = (rng() - 0.5) * (ISLAND_HALF * 2 - 4);
+      const z = (rng() - 0.5) * (ISLAND_HALF * 2 - 4);
+      if (!isInGrass(x, z))           continue;
+      if (isOnRoad(x, z))             continue;
+      if (isInPlaza(x, z))            continue;
+      const scale = 0.55 + rng() * 1.10;
+      positions.push(x, scale, z);
+      hashList.push(rng());
+      placed++;
     }
-    return { gridX: gx, gridZ: gz, hashes: hs };
+    return {
+      iPos:    new Float32Array(positions),
+      hashes:  new Float32Array(hashList),
+      count:   placed,
+    };
   }, []);
 
   useEffect(() => {
     if (!meshRef.current) return;
-    // All instance matrices are identity — the shader does the layout.
+    // All matrices identity — shader does the world placement.
     const ident = new THREE.Matrix4();
-    for (let i = 0; i < GRASS_COUNT; i++) meshRef.current.setMatrixAt(i, ident);
+    for (let i = 0; i < count; i++) meshRef.current.setMatrixAt(i, ident);
     meshRef.current.instanceMatrix.needsUpdate = true;
+    meshRef.current.count = count;
 
     const geom = meshRef.current.geometry;
-    geom.setAttribute("aGridX", new THREE.InstancedBufferAttribute(gridX, 1));
-    geom.setAttribute("aGridZ", new THREE.InstancedBufferAttribute(gridZ, 1));
+    geom.setAttribute("iPos",   new THREE.InstancedBufferAttribute(iPos, 3));
     geom.setAttribute("aHash",  new THREE.InstancedBufferAttribute(hashes, 1));
-  }, [gridX, gridZ, hashes]);
+  }, [iPos, hashes, count]);
 
   useFrame((_, delta) => {
     timeRef.current += delta;
     const m = matRef.current;
     if (!m) return;
     m.uniforms.uTime.value = timeRef.current;
-    m.uniforms.uPlayerPos.value.set(bikeState.x, 0, bikeState.z);
     if (dayRef?.current) {
       m.uniforms.uDayWeight.value = dayRef.current.dayWeight ?? 1;
     }
@@ -238,10 +164,6 @@ function GrassField({ dayRef }) {
         fragmentShader: GRASS_FRAG,
         uniforms: {
           uTime:          { value: 0 },
-          uPlayerPos:     { value: new THREE.Vector3() },
-          uTileSize:      { value: GRASS_TILE },
-          uGridSize:      { value: GRASS_GRID },
-          uViewRadius:    { value: GRASS_VIEW },
           uWindDir:       { value: new THREE.Vector2(0.65, 0.76) },
           uWindStrength:  { value: 0.18 },
           uTipColorA:     { value: new THREE.Color(0.46, 0.84, 0.26) },
@@ -263,8 +185,6 @@ function GrassField({ dayRef }) {
       args={[undefined, undefined, GRASS_COUNT]}
       frustumCulled={false}
     >
-      {/* Tapered pyramid blade — 4-vert geometry: 3 base verts + 1 tip.
-          Each blade is essentially a low-poly pyramid with a sharp tip. */}
       <coneGeometry args={[0.05, 1.05, 3]} />
       <primitive object={material} attach="material" />
     </instancedMesh>
@@ -272,64 +192,112 @@ function GrassField({ dayRef }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// WIND STREAKS — drifting white traces in the air around the player.
-//
-// Bruno-Simon-style "white wind lines" effect: thin elongated quads,
-// additive blended, drift on a constant wind vector and wrap around
-// the play area. We update only ~28 instance matrices per frame; the
-// streaks follow the player so they're always visible without rendering
-// a sky-full of geometry.
+// WIND STREAKS — drifting white traces in the air, irregular curves not
+// straight lines. The plane geometry has 32 segments along its length, and
+// the vertex shader displaces each segment with two-octave sine noise so
+// each streak reads as a flowing handwritten swirl rather than a stick.
 // ─────────────────────────────────────────────────────────────────────────────
-const STREAK_COUNT = 28;
-const STREAK_RADIUS = 32;       // wrap distance from player
-const STREAK_SPEED  = 4.5;      // m/s along wind direction
+
+const STREAK_VERT = /* glsl */`
+  attribute float aPhase;
+  attribute float aAmp;
+  uniform float uTime;
+
+  void main() {
+    vec3 p = position;
+    // p.x runs -0.5..0.5 along the streak's length; p.y is the thin
+    // ribbon thickness. We bend the ribbon vertically + laterally with
+    // two crossing sines so it looks calligraphic and unique per phase.
+    float along = (p.x + 0.5);                 // 0..1 along length
+    float wave1 = sin(along * 9.0  + aPhase + uTime * 0.6);
+    float wave2 = sin(along * 18.0 + aPhase * 1.7 - uTime * 0.9);
+    float disp  = (wave1 * 0.6 + wave2 * 0.4) * aAmp;
+    p.y += disp;
+    p.z += sin(along * 13.0 + aPhase * 0.8 + uTime * 0.4) * aAmp * 0.45;
+
+    // Fade to zero at both ends — gives the streak a tapered look.
+    float endFade = smoothstep(0.0, 0.12, along) * smoothstep(0.0, 0.12, 1.0 - along);
+    p.y *= endFade;
+    p.z *= endFade;
+
+    gl_Position = projectionMatrix * modelViewMatrix * vec4(p, 1.0);
+  }
+`;
+const STREAK_FRAG = /* glsl */`
+  precision highp float;
+  uniform vec3 uColor;
+  uniform float uOpacity;
+  void main() {
+    gl_FragColor = vec4(uColor, uOpacity);
+  }
+`;
+
+const STREAK_COUNT  = 22;
+const STREAK_RADIUS = 32;
+const STREAK_SPEED  = 4.5;
 
 function WindStreaks() {
-  const ref     = useRef();
-  const dummy   = useMemo(() => new THREE.Object3D(), []);
-  const wind    = useMemo(() => new THREE.Vector2(0.65, 0.76).normalize(), []);
+  const ref   = useRef();
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+  const wind  = useMemo(() => new THREE.Vector2(0.65, 0.76).normalize(), []);
 
-  // Per-streak random params: lateral offset, height, length, alpha,
-  // initial along-wind position. Pre-baked so we just add time.
-  const seeds = useMemo(() => {
+  // Per-streak base params (offset, height, length). Stored once.
+  const { seeds, phases, amps } = useMemo(() => {
     const rng = seededRng(0xc0fee_b00);
-    const arr = [];
+    const ss = [];
+    const ph = new Float32Array(STREAK_COUNT);
+    const am = new Float32Array(STREAK_COUNT);
     for (let i = 0; i < STREAK_COUNT; i++) {
-      arr.push({
+      ss.push({
         lateral: (rng() - 0.5) * STREAK_RADIUS * 1.6,
         height:  1.5 + rng() * 5.5,
-        length:  3.0 + rng() * 4.5,
-        alpha:   0.18 + rng() * 0.18,
+        length:  4.5 + rng() * 5.0,
         offset:  rng() * STREAK_RADIUS * 2,
       });
+      ph[i] = rng() * Math.PI * 2;
+      am[i] = 0.20 + rng() * 0.45;          // wave amplitude
     }
-    return arr;
+    return { seeds: ss, phases: ph, amps: am };
   }, []);
 
-  const geom = useMemo(() => new THREE.PlaneGeometry(1, 0.06), []);
-  const mat  = useMemo(() => new THREE.MeshBasicMaterial({
-    color: 0xffffff,
+  const geom = useMemo(() => new THREE.PlaneGeometry(1, 0.06, 32, 1), []);
+  const mat  = useMemo(() => new THREE.ShaderMaterial({
+    vertexShader:   STREAK_VERT,
+    fragmentShader: STREAK_FRAG,
+    uniforms: {
+      uTime:    { value: 0 },
+      uColor:   { value: new THREE.Color(1, 1, 1) },
+      uOpacity: { value: 0.55 },
+    },
     transparent: true,
-    opacity: 0.65,
-    depthWrite: false,
-    blending: THREE.AdditiveBlending,
-    toneMapped: false,
+    depthWrite:  false,
+    blending:    THREE.AdditiveBlending,
     side: THREE.DoubleSide,
   }), []);
 
-  // Wind angle in world XZ plane — rotates the strip's long axis
-  const angle = useMemo(() => Math.atan2(wind.x, wind.y), [wind]);
-  // Right-perpendicular to wind, used for the lateral offset
+  const angle    = useMemo(() => Math.atan2(wind.x, wind.y), [wind]);
   const lateralX = useMemo(() => -wind.y, [wind]);
   const lateralZ = useMemo(() =>  wind.x, [wind]);
+
+  useEffect(() => {
+    if (!ref.current) return;
+    ref.current.geometry.setAttribute(
+      "aPhase",
+      new THREE.InstancedBufferAttribute(phases, 1),
+    );
+    ref.current.geometry.setAttribute(
+      "aAmp",
+      new THREE.InstancedBufferAttribute(amps, 1),
+    );
+  }, [phases, amps]);
 
   useFrame((state) => {
     const inst = ref.current;
     if (!inst) return;
     const t = state.clock.getElapsedTime();
+    mat.uniforms.uTime.value = t;
     for (let i = 0; i < STREAK_COUNT; i++) {
       const s = seeds[i];
-      // Position along the wind direction wraps every 2*RADIUS metres
       const along = ((s.offset + t * STREAK_SPEED) % (STREAK_RADIUS * 2)) - STREAK_RADIUS;
       const x = bikeState.x + wind.x * along + lateralX * s.lateral;
       const z = bikeState.z + wind.y * along + lateralZ * s.lateral;

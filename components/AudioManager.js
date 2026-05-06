@@ -36,12 +36,13 @@ function writeMuted(v) {
   catch { /* noop */ }
 }
 
-/** Public helper for components that want to trigger a UI click sfx
- *  without subscribing to refs. Dispatches a window event the manager
- *  listens for. */
+/** Public helper for components that want to trigger a UI click sfx.
+ *  Currently a no-op: the user has asked to disable the click sound
+ *  while keeping ambient + wheels audible. Re-enable by uncommenting
+ *  the dispatch below. */
 export function playClick() {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new Event("ui:click"));
+  // window.dispatchEvent(new Event("ui:click"));
 }
 
 export default function AudioManager() {
