@@ -4,7 +4,7 @@ import { Suspense, useRef, useMemo } from "react";
 import { Environment, SoftShadows, ContactShadows, Sparkles } from "@react-three/drei";
 import { useFrame, useThree } from "@react-three/fiber";
 import { Physics } from "@react-three/rapier";
-import { EffectComposer, Bloom, Vignette, ChromaticAberration, SSAO } from "@react-three/postprocessing";
+import { EffectComposer, Bloom, ChromaticAberration, SSAO } from "@react-three/postprocessing";
 import { BlendFunction } from "postprocessing";
 import { Vector2, Fog, Color } from "three";
 
@@ -18,6 +18,7 @@ import Birds from "./Birds";
 import MobileControls from "./MobileControls";
 import EasterEggs from "./EasterEggs";
 import TrackTexture from "./TrackTexture";
+import CinematicEffect from "./CinematicEffect";
 
 import { sample as sampleDayCycle } from "@/lib/dayCycle";
 import { sharedUniforms } from "@/lib/sharedUniforms";
@@ -311,7 +312,11 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
         )}
         <Bloom intensity={0.65} luminanceThreshold={0.82} luminanceSmoothing={0.5} mipmapBlur />
         <ChromaticAberration offset={caOffset} radialModulation={false} modulationOffset={0} />
-        <Vignette eskil={false} offset={0.2} darkness={0.55} />
+        {/* Custom cinematic pass: saturation + contrast + day-tinted
+            vignette + film grain. Replaces the built-in <Vignette> —
+            same role but drives the corner colour from the day cycle
+            instead of fading to flat black. */}
+        <CinematicEffect />
       </EffectComposer>
     </Suspense>
   );
