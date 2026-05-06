@@ -197,7 +197,7 @@ function GrassField() {
   return (
     <instancedMesh
       ref={meshRef}
-      args={[undefined, undefined, GRASS_COUNT]}
+      args={[undefined, undefined, quality.grassCount]}
       frustumCulled={false}
     >
       <coneGeometry args={[0.05, 1.05, 3]} />
