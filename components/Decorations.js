@@ -128,8 +128,8 @@ const GRASS_VERT = /* glsl */`
     local.x += sway * tip * uWindDir.x;
     local.z += sway * tip * uWindDir.y;
 
-    // Apply height + width scale; height is multiplied by `fade` so the
-    // blade smoothly squashes flat at the coastline.
+    // Apply height + width scale; height is multiplied by the fade
+    // factor so the blade smoothly squashes flat at the coastline.
     local.x *= scale;
     local.z *= scale;
     local.y *= scale * fade;
