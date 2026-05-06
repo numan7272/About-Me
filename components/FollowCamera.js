@@ -8,7 +8,9 @@ import * as THREE from "three";
 import { shakeState } from "@/lib/cameraShake";
 
 // Chase-cam offset above/behind the bike (world-space isometric).
-const CAM_OFFSET = new THREE.Vector3(14, 18, 14);
+// Tightened from (14, 18, 14) so the bike fills more of the frame on
+// load; orbit zoom still works freely after the player drags.
+const CAM_OFFSET = new THREE.Vector3(11, 14, 11);
 const CAM_LERP   = 0.07;   // camera body catch-up speed (lower = dreamier)
 const TGT_LERP   = 0.10;   // orbit target tracking speed
 

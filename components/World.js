@@ -1,10 +1,11 @@
 "use client";
 
 import { Suspense, useRef, useMemo } from "react";
-import { Environment, SoftShadows, Sky, ContactShadows, Sparkles } from "@react-three/drei";
+import { Environment, SoftShadows, ContactShadows, Sparkles } from "@react-three/drei";
+import { useFrame, useThree } from "@react-three/fiber";
 import { Physics } from "@react-three/rapier";
-import { EffectComposer, Bloom, Vignette, ChromaticAberration } from "@react-three/postprocessing";
-import { Vector2 } from "three";
+import { EffectComposer, Bloom, Vignette, ChromaticAberration, SSAO, BlendFunction } from "@react-three/postprocessing";
+import { Vector2, Fog, Color } from "three";
 
 import Ground from "./Ground";
 import Player from "./Player";
@@ -16,6 +17,8 @@ import Birds from "./Birds";
 import MobileControls from "./MobileControls";
 import EasterEggs from "./EasterEggs";
 
+import { sample as sampleDayCycle } from "@/lib/dayCycle";
+
 // ─── Landmark positions (single source of truth) ─────────────────────────────
 const LM = {
   haw:        { x: -38, z: -35 },
@@ -25,30 +28,85 @@ const LM = {
   homebase:   { x:   0, z:   0 },
 };
 
-/**
- * Compute the Y rotation so a building's +Z (front) faces the HQ at origin.
- * Only used for procedural buildings — GLB floor decals don't need it.
- */
 function faceHQ(x, z, offset = 0) {
   return Math.atan2(0 - x, 0 - z) + offset;
+}
+
+/**
+ * Drives the dynamic day/night cycle.
+ *  - Reads the sun position + sky/ambient/fog colours from the shared
+ *    cycle util, applies them to the lights and the scene background.
+ *  - Writes a `dayRef.current` snapshot every frame so child components
+ *    (grass, cloud shadows) can react too without re-rendering React.
+ */
+function DayCycle({ sunRef, ambientRef, hemiRef, fillRef, dayRef }) {
+  const { scene } = useThree();
+  // Reusable colour holders so we don't allocate per frame.
+  const skyTint  = useMemo(() => new Color(), []);
+  const fogTint  = useMemo(() => new Color(), []);
+  // The Fog object is set once and mutated each frame.
+  const fog = useMemo(() => new Fog("#bcd8e8", 60, 220), []);
+  useMemo(() => { scene.fog = fog; }, [scene, fog]);
+
+  useFrame((state) => {
+    const t = state.clock.getElapsedTime();
+    const s = sampleDayCycle(t, dayRef.current ?? {});
+    dayRef.current = s;
+
+    // Sky / scene background — gentle clear colour blend
+    skyTint.copy(s.sky);
+    scene.background = skyTint;
+
+    // Fog colour follows the sky, distance is fixed but the colour shift
+    // is enough to feel "weather changing".
+    fogTint.copy(s.fog);
+    fog.color.copy(fogTint);
+
+    // Sun light: position from the unit-sphere direction × big radius
+    if (sunRef.current) {
+      const d = s.sunDir;
+      sunRef.current.position.set(d.x * 80, Math.max(8, d.y * 80), d.z * 80);
+      sunRef.current.intensity = s.sunIntensity;
+      sunRef.current.color.copy(s.sun);
+    }
+    if (ambientRef.current) {
+      ambientRef.current.intensity = s.ambientIntensity;
+      ambientRef.current.color.copy(s.ambient);
+    }
+    if (hemiRef.current) {
+      hemiRef.current.intensity = s.hemiIntensity;
+      hemiRef.current.color.copy(s.sky);          // top tint = sky
+      hemiRef.current.groundColor.copy(s.ambient);
+    }
+    if (fillRef.current) {
+      fillRef.current.intensity = 0.18 + s.dayWeight * 0.32;
+    }
+  });
+
+  return null;
 }
 
 export default function World({ onEnter, onExit, onClickOpen, followModeRef, orbitRef }) {
   const playerRef = useRef(null);
   const caOffset  = useMemo(() => new Vector2(0.0005, 0.0005), []);
 
+  // Refs for the lights so DayCycle can mutate their props per frame
+  // without rerendering React. The `dayRef` is shared down to grass +
+  // cloud shadows so they can colour-shift with the sun.
+  const sunRef     = useRef(null);
+  const ambientRef = useRef(null);
+  const hemiRef    = useRef(null);
+  const fillRef    = useRef(null);
+  const dayRef     = useRef({ dayWeight: 1 });
+
   return (
     <Suspense fallback={null}>
       <color attach="background" args={["#8ec8e8"]} />
 
-      <Sky
-        distance={4500} sunPosition={[60,40,-15]} inclination={0.47} azimuth={0.21}
-        turbidity={3.5} rayleigh={0.6} mieCoefficient={0.003} mieDirectionalG={0.9}
-      />
-
-      <ambientLight intensity={0.45} color="#ddeeff" />
-      <hemisphereLight args={["#c8e8ff","#3d6b44",0.55]} position={[0,50,0]} />
+      <ambientLight ref={ambientRef} intensity={0.45} color="#ddeeff" />
+      <hemisphereLight ref={hemiRef} args={["#c8e8ff","#3d6b44",0.55]} position={[0,50,0]} />
       <directionalLight
+        ref={sunRef}
         position={[45,65,30]} intensity={2.6} color="#fff4d6" castShadow
         shadow-mapSize-width={2048} shadow-mapSize-height={2048}
         shadow-camera-near={0.5} shadow-camera-far={250}
@@ -56,12 +114,22 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
         shadow-camera-top={70} shadow-camera-bottom={-70}
         shadow-bias={-0.0003} shadow-normalBias={0.06}
       />
-      <directionalLight position={[-30,25,-25]} intensity={0.5} color="#a8c8ff" />
+      {/* Cool fill light for the side away from the sun. Intensity is
+          modulated per frame in DayCycle. */}
+      <directionalLight ref={fillRef} position={[-30,25,-25]} intensity={0.5} color="#a8c8ff" />
       <directionalLight position={[0,-8,0]}     intensity={0.18} color="#a8d8a0" />
 
       <SoftShadows size={28} samples={12} focus={0.55} />
       <ContactShadows position={[0,0.015,0]} opacity={0.28} width={120} height={120} blur={3} far={12} color="#1a3a22" frames={1} />
       <Environment preset="city" background={false} />
+
+      <DayCycle
+        sunRef={sunRef}
+        ambientRef={ambientRef}
+        hemiRef={hemiRef}
+        fillRef={fillRef}
+        dayRef={dayRef}
+      />
 
       <FollowCamera targetRef={playerRef} followModeRef={followModeRef} orbitRef={orbitRef} />
 
@@ -73,11 +141,8 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
 
       <Physics gravity={[0,-18,0]}>
         <Ground landmarkPositions={LM} />
-        <Decorations />
+        <Decorations dayRef={dayRef} />
 
-        {/* HAW logo — full 3D logo just like Designa. The ground decal
-            previously rendered in Ground.js was removed so this is the
-            only HAW visual. */}
         <Landmark id="haw"
           model="/haw-logo-transformed.glb"
           position={[LM.haw.x, 0, LM.haw.z]}
@@ -89,7 +154,6 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
           onEnter={onEnter} onExit={onExit} onClickOpen={onClickOpen}
         />
 
-        {/* ── Designa ──────────────────────────────────────────────────────── */}
         <Landmark id="designa"
           model="/designa-logo-transformed.glb"
           position={[LM.designa.x, 0, LM.designa.z]}
@@ -101,8 +165,6 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
           onEnter={onEnter} onExit={onExit} onClickOpen={onClickOpen}
         />
 
-        {/* ── Yek Döner ────────────────────────────────────────────────────── */}
-        {/* FIX #3: corrected model filename to match /public exactly */}
         <Landmark id="kebab"
           model="/yekdoener-transformed.glb"
           glossy={false} floating={false}
@@ -115,7 +177,6 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
           onEnter={onEnter} onExit={onExit} onClickOpen={onClickOpen}
         />
 
-        {/* ── Thor Heyerdahl Gymnasium ─────────────────────────────────────── */}
         <Landmark id="highschool"
           proceduralShape="school"
           position={[LM.highschool.x, 0, LM.highschool.z]}
@@ -127,7 +188,6 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
           onEnter={onEnter} onExit={onExit} onClickOpen={onClickOpen}
         />
 
-        {/* ── Homebase HQ ──────────────────────────────────────────────────── */}
         <Landmark id="homebase"
           proceduralShape="house"
           position={[LM.homebase.x, 0, LM.homebase.z]}
@@ -141,16 +201,10 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
         <Player playerRef={playerRef} followModeRef={followModeRef} />
       </Physics>
 
-      {/* In-scene 3D joystick (mobile only). Lives outside <Physics> on
-          purpose — it's a HUD prop, not a colliding entity. */}
       <MobileControls />
 
-      {/* Hidden discoveries — small clickable props that open their own
-          info card. Kept outside Physics: pointer events use R3F's
-          raycaster, no rigid body required. */}
       <EasterEggs onClickOpen={onClickOpen} />
 
-      {/* Atmosphere — drifting golden dust motes catch the bloom nicely */}
       <Sparkles
         count={140}
         size={3}
@@ -160,7 +214,6 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
         color="#ffe9b3"
         opacity={0.55}
       />
-      {/* A second, denser layer of subtle bluish dust closer to the ground */}
       <Sparkles
         count={90}
         size={1.6}
@@ -171,7 +224,21 @@ export default function World({ onEnter, onExit, onClickOpen, followModeRef, orb
         opacity={0.4}
       />
 
-      <EffectComposer multisampling={0} disableNormalPass>
+      <EffectComposer multisampling={0}>
+        {/* SSAO pass — soft contact shadows where geometry meets the
+            ground, makes the bike + buildings feel grounded. */}
+        <SSAO
+          blendFunction={BlendFunction.MULTIPLY}
+          samples={16}
+          radius={4}
+          intensity={20}
+          luminanceInfluence={0.7}
+          worldDistanceThreshold={0.5}
+          worldDistanceFalloff={0.1}
+          worldProximityThreshold={6}
+          worldProximityFalloff={2}
+          fade={0.02}
+        />
         <Bloom intensity={0.65} luminanceThreshold={0.82} luminanceSmoothing={0.5} mipmapBlur />
         <ChromaticAberration offset={caOffset} radialModulation={false} modulationOffset={0} />
         <Vignette eskil={false} offset={0.2} darkness={0.55} />

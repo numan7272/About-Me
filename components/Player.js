@@ -621,8 +621,22 @@ function DriftSparks({ playerRef }) {
 function VanMoofModel({ scale = 1, leanRef }) {
   const { scene } = useGLTF(BIKE_URL);
   const groupRef  = useRef();
+  const outlineGroup = useMemo(() => new THREE.Group(), []);
 
   useEffect(() => {
+    // Pass 1: tweak the bike's PBR look. Pass 2: build a backface-only
+    // shell that gets scaled up slightly — classic "inverted hull"
+    // outline trick. Cheaper than a full edge-detect post-pass and the
+    // shape stays consistent through bloom + tone-mapping.
+    while (outlineGroup.children.length) outlineGroup.remove(outlineGroup.children[0]);
+
+    const outlineMat = new THREE.MeshBasicMaterial({
+      color:    0x0a0a10,
+      side:     THREE.BackSide,
+      toneMapped: false,
+      depthWrite: true,
+    });
+
     scene.traverse((o) => {
       if (!o.isMesh) return;
       o.castShadow    = true;
@@ -632,8 +646,17 @@ function VanMoofModel({ scale = 1, leanRef }) {
         o.material.metalness       = Math.max(o.material.metalness  ?? 0.2, 0.4);
         o.material.envMapIntensity = 1.2;
       }
+      // Build the outline shell as cloned meshes that share the same
+      // local transform as the original. We push them slightly outward
+      // along the normal by upscaling the mesh.
+      const shell = o.clone();
+      shell.material = outlineMat;
+      shell.castShadow = false;
+      shell.receiveShadow = false;
+      shell.scale.multiplyScalar(1.025);
+      outlineGroup.add(shell);
     });
-  }, [scene]);
+  }, [scene, outlineGroup]);
 
   useFrame((_, delta) => {
     if (!groupRef.current || leanRef === null || leanRef === undefined) return;
@@ -647,6 +670,10 @@ function VanMoofModel({ scale = 1, leanRef }) {
   return (
     <group ref={groupRef} rotation={[0, -Math.PI / 2, 0]}>
       <primitive object={scene} scale={scale} />
+      {/* The outline shell sits on top — same local space, just slightly
+          larger. Backface culling means we only see the rim around the
+          bike's silhouette. */}
+      <primitive object={outlineGroup} scale={scale} />
     </group>
   );
 }
