@@ -703,16 +703,16 @@ const LAMPS_RAW = [
   [  6, 0,  32], [-28, 0,  26],
 ];
 
-// Houses — only the inland ones near roads remain. Edge houses near the
-// coastline were removed because they read as random debris on the new
-// natural island silhouette.
-const HOUSES = [
-  { pos: [-26, 0,  -8], rot: 0.4,  pi: 0, sc: 1.0,  v: 0 },
-  { pos: [ 28, 0,   8], rot: -0.3, pi: 1, sc: 0.95, v: 2 },
-  { pos: [-22, 0,  18], rot: 0.7,  pi: 2, sc: 1.0,  v: 1 },
-  { pos: [ 22, 0, -22], rot: -0.5, pi: 3, sc: 1.05, v: 2 },
-  { pos: [-14, 0, -28], rot: 1.1,  pi: 4, sc: 0.9,  v: 1 },
-  { pos: [ 14, 0,  28], rot: 0.2,  pi: 5, sc: 1.0,  v: 0 },
+// Houses — placed in the meadow "wedges" between landmark roads, where
+// the radial road from HQ and any inter-landmark road both clear the
+// position by at least HOUSE_ROAD_CLEAR metres. Each spot has been hand-
+// audited to avoid overlapping a tree or the Designa↔Kebab cross-road.
+const HOUSES_RAW = [
+  { pos: [-26, 0,  12], rot: 0.4,  pi: 0, sc: 1.0,  v: 0 },   // NW wedge
+  { pos: [-12, 0,  24], rot: 0.7,  pi: 2, sc: 1.0,  v: 1 },   // N wedge
+  { pos: [ 30, 0,  18], rot: 1.1,  pi: 4, sc: 0.9,  v: 1 },   // NE wedge
+  { pos: [ 36, 0,   4], rot: -0.3, pi: 1, sc: 0.95, v: 2 },   // E wedge
+  { pos: [ 12, 0, -38], rot: -0.5, pi: 3, sc: 1.05, v: 2 },   // S wedge
 ];
 
 const ROCKS = [
@@ -771,6 +771,43 @@ const LAMPS   = LAMPS_RAW.filter(([x, , z]) => !isBlocked(x, z));
 const FLOWERS = FLOWERS_RAW.filter(([x, , z]) => !isBlocked(x, z));
 const MOUNDS  = MOUNDS_RAW.filter(([x, , z]) => !isBlocked(x, z));
 const DIRT    = DIRT_RAW.filter(([x, , z]) => !isBlocked(x, z));
+
+// Houses get a stricter test:
+//  - 7 m clearance from any road centre-line (vs. 5.5 for trees), so a
+//    ~3 m-footprint house never overhangs the curb.
+//  - 4 m clearance from any already-placed tree, lamp, mound, or
+//    Easter-egg position so houses don't end up wedged inside a bush.
+const HOUSE_ROAD_CLEAR = 7;
+const HOUSE_NEIGHBOUR_CLEAR = 4;
+const NEIGHBOUR_POINTS = [
+  ...TREES.map((t)   => [t[0],   t[2]]),
+  ...LAMPS.map((l)   => [l[0],   l[2]]),
+  ...MOUNDS.map((m)  => [m[0],   m[2]]),
+  // Easter-egg positions hard-coded here (kept in sync with EasterEggs.js).
+  // Avoids the hangar-on-top-of-bush failure mode the user reported.
+  [-3.6, 6.4],   // raspberry pi
+  [11,   49],    // router
+  [-18, -10],    // shipping container
+  [26,   12],    // dumbbell
+];
+
+function tooCloseToRoad(x, z, clear) {
+  return ROAD_SEGMENTS.some(([[ax, az], [bx, bz]]) =>
+    distToSeg(x, z, ax, az, bx, bz) < clear,
+  );
+}
+function tooCloseToNeighbour(x, z) {
+  return NEIGHBOUR_POINTS.some(
+    ([nx, nz]) => Math.hypot(x - nx, z - nz) < HOUSE_NEIGHBOUR_CLEAR,
+  );
+}
+
+const HOUSES = HOUSES_RAW.filter(({ pos: [x, , z] }) =>
+  !tooCloseToRoad(x, z, HOUSE_ROAD_CLEAR) &&
+  !isInPlaza(x, z) &&
+  isInGrass(x, z) &&
+  !tooCloseToNeighbour(x, z),
+);
 
 // ─────────────────────────────────────────────────────────────────────────────
 // FIREFLIES — small instanced orbs that orbit around each lamppost

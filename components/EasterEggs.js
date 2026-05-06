@@ -306,41 +306,69 @@ function ContainerModel() {
   );
 }
 
-// ─── Egg 4: 20 kg Plate (half-sunk in the meadow) ────────────────────────────
+// ─── Egg 4: Dumbbell (lying on the meadow) ───────────────────────────────────
 
-function DumbbellPlateModel() {
-  // The plate stands vertical (like a wheel) and is tilted slightly so it
-  // looks dropped & forgotten. Position is set so the lower half is below
-  // y = 0 — half-buried in the grass.
+function DumbbellModel() {
+  // Classic gym dumbbell — chrome handle in the middle, two stacked-plate
+  // weights at each end. Lies flat on the grass; the whole rig is tilted
+  // slightly so it doesn't look perfectly axis-aligned.
+  const HANDLE_LEN = 0.55;
+  const HANDLE_R   = 0.045;
+  const PLATE_R    = 0.22;
+  const PLATE_T    = 0.08;
+  const SMALL_R    = 0.16;
+  const SMALL_T    = 0.07;
+
   return (
-    <group rotation={[0, 0.3, 0.18]} position={[0, 0.10, 0]}>
-      {/* Outer plate body */}
-      <mesh rotation={[Math.PI / 2, 0, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.55, 0.55, 0.10, 36]} />
-        <meshStandardMaterial color="#15161a" metalness={0.55} roughness={0.45} />
+    <group rotation={[0, 0.5, 0]} position={[0, 0.22, 0]}>
+      {/* Knurled chrome handle — long axis along world X. PlaneGeo's local
+          +Y becomes world +X after rotation.z = π/2, so a Y-aligned
+          cylinder rotated 90° around Z lies horizontally. */}
+      <mesh rotation={[0, 0, Math.PI / 2]} castShadow>
+        <cylinderGeometry args={[HANDLE_R, HANDLE_R, HANDLE_LEN, 18]} />
+        <meshStandardMaterial color="#cfcfd4" metalness={0.85} roughness={0.28} />
       </mesh>
-      {/* Slightly raised hub */}
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <cylinderGeometry args={[0.16, 0.16, 0.13, 24]} />
-        <meshStandardMaterial color="#1f1f24" metalness={0.7} roughness={0.4} />
-      </mesh>
-      {/* Centre hole — narrow cylinder, dark inside */}
-      <mesh rotation={[Math.PI / 2, 0, 0]} position={[0, 0, 0]}>
-        <cylinderGeometry args={[0.052, 0.052, 0.16, 16]} />
-        <meshBasicMaterial color="#000" side={THREE.DoubleSide} />
-      </mesh>
-      {/* "20 KG" raised oval ring on the front face */}
-      <mesh rotation={[0, 0, 0]} position={[0, 0, 0.052]}>
-        <ringGeometry args={[0.26, 0.34, 36]} />
-        <meshStandardMaterial color="#a3a3a3" metalness={0.4} roughness={0.5} side={THREE.DoubleSide} />
-      </mesh>
-      {/* Faint number text — three stamped marks at top to suggest weight */}
-      {[-0.10, 0, 0.10].map((x, i) => (
-        <mesh key={`mark-${i}`} position={[x, 0.30, 0.052]}>
-          <boxGeometry args={[0.02, 0.04, 0.005]} />
-          <meshStandardMaterial color="#cccccc" metalness={0.4} roughness={0.6} />
+
+      {/* Left-end stacked weight cluster: outer big plate + inner small */}
+      <group position={[-HANDLE_LEN / 2 - PLATE_T / 2, 0, 0]}>
+        <mesh rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
+          <cylinderGeometry args={[PLATE_R, PLATE_R, PLATE_T, 28]} />
+          <meshStandardMaterial color="#15161a" metalness={0.55} roughness={0.45} flatShading />
         </mesh>
-      ))}
+        <mesh
+          rotation={[0, 0, Math.PI / 2]}
+          position={[PLATE_T / 2 + SMALL_T / 2, 0, 0]}
+          castShadow
+        >
+          <cylinderGeometry args={[SMALL_R, SMALL_R, SMALL_T, 24]} />
+          <meshStandardMaterial color="#1f2024" metalness={0.6} roughness={0.4} flatShading />
+        </mesh>
+      </group>
+
+      {/* Right-end weight cluster — mirror of the left */}
+      <group position={[HANDLE_LEN / 2 + PLATE_T / 2, 0, 0]}>
+        <mesh rotation={[0, 0, Math.PI / 2]} castShadow receiveShadow>
+          <cylinderGeometry args={[PLATE_R, PLATE_R, PLATE_T, 28]} />
+          <meshStandardMaterial color="#15161a" metalness={0.55} roughness={0.45} flatShading />
+        </mesh>
+        <mesh
+          rotation={[0, 0, Math.PI / 2]}
+          position={[-PLATE_T / 2 - SMALL_T / 2, 0, 0]}
+          castShadow
+        >
+          <cylinderGeometry args={[SMALL_R, SMALL_R, SMALL_T, 24]} />
+          <meshStandardMaterial color="#1f2024" metalness={0.6} roughness={0.4} flatShading />
+        </mesh>
+      </group>
+
+      {/* "20 KG" stamp — a small plaque on the larger plate face */}
+      <mesh
+        position={[-HANDLE_LEN / 2 - PLATE_T - 0.006, 0, 0]}
+        rotation={[0, 0, Math.PI / 2]}
+      >
+        <ringGeometry args={[0.10, 0.16, 28]} />
+        <meshStandardMaterial color="#a3a3a8" metalness={0.4} roughness={0.55} side={THREE.DoubleSide} />
+      </mesh>
     </group>
   );
 }
@@ -395,19 +423,19 @@ export default function EasterEggs({ onClickOpen }) {
         <ContainerModel />
       </EggMarker>
 
-      {/* Egg 4: 20 kg plate — half-sunk in the grass between Designa and
-          the kebab shop. */}
+      {/* Egg 4: 20 kg dumbbell — lying flat on the grass between Designa
+          and the kebab shop, slightly off the road. */}
       <EggMarker
         id="weight"
         position={[26, 0, 12]}
         rotation={0.9}
         color="#f472b6"
-        clickBubble={[1.4, 1.0, 1.0]}
-        clickOffsetY={0.3}
-        haloRadius={0.8}
+        clickBubble={[1.6, 0.8, 1.2]}
+        clickOffsetY={0.25}
+        haloRadius={0.85}
         onClickOpen={onClickOpen}
       >
-        <DumbbellPlateModel />
+        <DumbbellModel />
       </EggMarker>
     </group>
   );

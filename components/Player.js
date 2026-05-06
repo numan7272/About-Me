@@ -344,46 +344,45 @@ function GrassTrail({ playerRef }) {
 
   const trailGeo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
 
-  // Pale crushed-grass colour. The material is fully opaque — fading is
-  // done by shrinking the instance's scale to zero, so we don't need
-  // `transparent`/`depthWrite:false` (which previously caused the strips
-  // to render as solid black on some GPUs because the missing alpha-fade
-  // of vertex colours collapsed RGB toward 0).
+  // Bright cream — explicit Color object so the value is unambiguous to
+  // the renderer.  We disable depth testing entirely (renderOrder
+  // controls layering) so the strip is never occluded by the turf,
+  // grass blades, or any other geometry. No instanceColor anywhere —
+  // skipping it means Three never creates the per-instance tint buffer
+  // that was darkening the strips on some drivers.
   const trailMat = useMemo(() => new THREE.MeshBasicMaterial({
-    color: 0xe8edc8,
-    side: THREE.DoubleSide,
-    polygonOffset: true,
-    polygonOffsetFactor: -3,
-    polygonOffsetUnits: -3,
-    toneMapped: false,
+    color:        new THREE.Color(0.96, 0.98, 0.86),
+    side:         THREE.DoubleSide,
+    transparent:  true,
+    opacity:      0.85,
+    depthTest:    false,
+    depthWrite:   false,
+    toneMapped:   false,
   }), []);
 
-  const nextDrop = useRef(0);
-  const headIdx  = useRef(0);
+  const nextDrop   = useRef(0);
+  const headIdx    = useRef(0);
   const birth      = useMemo(() => new Float32Array(TRAIL_MAX), []);
   const slotX      = useMemo(() => new Float32Array(TRAIL_MAX), []);
   const slotZ      = useMemo(() => new Float32Array(TRAIL_MAX), []);
   const slotYaw    = useMemo(() => new Float32Array(TRAIL_MAX), []);
   const slotLength = useMemo(() => new Float32Array(TRAIL_MAX), []);
 
+  // Setup: park every slot off-screen with a tiny scale so nothing renders
+  // until a drop happens. We deliberately do NOT call setColorAt here —
+  // creating instanceColor at all is what dragged the strip colour to
+  // black on some GPUs, so we just let the material colour rule.
   useEffect(() => {
     const inst = instRef.current;
     if (!inst) return;
-    // Explicitly initialise instanceColor to white. Without this, some
-    // GPU drivers leave the per-instance colour buffer at zeros, which
-    // multiplies the material colour to black and produces the dark
-    // streaks the user has seen.
-    const white = new THREE.Color(1, 1, 1);
     for (let i = 0; i < TRAIL_MAX; i++) {
       birth[i] = -1e6;
       dummy.position.set(0, -999, 0);
       dummy.scale.setScalar(0.001);
       dummy.updateMatrix();
       inst.setMatrixAt(i, dummy.matrix);
-      inst.setColorAt(i, white);
     }
     inst.instanceMatrix.needsUpdate = true;
-    if (inst.instanceColor) inst.instanceColor.needsUpdate = true;
   }, [dummy, birth]);
 
   useFrame((state) => {
@@ -409,7 +408,10 @@ function GrassTrail({ playerRef }) {
       }
       const k    = 1 - age / TRAIL_LIFE;
       const ease = k * k;
-      dummy.position.set(slotX[i], 0.014, slotZ[i]);
+      // Strip sits clearly above the turf top (y = 0.045) so depth-
+      // ordering can't drag it back behind the grass. With
+      // depthTest:false this is purely belt-and-braces.
+      dummy.position.set(slotX[i], 0.05, slotZ[i]);
       dummy.rotation.set(-Math.PI / 2, 0, slotYaw[i]);
       dummy.scale.set(0.18 * ease, slotLength[i], 1);
       dummy.updateMatrix();
@@ -450,8 +452,17 @@ function GrassTrail({ playerRef }) {
     }
   });
 
+  // renderOrder: -5 keeps the strips behind the bike & landmarks (which
+  // default to renderOrder 0) so they don't draw on top of the bike
+  // itself, but still in front of the turf which has renderOrder 0 as
+  // well — depthTest:false + this order forces a stable layering.
   return (
-    <instancedMesh ref={instRef} args={[trailGeo, trailMat, TRAIL_MAX]} frustumCulled={false} />
+    <instancedMesh
+      ref={instRef}
+      args={[trailGeo, trailMat, TRAIL_MAX]}
+      frustumCulled={false}
+      renderOrder={1}
+    />
   );
 }
 
