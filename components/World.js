@@ -25,6 +25,7 @@ import { getWindNoiseTexture } from "@/lib/windNoise";
 import { trackState } from "@/lib/trackTexture";
 import { bikeState } from "@/lib/bikeStore";
 import { quality } from "@/lib/quality";
+import { sampleWeather } from "@/lib/weather";
 
 // ─── Landmark positions (single source of truth) ─────────────────────────────
 const LM = {
@@ -59,9 +60,18 @@ function SharedUniformsTick({ dayRef }) {
   useFrame((_, delta) => {
     sharedUniforms.uTime.value += delta;
     sharedUniforms.uPlayerPos.value.set(bikeState.x, 0, bikeState.z);
-    if (dayRef.current) {
-      sharedUniforms.uDayWeight.value = dayRef.current.dayWeight ?? 1;
-    }
+
+    const dayWeight = dayRef.current?.dayWeight ?? 1;
+    sharedUniforms.uDayWeight.value = dayWeight;
+
+    // Weather: slow direction drift + gust strength pulse + day-cycle
+    // coupling. Pushed straight into the shared wind uniforms so every
+    // wind-aware shader (grass, bushes, trees, flowers, streaks) sees
+    // the same breeze on the same frame.
+    const w = sampleWeather(sharedUniforms.uTime.value, dayWeight);
+    sharedUniforms.uWindDir.value.copy(w.dir);
+    sharedUniforms.uWindStrength.value = w.strength;
+
     // TrackTexture creates the render target asynchronously in a
     // useMemo — once ready, route it to the shared uniform so grass
     // (and any future track-aware shader) sees it.

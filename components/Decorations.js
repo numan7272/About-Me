@@ -11,6 +11,17 @@ import { trackState } from "@/lib/trackTexture";
 import { sharedUniforms } from "@/lib/sharedUniforms";
 import { quality } from "@/lib/quality";
 
+// Slice an array down to a quality-tier-appropriate count while keeping
+// a stable, evenly-spread subset (every Nth item). Used so low-tier
+// devices see fewer hand-placed bushes / flowers / etc. without the
+// remaining ones clustering in one corner of the meadow.
+function pickByDensity(arr) {
+  const f = quality.foliageDensity ?? 1;
+  if (f >= 1) return arr;
+  const stride = Math.max(1, Math.round(1 / f));
+  return arr.filter((_, i) => i % stride === 0);
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Seeded pseudo-random helper — deterministic so the layout never re-shuffles.
 // ─────────────────────────────────────────────────────────────────────────────
@@ -972,6 +983,62 @@ function DirtPatch({ position, radius = 1.2, seed = 1 }) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// BUSH — small low ground-shrub.
+//
+// A handful of overlapping icosahedra at ground level, no trunk —
+// slots between the grass and the proper Trees. Adds vertical
+// midline interest so the meadow isn't "blade carpet" → "tree" with
+// nothing in between.
+//
+// Each bush sways subtly via the same useCanopySway hook the trees use
+// so it answers to the shared wind vector.
+// ─────────────────────────────────────────────────────────────────────────────
+function Bush({ position, scale = 1, hueShift = 0, ry = 0, seed = 0 }) {
+  const baseColor   = useMemo(
+    () => new THREE.Color(`hsl(${108 + hueShift}, 50%, 32%)`).getStyle(),
+    [hueShift],
+  );
+  const accentColor = useMemo(
+    () => new THREE.Color(`hsl(${100 + hueShift}, 56%, 40%)`).getStyle(),
+    [hueShift],
+  );
+  const rng = useMemo(() => seededRng(seed * 17 + 11), [seed]);
+  // 2-4 blobs of varying size positioned slightly off-centre
+  const blobs = useMemo(
+    () => Array.from({ length: 2 + Math.floor(rng() * 3) }, () => ({
+      x:    (rng() - 0.5) * 0.55,
+      z:    (rng() - 0.5) * 0.55,
+      y:    0.18 + rng() * 0.10,
+      size: 0.30 + rng() * 0.25,
+      tint: rng() > 0.5,
+    })),
+    [rng],
+  );
+
+  // Small wind sway — pivot at the bush base. Same hook the trees use.
+  const swayRef = useCanopySway(position, 0.07);
+
+  return (
+    <group position={position} rotation={[0, ry, 0]}>
+      <group ref={swayRef}>
+        <group scale={scale}>
+          {blobs.map((b, i) => (
+            <mesh key={i} position={[b.x, b.y, b.z]} castShadow receiveShadow>
+              <icosahedronGeometry args={[b.size, 0]} />
+              <meshStandardMaterial
+                color={b.tint ? accentColor : baseColor}
+                roughness={0.85}
+                flatShading
+              />
+            </mesh>
+          ))}
+        </group>
+      </group>
+    </group>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // FLOWER PATCH — small clump of bright icosahedral "blossoms" on stems.
 // Adds a pop of saturated colour at ground level so the meadow doesn't feel
 // like one flat green carpet.
@@ -1181,9 +1248,32 @@ const DIRT_RAW = [
 // Apply the road / plaza / beach filter exactly once at module load
 const TREES   = TREES_RAW.filter(([x, , z]) => !isBlocked(x, z));
 const LAMPS   = LAMPS_RAW.filter(([x, , z]) => !isBlocked(x, z));
-const FLOWERS = FLOWERS_RAW.filter(([x, , z]) => !isBlocked(x, z));
-const MOUNDS  = MOUNDS_RAW.filter(([x, , z]) => !isBlocked(x, z));
-const DIRT    = DIRT_RAW.filter(([x, , z]) => !isBlocked(x, z));
+// Hand-placed bushes — small ground-shrubs scattered between grass and
+// the taller trees. Each entry: [x, z, scale, hueShift, ry].
+const BUSHES_RAW = [
+  [-32, 0,   8, 1.3,   3, 0.4],
+  [ 24, 0,  -6, 1.0,  -2, 1.1],
+  [-18, 0,  20, 1.4,   5, 2.0],
+  [ 18, 0,  18, 1.1,  -4, -0.6],
+  [-26, 0, -16, 1.2,   1, 0.9],
+  [ 30, 0,   2, 1.0,   4, -1.3],
+  [-12, 0,  36, 1.3,  -3, 0.2],
+  [ 16, 0, -34, 1.4,   6, 1.7],
+  [-40, 0,   6, 1.0,  -2, 0.5],
+  [ 38, 0,  20, 1.2,   8, -0.8],
+  [ -6, 0,  46, 0.9,  -4, 1.4],
+  [  4, 0, -42, 1.1,   3, -0.3],
+  [-44, 0, -14, 0.9,   2, 0.7],
+  [ 44, 0, -10, 1.3,  -7, 1.9],
+  [-22, 0, -34, 1.0,   5, -0.5],
+];
+
+// Filter against road/plaza/coast, then slice by quality.foliageDensity
+// so weak devices see fewer hand-placed props.
+const FLOWERS = pickByDensity(FLOWERS_RAW.filter(([x, , z]) => !isBlocked(x, z)));
+const MOUNDS  = pickByDensity(MOUNDS_RAW .filter(([x, , z]) => !isBlocked(x, z)));
+const DIRT    = pickByDensity(DIRT_RAW   .filter(([x, , z]) => !isBlocked(x, z)));
+const BUSHES  = pickByDensity(BUSHES_RAW .filter(([x, , z]) => !isBlocked(x, z)));
 
 // Houses get a stricter test:
 //  - 7 m clearance from any road centre-line (vs. 5.5 for trees), so a
@@ -1378,6 +1468,18 @@ export default function Decorations({ dayRef, rainEnabled = false }) {
           />
         );
       })}
+
+      {/* Bushes — vertical mid-line between grass and trees */}
+      {BUSHES.map((b, i) => (
+        <Bush
+          key={`bu-${i}`}
+          position={[b[0], 0, b[2]]}
+          scale={b[3]}
+          hueShift={b[4]}
+          ry={b[5]}
+          seed={i * 7 + 1}
+        />
+      ))}
 
       {/* Flower patches scattered across the meadow */}
       {FLOWERS.map((p, i) => (
