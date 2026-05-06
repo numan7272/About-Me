@@ -51,9 +51,17 @@ const GRASS_VERT = /* glsl */`
   varying float vHash;
 
   void main() {
-    // Local blade vertex (cone). tipFactor = 0 at root, 1 at tip.
+    // Local blade vertex (tapered ribbon). tipFactor = 0 at root, 1 at tip.
     vec3 local = position;
     float tip  = smoothstep(0.0, 1.0, (local.y + 0.001) / 1.05);
+
+    // Per-blade Y-axis rotation so blades don't all face the same way —
+    // crucial for the field to read as natural rather than as a stamped
+    // grid.  aHash maps to 0..2π.
+    float rotY = aHash * 6.2832;
+    float cR   = cos(rotY);
+    float sR   = sin(rotY);
+    local.xz   = mat2(cR, -sR, sR, cR) * local.xz;
 
     // ── Track flatten: sample the off-screen track texture at this
     // blade's world position and squash the blade height by however
@@ -120,6 +128,43 @@ const GRASS_FRAG = /* glsl */`
 `;
 
 const ISLAND_HALF = 68;            // sampling bounds; isInGrass trims to coast
+
+/**
+ * Custom blade geometry — 5 vertices forming a tapered ribbon:
+ *
+ *         tip
+ *        /   \
+ *      ml --- mr        (mid, half base width)
+ *      /       \
+ *    bl ------- br      (base)
+ *
+ * Two triangles for the lower half (so the mid vertices can bend
+ * independently of the base) plus one triangle for the upper half
+ * (mid → tip). The shader's tipFactor reads each vertex's y/1.05 so
+ * mid bends ~50% as much as the tip and the base stays planted.
+ */
+const bladeGeometry = (() => {
+  const positions = new Float32Array([
+    // bl, br — base, full width
+    -0.045, 0.00, 0,
+     0.045, 0.00, 0,
+    // ml, mr — mid, ~half width
+    -0.024, 0.55, 0,
+     0.024, 0.55, 0,
+    // tip
+     0.000, 1.05, 0,
+  ]);
+  const indices = [
+    0, 1, 3,    // bl, br, mr — lower-right
+    0, 3, 2,    // bl, mr, ml — lower-left
+    2, 3, 4,    // ml, mr, tip — upper triangle
+  ];
+  const g = new THREE.BufferGeometry();
+  g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  g.setIndex(indices);
+  g.computeVertexNormals();
+  return g;
+})();
 
 function GrassField() {
   const meshRef = useRef();
@@ -200,7 +245,11 @@ function GrassField() {
       args={[undefined, undefined, quality.grassCount]}
       frustumCulled={false}
     >
-      <coneGeometry args={[0.05, 1.05, 3]} />
+      {/* Custom 5-vertex tapered ribbon — base + middle + tip. Reads as
+          a real grass blade rather than a 3-sided cone pyramid. The
+          shader bends the upper vertices (mid + tip) more than the
+          base via tipFactor, so wind produces a natural curve. */}
+      <primitive object={bladeGeometry} attach="geometry" />
       <primitive object={material} attach="material" />
     </instancedMesh>
   );
