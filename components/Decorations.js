@@ -23,86 +23,94 @@ function seededRng(seed) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GRASS FIELD — static instances scattered across the inner-grass polygon.
+// GRASS FIELD — Bruno Simon's exact approach.
 //
-// Earlier we tried Bruno-Simon-style "infinity grass" with a small grid
-// that follows the player.  The user disliked the visible render-radius
-// it produced — they want grass everywhere on the meadow at once.
+// Each blade is a single triangle with 3 vertices, all stored at the
+// same world XZ (the blade's anchor). A per-vertex `aShape` attribute
+// gives one of three offsets:
+//   (0, 1)   → tip (centered, full height)
+//   (1, 0)   → base-right (full width offset, ground)
+//   (-1, 0)  → base-left
+// The vertex shader multiplies these by uBladeWidth / uBladeHeight,
+// rotates the side offset to face the camera, and adds wind sway.
 //
-// This version places ~12k blades once at module load, then runs them
-// through the same wind shader (traveling-gust plane wave + per-blade
-// hashed sway) so they ripple as a unit when the wind changes.
+// Not InstancedMesh — flat BufferGeometry with 3*N vertices total, like
+// Bruno's Grass.js. Memory is fine (3 × N × 6 floats for everything),
+// and the shader is much simpler than packing per-instance attributes.
+//
+// Density much higher than before: Bruno runs 78k blades over a 280²
+// area; we scale to 30-50k for our smaller play area.
 // ─────────────────────────────────────────────────────────────────────────────
 
 const GRASS_VERT = /* glsl */`
-  attribute vec3  iPos;             // per-instance world XZ + scale (in y)
-  attribute float aHash;            // per-instance 0..1 hash for jitter
+  // Per-vertex attributes:
+  //   position : the blade's anchor (worldX, 0, worldZ) — same for all 3
+  //              vertices of a triangle.
+  //   aShape   : (-1..1, 0..1) — vertex 0 is tip (0, 1), vertex 1 is
+  //              base-right (1, 0), vertex 2 is base-left (-1, 0).
+  //   aHash    : per-blade random 0..1 (same value 3× in a row).
+  attribute vec2  aShape;
+  attribute float aHash;
 
   uniform float     uTime;
-  uniform vec2      uWindDir;       // base drift direction
+  uniform vec2      uWindDir;
   uniform float     uWindStrength;
-  uniform sampler2D uWindNoiseTex;  // procedural noise — direction varies per location
+  uniform sampler2D uWindNoiseTex;
   uniform float     uWindNoiseScale;
-  uniform sampler2D uTrackTex;      // off-screen render of bike trail
+  uniform sampler2D uTrackTex;
   uniform float     uTrackWorldSize;
-  uniform float     uTrackHas;      // 0 if no texture available, 1 if ready
+  uniform float     uTrackHas;
+  uniform float     uBladeWidth;
+  uniform float     uBladeHeight;
 
   varying float vTip;
   varying float vHash;
 
   void main() {
-    // Local blade vertex (tapered ribbon). tipFactor = 0 at root, 1 at tip.
-    // Divisor matches BLADE_HEIGHT in the JS geometry so the upper verts
-    // (which sit at 0.40 m) read as tip = 1.0.
-    vec3 local = position;
-    float tip  = smoothstep(0.0, 1.0, (local.y + 0.001) / 0.40);
+    vec3 base = position;                    // world XZ + Y=0
+    float scale = 0.7 + aHash * 0.55;        // per-blade size variation
 
-    // Camera-facing rotation (Bruno's trick): each blade rotates around
-    // its base so the flat ribbon faces the camera. With a small
-    // per-blade jitter (aHash) so blades aren't all in lock-step. Far
-    // better than fixed-rotation flat blades — those go invisible when
-    // viewed edge-on, which is what made the field look like spears.
-    vec3 toCam = cameraPosition - vec3(iPos.x, 0.0, iPos.z);
-    float rotY = atan(toCam.x, toCam.z) + (aHash - 0.5) * 1.4;
+    // Per-vertex local offset: side along ±X (multiplied by width),
+    // up along Y (multiplied by height). aShape.y is also our tipFactor.
+    float w = aShape.x * uBladeWidth  * scale;
+    float h = aShape.y * uBladeHeight * scale;
+
+    // Camera-facing rotation around Y. Each blade points its flat side
+    // at the camera, with a small per-blade jitter so the field isn't
+    // stamped. ±0.6 rad is enough randomness without losing the
+    // benefit of facing-the-camera (which avoids edge-on invisibility).
+    vec3 toCam = cameraPosition - base;
+    float rotY = atan(toCam.x, toCam.z) + (aHash - 0.5) * 1.2;
     float cR   = cos(rotY);
     float sR   = sin(rotY);
-    local.xz   = mat2(cR, -sR, sR, cR) * local.xz;
+    vec2 sideXZ = vec2(cR * w, sR * w);
 
-    // ── Track flatten: sample the off-screen track texture at this
-    // blade's world position and squash the blade height by however
-    // bright the texture is at that pixel.
-    vec2 trackUv = vec2(iPos.x, iPos.z) / uTrackWorldSize + 0.5;
+    // Track flatten — sample the off-screen render of the bike's path
+    // and squash the height factor where the bike has been.
+    vec2 trackUv = base.xz / uTrackWorldSize + 0.5;
     float track  = uTrackHas * texture2D(uTrackTex, trackUv).r;
     float flatten = 1.0 - track * 0.85;
 
-    // ── Wind: sample a procedural 2D noise texture at this blade's
-    // world position offset by uTime * uWindDir. The R/G channels
-    // encode wind X/Z direction as 0..1, decoded back to -1..1 here.
-    // This produces spatially-varying, smoothly-flowing wind — the
-    // pattern reads as gusts curling across the meadow rather than
-    // every blade swaying on the same sine.
-    vec2 noiseUv = vec2(iPos.x, iPos.z) * uWindNoiseScale
-                 + uWindDir * uTime * 0.06;
-    vec4 noise   = texture2D(uWindNoiseTex, noiseUv);
-    vec2 windVec = noise.rg * 2.0 - 1.0;          // -1..1
+    // Wind — sample the procedural noise texture at the blade's world
+    // XZ. R/G channels encode wind X/Z direction (0..1 → -1..1).
+    vec2 noiseUv = base.xz * uWindNoiseScale + uWindDir * uTime * 0.06;
+    vec2 windVec = texture2D(uWindNoiseTex, noiseUv).rg * 2.0 - 1.0;
 
-    // Per-blade hashed sub-sway so neighbours don't all move in lockstep
+    // Per-blade phase keeps neighbours out of perfect sync
     float personal = sin(uTime * 1.7 + aHash * 6.2832) * 0.35;
+    float sway     = (length(windVec) * 1.4 + personal) * uWindStrength;
 
-    // Combine: spatial-noise direction modulated by per-blade phase
-    float sway = (length(windVec) * 1.4 + personal) * uWindStrength;
-    local.x += sway * tip * windVec.x;
-    local.z += sway * tip * windVec.y;
+    // Tip displacement in world XZ — only the upper vertex moves much
+    // (aShape.y is 0 at base, 1 at tip).
+    vec2 tipPush = sway * aShape.y * uBladeHeight * windVec;
 
-    float scale = iPos.y;
-    local.x *= scale;
-    local.z *= scale;
-    local.y *= scale * flatten;
+    vec3 offset = vec3(sideXZ.x + tipPush.x,
+                       h * flatten,
+                       sideXZ.y + tipPush.y);
 
-    vec3 worldPos = vec3(iPos.x + local.x, local.y, iPos.z + local.z);
-    gl_Position = projectionMatrix * viewMatrix * vec4(worldPos, 1.0);
+    gl_Position = projectionMatrix * viewMatrix * vec4(base + offset, 1.0);
 
-    vTip  = tip;
+    vTip  = aShape.y;
     vHash = aHash;
   }
 `;
@@ -132,127 +140,71 @@ const GRASS_FRAG = /* glsl */`
   }
 `;
 
-const ISLAND_HALF = 68;            // sampling bounds; isInGrass trims to coast
+const ISLAND_HALF = 68;             // sampling bounds; isInGrass trims to coast
 
-// Blade dimensions — calibrated against Bruno's folio-2025 Grass.js
-// (height 0.6, width 0.1 at base). My earlier 1.05 m height made blades
-// read as spears jutting out of the ground.
-const BLADE_HEIGHT = 0.40;
-const BLADE_BASE_W = 0.110;
-const BLADE_LOWMID_W = 0.090;
-const BLADE_MIDHI_W  = 0.055;
-const BLADE_UPPER_W  = 0.025;
+// Blade dimensions — calibrated against Bruno's folio-2025 Grass.js.
+const BLADE_WIDTH  = 0.075;
+const BLADE_HEIGHT = 0.42;
 
-/**
- * Custom blade geometry — 7 vertices forming a leaf-shaped tapered ribbon:
- *
- *           tip
- *          /   \
- *        ul --- ur          80% — narrow neck
- *       /         \
- *     ml --------- mr       55% — main body
- *      \           /
- *       ll ----- lr         15% — slightly bowed lower
- *         \     /
- *          bl - br          0%  — base, full width
- *
- * The slight outward bow at lower-mid + smooth taper toward the tip
- * gives a real grass-blade silhouette instead of a sharp triangle.
- * Five triangles total. The mid-vertices are the wind-shader's hinge
- * points — the upper section bends most via tipFactor.
- */
-const bladeGeometry = (() => {
-  const H = BLADE_HEIGHT;
-  const positions = new Float32Array([
-    // bl, br — base, full width
-    -BLADE_BASE_W,    0.00 * H, 0,
-     BLADE_BASE_W,    0.00 * H, 0,
-    // ll, lr — lower-mid, slightly narrower (gives the soft outward curl
-    //                                        at the base)
-    -BLADE_LOWMID_W,  0.18 * H, 0,
-     BLADE_LOWMID_W,  0.18 * H, 0,
-    // ml, mr — main body
-    -BLADE_MIDHI_W,   0.55 * H, 0,
-     BLADE_MIDHI_W,   0.55 * H, 0,
-    // ul, ur — upper neck
-    -BLADE_UPPER_W,   0.85 * H, 0,
-     BLADE_UPPER_W,   0.85 * H, 0,
-    // tip
-     0.000,           1.00 * H, 0,
-  ]);
-  const indices = [
-    // base section
-    0, 1, 3,
-    0, 3, 2,
-    // lower mid section
-    2, 3, 5,
-    2, 5, 4,
-    // upper mid section
-    4, 5, 7,
-    4, 7, 6,
-    // tip cap
-    6, 7, 8,
-  ];
-  const g = new THREE.BufferGeometry();
-  g.setAttribute("position", new THREE.BufferAttribute(positions, 3));
-  g.setIndex(indices);
-  g.computeVertexNormals();
-  return g;
-})();
+// bladeShape encodes per-vertex offsets for a single triangle:
+//   vertex 0 → tip:        ( 0,  1)
+//   vertex 1 → base-right: ( 1,  0)
+//   vertex 2 → base-left:  (-1,  0)
+// The vertex shader multiplies these by uBladeWidth/Height and rotates
+// the side offset around Y to face the camera. Bruno's exact pattern.
+const BLADE_SHAPE = [
+  [0,  1],
+  [1,  0],
+  [-1, 0],
+];
 
 function GrassField() {
-  const meshRef = useRef();
-
-  // Pre-compute every blade's anchor + scale + hash. Module-level deps
-  // are stable so this runs once. Density depends on the device tier.
-  const { iPos, hashes, count } = useMemo(() => {
+  // Build the whole field as a flat (non-instanced) BufferGeometry —
+  // 3 * N vertices total, each storing the blade's world XZ anchor in
+  // its position, plus per-vertex aShape and aHash attributes. The
+  // shader fans those into the final triangle.
+  const geometry = useMemo(() => {
     const target = quality.grassCount;
     const rng = seededRng(0xdeadbeef);
-    const positions = [];
-    const hashList  = [];
-    let placed   = 0;
+    const pos    = [];
+    const shape  = [];
+    const hashes = [];
+
+    let placed = 0;
     let attempts = 0;
     while (placed < target && attempts < target * 6) {
       attempts++;
       const x = (rng() - 0.5) * (ISLAND_HALF * 2 - 4);
       const z = (rng() - 0.5) * (ISLAND_HALF * 2 - 4);
-      if (!isInGrass(x, z))           continue;
-      if (isOnRoad(x, z))             continue;
-      if (isInPlaza(x, z))            continue;
-      const scale = 0.55 + rng() * 1.10;
-      positions.push(x, scale, z);
-      hashList.push(rng());
+      if (!isInGrass(x, z)) continue;
+      if (isOnRoad(x, z))   continue;
+      if (isInPlaza(x, z))  continue;
+
+      const h = rng();
+      // 3 verts per blade, all anchored at the same world XZ.
+      for (let v = 0; v < 3; v++) {
+        pos.push(x, 0, z);
+        shape.push(BLADE_SHAPE[v][0], BLADE_SHAPE[v][1]);
+        hashes.push(h);
+      }
       placed++;
     }
-    return {
-      iPos:    new Float32Array(positions),
-      hashes:  new Float32Array(hashList),
-      count:   placed,
-    };
+
+    const g = new THREE.BufferGeometry();
+    g.setAttribute("position", new THREE.Float32BufferAttribute(pos,    3));
+    g.setAttribute("aShape",   new THREE.Float32BufferAttribute(shape,  2));
+    g.setAttribute("aHash",    new THREE.Float32BufferAttribute(hashes, 1));
+    return g;
   }, []);
 
-  useEffect(() => {
-    if (!meshRef.current) return;
-    // All matrices identity — shader does the world placement.
-    const ident = new THREE.Matrix4();
-    for (let i = 0; i < count; i++) meshRef.current.setMatrixAt(i, ident);
-    meshRef.current.instanceMatrix.needsUpdate = true;
-    meshRef.current.count = count;
-
-    const geom = meshRef.current.geometry;
-    geom.setAttribute("iPos",   new THREE.InstancedBufferAttribute(iPos, 3));
-    geom.setAttribute("aHash",  new THREE.InstancedBufferAttribute(hashes, 1));
-  }, [iPos, hashes, count]);
-
-  // The material reuses sharedUniforms by reference — no per-frame
-  // updates needed here, World.js ticks them once for all materials.
+  // Material reuses sharedUniforms by reference — World.js's tick
+  // pushes new values once and every shader picks them up.
   const material = useMemo(
     () =>
       new THREE.ShaderMaterial({
         vertexShader:   GRASS_VERT,
         fragmentShader: GRASS_FRAG,
         uniforms: {
-          // shared with every other wind/day/track-aware material
           uTime:           sharedUniforms.uTime,
           uWindDir:        sharedUniforms.uWindDir,
           uWindStrength:   sharedUniforms.uWindStrength,
@@ -262,7 +214,8 @@ function GrassField() {
           uTrackTex:       sharedUniforms.uTrackTex,
           uTrackWorldSize: sharedUniforms.uTrackWorldSize,
           uTrackHas:       sharedUniforms.uTrackHas,
-          // material-specific: blade colour palette
+          uBladeWidth:     { value: BLADE_WIDTH },
+          uBladeHeight:    { value: BLADE_HEIGHT },
           uTipColorA:      { value: new THREE.Color(0.46, 0.84, 0.26) },
           uTipColorB:      { value: new THREE.Color(0.74, 0.92, 0.32) },
           uRootColorA:     { value: new THREE.Color(0.07, 0.26, 0.10) },
@@ -274,18 +227,9 @@ function GrassField() {
   );
 
   return (
-    <instancedMesh
-      ref={meshRef}
-      args={[undefined, undefined, quality.grassCount]}
-      frustumCulled={false}
-    >
-      {/* Custom 5-vertex tapered ribbon — base + middle + tip. Reads as
-          a real grass blade rather than a 3-sided cone pyramid. The
-          shader bends the upper vertices (mid + tip) more than the
-          base via tipFactor, so wind produces a natural curve. */}
-      <primitive object={bladeGeometry} attach="geometry" />
+    <mesh geometry={geometry} frustumCulled={false}>
       <primitive object={material} attach="material" />
-    </instancedMesh>
+    </mesh>
   );
 }
 
