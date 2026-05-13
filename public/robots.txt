@@ -1,0 +1,10 @@
+# https://numan-yesil.com — Numan Yesil Portfolio
+
+User-agent: *
+Allow: /
+
+# Composer/Dev-Hilfsseiten nicht indexieren
+Disallow: /og-composer.html
+
+# Verweis auf Sitemap
+Sitemap: https://numan-yesil.com/sitemap.xml
