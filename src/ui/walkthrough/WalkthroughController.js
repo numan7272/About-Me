@@ -209,6 +209,9 @@ export class WalkthroughController {
     this.game?.ui?.drawer?.hide?.();
     this.game?.world?.stationLabels?.setActiveStation?.(null);
     this.game?.world?.proximity?.clearHighlight?.();
+    // Falls bei Yek abgebrochen: DayCycle smooth zurück zu Tag + Auto-Cycle
+    // wieder freigeben damit der normale Zyklus weiterläuft.
+    this.game?.world?.dayCycle?.transitionTo?.(0, 3, true);
     // Camera zurück in Follow-Mode (User soll wieder fahren können)
     this.game?.cameraRig?.cancelFly?.();
     this.game?.cameraRig?.recenter?.();
@@ -268,6 +271,25 @@ export class WalkthroughController {
         prox.highlightEgg(station.eggHint);
       } else {
         prox.clearHighlight();
+      }
+    }
+
+    // ── Yek-Killer-Moment: Tag → Sonnenuntergang Übergang ──
+    // Bei Yek (Family-Restaurant, "Drei Jahre in der Gastro") fadet die Welt
+    // in Dämmerung. Die Street-Lamps gehen automatisch an (sie reagieren auf
+    // nightFactor via DayCycle). 4 Sekunden Übergang, synchron mit der
+    // 1.8s-FlyTo + leichter Tail damit der Recruiter beim Lesen die Stimmung
+    // ankommen sieht.
+    //
+    // Für alle anderen Stationen: zurück zu Tag (sofern wir vorher in Dusk
+    // standen). `releaseAfter` = Auto-Cycle wieder freigeben sobald wieder bei
+    // Day angekommen, damit der Tag/Nacht-Zyklus normal weiterläuft.
+    const dayCycle = this.game?.world?.dayCycle;
+    if (dayCycle?.transitionTo) {
+      if (stationId === "yek") {
+        dayCycle.transitionTo(0.28, 4, false);   // → Dusk, lock
+      } else {
+        dayCycle.transitionTo(0, 4, true);       // → Day, release auto-cycle
       }
     }
   }

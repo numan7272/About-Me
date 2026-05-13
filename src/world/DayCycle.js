@@ -111,6 +111,12 @@ export class DayCycle {
     this._overrideProgress = null;
     this._paused = false;
 
+    // ── Smooth-Transition-State (für Yek-Killer-Moment u.a.) ──
+    // Wird via transitionTo() gesetzt. Während eines aktiven Transition wird
+    // der effektive Progress geblendet zwischen "aktueller Wert" (auto oder
+    // override) und "Ziel" über duration Sekunden.
+    this._transition = null;   // { from, to, durationSec, startTime, releaseAfter }
+
     // Live-State — wird jeden Frame aktualisiert
     this.live = {
       progress: 0,
@@ -233,6 +239,35 @@ export class DayCycle {
       const elapsed = performance.now() / 1000 - this._startTime;
       progress = (elapsed / CYCLE_DURATION_SEC) % 1;
     }
+
+    // Smooth-Transition aktiv? Dann zwischen current-progress und target lerpen
+    if (this._transition) {
+      const tr = this._transition;
+      const elapsed = performance.now() / 1000 - tr.startTime;
+      const t = Math.min(1, elapsed / tr.durationSec);
+      // smoothstep für natürlich wirkenden Übergang
+      const eased = t * t * (3 - 2 * t);
+      // Smart-Lerp für Cyclic-Werte: wenn from=0.1 und to=0.28 → lerp(0.1, 0.28).
+      // Aber wenn from=0.9 und to=0.05 → Cycle-Wrap (kürzester Weg).
+      let from = tr.from;
+      let to = tr.to;
+      let delta = to - from;
+      if (Math.abs(delta) > 0.5) {
+        if (delta > 0) from += 1; else to += 1;
+        delta = to - from;
+      }
+      progress = (from + delta * eased + 1) % 1;
+      if (t >= 1) {
+        // Transition beendet — entweder auf override stehen lassen oder freigeben
+        if (tr.releaseAfter) {
+          this._overrideProgress = null;
+        } else {
+          this._overrideProgress = tr.to;
+        }
+        this._transition = null;
+      }
+    }
+
     this.live.progress = progress;
 
     // Keyframe-Pair finden
@@ -330,6 +365,32 @@ export class DayCycle {
         this._debugState.progress = +progress.toFixed(3);
       }
     }
+  }
+
+  /**
+   * Smooth-Transition zu einem festen Progress-Wert über `durationSec`.
+   * Nach Ablauf bleibt der DayCycle auf diesem Wert stehen (Override).
+   * Mit `releaseAfter: true` läuft der Auto-Cycle nach dem Übergang weiter.
+   *
+   * Beispiel — Yek-Killer-Moment:
+   *   dayCycle.transitionTo(0.28, 4);    // 4s ramp to dusk, freezes there
+   *   dayCycle.transitionTo(0, 4, true); // 4s ramp back to day, then auto
+   */
+  transitionTo(targetProgress, durationSec = 4, releaseAfter = false) {
+    const currentProgress = this.live.progress ?? 0;
+    this._transition = {
+      from: currentProgress,
+      to: ((targetProgress % 1) + 1) % 1,
+      durationSec: Math.max(0.1, durationSec),
+      startTime: performance.now() / 1000,
+      releaseAfter,
+    };
+  }
+
+  /** Aktuellen Override-Lock loslassen → Auto-Cycle läuft weiter. */
+  releaseOverride() {
+    this._overrideProgress = null;
+    this._transition = null;
   }
 
   /** Refs zu den Scene-Lights setzen (von World aus aufgerufen). */

@@ -28,7 +28,8 @@ export class Hud {
     });
     document.body.appendChild(this.root);
 
-    this._buildHintBar();
+    // Hint-Bar bewusst entfernt — Controls werden via HotkeyHelp (?-Button
+    // unten rechts) erklärt. Bildschirm bleibt clean.
     this._buildSpeedHud();
     this._buildRecenterButton();
   }
@@ -42,29 +43,29 @@ export class Hud {
       transform: "translateX(-50%)",
       textAlign: "center",
       pointerEvents: "none",
-    });
-
-    const eyebrow = document.createElement("div");
-    eyebrow.textContent = "Numan's Roadmap";
-    Object.assign(eyebrow.style, {
-      fontSize: "10px",
-      textTransform: "uppercase",
-      letterSpacing: "0.32em",
-      color: "rgba(160, 170, 180, 0.85)",
-    });
-
-    const sub = document.createElement("div");
-    sub.textContent = "Drive with W A S D · Brake with Space · F = Headlight";
-    Object.assign(sub.style, {
-      marginTop: "4px",
+      // Dezent, dunkel-gefärbt, fadet nach ein paar Sekunden weg
+      padding: "7px 16px",
+      borderRadius: "999px",
+      background: "rgba(4, 8, 16, 0.42)",
+      border: "1px solid rgba(255, 255, 255, 0.08)",
+      backdropFilter: "blur(8px)",
+      WebkitBackdropFilter: "blur(8px)",
       fontSize: "12px",
       color: "rgba(220, 225, 230, 0.85)",
+      transition: "opacity 0.6s ease",
     });
+    wrap.textContent = "W A S D · Space = Brake · F = Headlight";
 
-    wrap.appendChild(eyebrow);
-    wrap.appendChild(sub);
     this.root.appendChild(wrap);
     this.hintBar = wrap;
+
+    // Auto-fade nach 8 Sekunden — Recruiter weiß dann wie's geht, und der
+    // Bildschirm wird sauberer für den Rest der Session.
+    this._hintFadeTimer = setTimeout(() => {
+      wrap.style.opacity = "0";
+      // Nach Fade komplett ausblenden damit kein space-claim mehr
+      setTimeout(() => { wrap.style.display = "none"; }, 700);
+    }, 8000);
   }
 
   _buildSpeedHud() {
