@@ -270,17 +270,13 @@ export const STATIONS = {
 
 // Kontakt-Daten — werden vom ContactPanel angezeigt.
 //
-// CV-Pfade: `public/cv/` ist in .gitignore (DSGVO), die PDFs existieren nur
-// lokal. Vite kopiert sie beim `npm run build` trotzdem ins dist/, weil
-// gitignore != .vercelignore. Für GitHub-Pages-Deploys ohne Vercel müsstest
-// du diese URLs durch externe Links ersetzen (Dropbox, Drive, eigener Server).
-// Per ENV-Variable überschreibbar — siehe README.
+// CV-Download bewusst NICHT enthalten — Lebenslauf wird auf Anfrage
+// individuell per E-Mail verschickt. Keine öffentlich gehosteten PDFs mit
+// Adresse/Telefon/Geburtsdatum (DSGVO + Best-Practice).
 export const CONTACT = {
   email: "hi@numan-yesil.com",
   linkedin: "https://www.linkedin.com/in/numan-yesil-104654152",
   github: "https://github.com/numan7272",
-  cvDe: import.meta.env?.VITE_CV_DE_URL || "/cv/Numan-Yesil-Lebenslauf-DE.pdf",
-  cvEn: import.meta.env?.VITE_CV_EN_URL || "/cv/Numan-Yesil-CV-EN.pdf",
   location: "Kiel, Deutschland",
 };
 
@@ -293,7 +289,6 @@ export const WALKTHROUGH_UI = {
     prev: "Zurück",
     skip: "Tour beenden",
     contact: "Kontakt",
-    cv_download: "Lebenslauf herunterladen",
     step_what: "Was",
     step_how: "Konkret gemacht",
     step_stack: "Tech & Skills",
@@ -308,7 +303,6 @@ export const WALKTHROUGH_UI = {
     prev: "Back",
     skip: "End tour",
     contact: "Contact",
-    cv_download: "Download CV",
     step_what: "What",
     step_how: "What I did",
     step_stack: "Tech & Skills",

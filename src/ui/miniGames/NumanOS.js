@@ -707,7 +707,7 @@ export class NumanOS {
     `;
 
     const title = {
-      browser: "Browser — numan.dev",
+      browser: "Browser — numan-yesil.com",
       projects: "Projects — Finder",
       terminal: "Terminal — numan@dev",
       readme: "README.txt",
@@ -793,10 +793,10 @@ export class NumanOS {
         <span style="opacity:0.6;">→</span>
         <span style="opacity:0.6;">↻</span>
         <div class="nos-browser-tabs">
-          <div class="nos-browser-tab active">numan.dev</div>
+          <div class="nos-browser-tab active">numan-yesil.com</div>
           <div class="nos-browser-tab" style="opacity:0.6;">+</div>
         </div>
-        <div class="nos-browser-url">https://numan.dev</div>
+        <div class="nos-browser-url">https://numan-yesil.com/</div>
       </div>
       <div class="nos-browser-content">
         <h1 style="margin:0 0 6px;font-size:22px;">Numan Yesil</h1>

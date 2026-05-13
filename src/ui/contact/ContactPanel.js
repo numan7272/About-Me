@@ -1,23 +1,16 @@
 /**
  * ContactPanel — der "Direkt zum Kontakt"-Pfad.
  *
- * Vom HR-Recruiter-Audit als überlebenswichtig markiert:
- *   "Permanenter 'Direkt zum Kontakt'-Button oben rechts neben der MiniMap,
- *    sichtbar in jedem Modus. Klick öffnet ein schlankes Side-Panel mit
- *    E-Mail, LinkedIn, GitHub und CV-Download als PDF."
- *
- * Zwei Komponenten in einem File (eng gekoppelt):
- *   - ContactButton  — kleiner Pill-Button oben rechts ("Kontakt →")
- *   - ContactPanel   — Side-Panel das von rechts reinslidet
- *
- * Side-Panel-Inhalte:
+ * Permanenter "Kontakt →"-Button oben rechts. Klick öffnet Side-Panel mit:
  *   - Numan + Standort
  *   - E-Mail (klickbar + Kopieren-Button)
- *   - LinkedIn-Button
- *   - GitHub-Button
- *   - CV-Download (DE + EN, Sprache-abhängig hervorgehoben)
+ *   - LinkedIn
+ *   - GitHub
  *
- * Schließen: ESC-Taste, Klick außerhalb, X-Button.
+ * KEIN CV-Download — Lebenslauf wird auf Anfrage individuell verschickt
+ * (DSGVO + saubere Bewerbungspraxis).
+ *
+ * Schließen: ESC, Klick außerhalb, X-Button.
  */
 
 import { CONTACT, getWalkthroughStrings } from "../../data/stations.js";
@@ -239,31 +232,9 @@ export class ContactPanel {
     }));
     this.panel.appendChild(buttonsWrap);
 
-    // ── CV-Download-Block ──
-    const cvHeader = document.createElement("div");
-    cvHeader.textContent = this._strings().cv_download;
-    Object.assign(cvHeader.style, {
-      fontSize: "10px",
-      letterSpacing: "0.2em",
-      textTransform: "uppercase",
-      color: "rgba(170, 190, 210, 0.7)",
-      marginTop: "28px",
-      marginBottom: "10px",
-    });
-    this.panel.appendChild(cvHeader);
-
-    const cvRow = document.createElement("div");
-    Object.assign(cvRow.style, {
-      display: "grid",
-      gridTemplateColumns: "1fr 1fr",
-      gap: "10px",
-    });
-
-    const lang = this._lang();
-    const primaryDe = lang === "de";
-    cvRow.appendChild(this._buildCvBtn("Lebenslauf · DE", CONTACT.cvDe, primaryDe));
-    cvRow.appendChild(this._buildCvBtn("CV · EN", CONTACT.cvEn, !primaryDe));
-    this.panel.appendChild(cvRow);
+    // (CV-Download bewusst entfernt — Lebenslauf wird individuell auf
+    // Anfrage geschickt, nicht öffentlich gehostet. DSGVO + saubere
+    // Bewerbungs-Praxis.)
 
     // ── Footer-Hint ──
     const footer = document.createElement("div");
@@ -401,42 +372,6 @@ export class ContactPanel {
     });
     a.appendChild(arrow);
 
-    return a;
-  }
-
-  _buildCvBtn(label, url, primary) {
-    const a = document.createElement("a");
-    a.href = url;
-    a.target = "_blank";
-    a.rel = "noopener noreferrer";
-    a.download = "";   // Browser zeigt Save-Dialog statt inline-PDF
-    a.textContent = label;
-    Object.assign(a.style, {
-      padding: "11px 12px",
-      borderRadius: "10px",
-      textAlign: "center",
-      textDecoration: "none",
-      fontSize: "13px",
-      fontWeight: "600",
-      border: primary
-        ? "1px solid rgba(126, 200, 255, 0.55)"
-        : "1px solid rgba(255, 255, 255, 0.14)",
-      background: primary
-        ? "linear-gradient(135deg, rgba(126,200,255,0.28), rgba(126,200,255,0.14))"
-        : "rgba(255, 255, 255, 0.04)",
-      color: primary ? "rgba(245, 250, 255, 0.98)" : "rgba(220, 230, 240, 0.85)",
-      transition: "background 0.15s, border-color 0.15s",
-    });
-    a.addEventListener("mouseenter", () => {
-      a.style.background = primary
-        ? "linear-gradient(135deg, rgba(126,200,255,0.42), rgba(126,200,255,0.22))"
-        : "rgba(255, 255, 255, 0.10)";
-    });
-    a.addEventListener("mouseleave", () => {
-      a.style.background = primary
-        ? "linear-gradient(135deg, rgba(126,200,255,0.28), rgba(126,200,255,0.14))"
-        : "rgba(255, 255, 255, 0.04)";
-    });
     return a;
   }
 
