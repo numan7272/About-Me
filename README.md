@@ -166,7 +166,7 @@ MIT — see [LICENSE](LICENSE). The bike GLB and island GLB are my own (Blender 
 
 - GitHub: [@numan7272](https://github.com/numan7272)
 - LinkedIn: [in/numan-yesil](https://www.linkedin.com/in/numan-yesil)
-- Email: numan.yesil72@gmail.com
+- Email: hi@numan-yesil.com
 - Live demo: https://numan-yesil.com
 
 If you're hiring, my old portfolio's case-study is at [numan7272/About-Me on the legacy `main` branch](https://github.com/numan7272/About-Me/tree/main). This `v2` branch is the active one.
