@@ -160,10 +160,14 @@ export class Hud {
       this.speedValue.textContent = kmh.toFixed(0);
     }
 
-    // Recenter-Button-Sichtbarkeit
+    // Recenter-Button-Sichtbarkeit + Position relativ zum Drawer
+    // (Drawer ist auf Mobile bottom-fixed, darum heben wir den Button höher
+    //  wenn der Drawer gerade offen ist).
     if (this.recenterBtn && this.game.cameraRig) {
       const show = !this.game.cameraRig.followMode;
       this.recenterBtn.style.display = show ? "block" : "none";
+      const drawerOpen = !!this.game?.ui?.drawer?.isOpen;
+      this.recenterBtn.style.bottom = drawerOpen ? "280px" : "100px";
     }
   }
 

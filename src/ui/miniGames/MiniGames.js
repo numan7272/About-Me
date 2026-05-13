@@ -79,8 +79,8 @@ export class MiniGames {
     const discoveryHud = ui?.discoveryHud;
     if (discoveryHud?.markDiscovered) {
       const titleMap = {
-        router: "Egg gehackt — Router-Pentest",
-        hq:     "HQ infiltrated — Dev-Setup unlocked",
+        router: "Yek Network Audit — solved",
+        hq:     "NumanOS — SQLi Lab solved",
       };
       discoveryHud.markDiscovered(eggId, titleMap[id] || `Egg ${eggId}`);
     }

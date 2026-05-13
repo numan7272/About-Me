@@ -2,7 +2,7 @@
 
 > An interactive 3D portfolio. Drive a bike around a small island, discover stations that map to my education, work, and projects, and find a few hidden labs along the way.
 >
-> Built by **Numan Yesil** — Wirtschaftsinformatik @ HAW Kiel · Cybersecurity focus.
+> Built by **Numan Yesil** — Wirtschaftsinformatik @ HAW Kiel.
 
 [![Three.js](https://img.shields.io/badge/three.js-r184-000000?logo=three.js)](https://threejs.org)
 [![Vite](https://img.shields.io/badge/vite-8.x-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
@@ -101,12 +101,12 @@ Movement uses **lerp-based velocity** (`lerpT = min(1, ACCEL * dt)`) rather than
 
 ## Hidden labs (easter eggs)
 
-There are a few **interactive labs** scattered around the island. Two of them double as practical demonstrations of basic offensive security — they're framed as part of the story, not as a CTF showcase, but if you're a security person you'll recognize what they are.
+A handful of **interactive labs** are scattered around the island. Two of them are small offensive-security walkthroughs framed inside the story, not as a CTF showcase — but if you're from security you'll recognize the references.
 
-- **Router-Egg** (somewhere on the island) — opens a sandboxed Kali-style terminal. Pentest a fictional Hikvision IP-cam: `nmap`, `curl` for the banner, `telnet` with default credentials. Story is real: this was the first network I ever audited (my family's restaurant, 2022).
+- **Router-Egg** (somewhere on the island) — opens a sandboxed Kali-style terminal. Audit a fictional Hikvision IP-cam: `nmap`, `curl` for the banner, `telnet` with default credentials. CVE-2017-7921 is the reference. Story is real: this was the first network audit I did (my family's restaurant, 2022).
 - **HQ-Building** (clickable directly) — boots a fake macOS desktop ("NumanOS"). Browser, Projects folder, Terminal, README. Hidden on the desktop: a `TODO_fix_sql_injection.txt` that opens a vulnerable login form with live SQL-query preview. Classic `' OR 1=1 --` bypass, plus an optional `UNION SELECT` level for exfiltration.
 
-Both labs are **client-side sandboxes** — no real commands executed, no real network traffic. They exist to demonstrate that I can think like an attacker (and that my old PHP code from 2018 deserved to be shamed in public).
+Both labs are **client-side sandboxes** — no real commands executed, no real network traffic. They exist to demonstrate that I can think through an attack path, not to claim wizard-level expertise.
 
 ---
 

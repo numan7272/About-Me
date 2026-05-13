@@ -66,7 +66,7 @@ What you can do here:
   · Read this file
   · ...and maybe one more thing if you read carefully
 
-I'm Numan, Wirtschaftsinformatik student at HAW Kiel, Cybersecurity focus.
+I'm Numan, Wirtschaftsinformatik student at HAW Kiel.
 Practice > theory. Always.
 
 — n
@@ -502,6 +502,60 @@ export class NumanOS {
         from { opacity: 0; transform: translate(-50%, -10px); }
         to   { opacity: 1; transform: translate(-50%, 0); }
       }
+
+      /* ── Mobile (≤ 640px) ── */
+      @media (max-width: 640px) {
+        .nos-menubar { padding: 0 10px; height: 32px; font-size: 12px; }
+        .nos-menubar-left { gap: 10px; }
+        .nos-menubar-left .nos-menu-item { display: none; }
+        .nos-menubar-left .nos-menu-app { display: inline; }
+        .nos-menubar-right .nos-clock { display: none; }
+        .nos-close-os { padding: 4px 10px; font-size: 12px; }
+
+        .nos-desktop-area { padding: 20px 16px; }
+        .nos-icons {
+          grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+          gap: 12px;
+        }
+        .nos-icon { padding: 10px 4px; }
+        .nos-icon-glyph { font-size: 36px; }
+        .nos-icon-label { font-size: 11px; }
+
+        .nos-dock {
+          padding: 6px 10px;
+          bottom: 10px;
+          gap: 8px;
+        }
+        .nos-dock-icon { font-size: 28px; }
+
+        /* Fenster werden fullscreen statt draggable */
+        .nos-window {
+          position: fixed !important;
+          left: 0 !important;
+          top: 32px !important;
+          width: 100% !important;
+          height: calc(100vh - 32px) !important;
+          min-width: 0;
+          min-height: 0;
+          border-radius: 0;
+          border: 0;
+        }
+        .nos-win-titlebar { cursor: default; }
+
+        /* Projects + Browser füllen den Viewport */
+        .nos-win-body { padding: 14px 14px; }
+        .nos-browser-bar { padding: 6px 10px; gap: 6px; flex-wrap: wrap; }
+        .nos-browser-url { font-size: 11px; padding: 4px 8px; }
+        .nos-browser-content { padding: 16px 14px; }
+        .nos-browser-tabs { width: 100%; order: 2; margin-top: 4px; }
+
+        .nos-project { padding: 14px; }
+        .nos-project-name { font-size: 15px; }
+        .nos-project-body { font-size: 12px; }
+
+        .nos-term-body { font-size: 12px; padding: 12px; }
+        .nos-term-input { font-size: 16px; }   /* iOS zoom avoidance */
+      }
     `;
     root.appendChild(style);
 
@@ -801,7 +855,7 @@ export class NumanOS {
       <div class="nos-browser-content">
         <h1 style="margin:0 0 6px;font-size:22px;">Numan Yesil</h1>
         <p style="margin:0 0 14px;opacity:0.7;font-size:13px;">
-          Wirtschaftsinformatik @ HAW Kiel · Cybersecurity Focus
+          Wirtschaftsinformatik @ HAW Kiel
         </p>
         <p style="font-size:13px;line-height:1.6;opacity:0.85;">
           You're literally looking at this site right now, from inside this site.
@@ -997,7 +1051,7 @@ export class NumanOS {
     this._success = true;
     const banner = document.createElement("div");
     banner.className = "nos-success-banner";
-    banner.textContent = "🎉 Egg gehackt — SQL Injection Bypass";
+    banner.textContent = "SQLi Lab solved — authentication bypassed";
     this.dom.area.appendChild(banner);
     setTimeout(() => banner.remove(), 3500);
     // Counter erhöhen

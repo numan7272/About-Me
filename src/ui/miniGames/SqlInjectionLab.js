@@ -44,22 +44,38 @@ const THEMES = {
   },
 };
 
-const VALID_BYPASSES = [
+// Level-1: klassischer Tautology-Bypass
+const LEVEL1_TAUTOLOGY = [
   /'\s*or\s*'1'\s*=\s*'1/i,
   /'\s*or\s*1\s*=\s*1/i,
   /'\s*or\s*"1"\s*=\s*"1/i,
-  /admin'\s*--/i,
-  /admin'\s*#/i,
   /'\s*\|\|\s*'1'\s*=\s*'1/i,
 ];
 
-const UNION_SUCCESS = /union\s+select.*from\s+users/i;
+// Level-2: Comment-Bypass — schließt Username-Quote + kommentiert Password aus
+const LEVEL2_COMMENT = [
+  /^admin'\s*--/i,
+  /^admin'\s*#/i,
+  /^admin'\/\*/i,
+];
+
+// Level-3: UNION-based Data Exfiltration
+const LEVEL3_UNION = /union\s+select.*from\s+users/i;
+
+// Level-4: Blind / Time-based — User triggert ein SLEEP/BENCHMARK/WAITFOR
+const LEVEL4_BLIND = [
+  /sleep\s*\(\s*\d+\s*\)/i,
+  /benchmark\s*\(/i,
+  /waitfor\s+delay/i,
+  /pg_sleep\s*\(/i,
+];
 
 const HINTS = [
-  "What happens if your input contains a single quote? Try just: ' (one quote).",
-  "Try to break the WHERE-clause logic with: ' OR 1=1 --",
-  "The `--` (two dashes + space) starts a comment in SQL — it ignores the rest.",
-  "Bonus: Use `UNION SELECT username, password FROM users --` to exfiltrate data.",
+  "L1: Was passiert wenn deine Eingabe ein einzelnes Anführungszeichen enthält? Probier einfach: '",
+  "L1: Brich die WHERE-Klausel mit Tautology: ' OR 1=1 --",
+  "L2: Statt OR 1=1 — versuch direkt admin'-- als Username. Das Quote schließt den String, -- kommentiert den Rest aus.",
+  "L3: Extrahier Daten mit UNION. Probier: ' UNION SELECT username, password FROM users --",
+  "L4: Wenn das Login-Response gleich aussieht für richtig und falsch — Blind-SQLi. Probier ' AND SLEEP(5) -- und schau auf die Response-Time.",
 ];
 
 export class SqlInjectionLab {
@@ -69,8 +85,10 @@ export class SqlInjectionLab {
     this.themeName = "kali";
     this.theme = THEMES.kali;
     this.state = {
-      level1Solved: false,
-      level2Solved: false,
+      level1Solved: false,   // Tautology (OR 1=1)
+      level2Solved: false,   // Comment-Bypass (admin'--)
+      level3Solved: false,   // UNION SELECT
+      level4Solved: false,   // Time-based blind
       hintsUsed: 0,
     };
   }
@@ -87,37 +105,43 @@ export class SqlInjectionLab {
 
   _buildDom() {
     const t = this.theme;
+    const isMobile = window.matchMedia("(max-width: 640px)").matches;
+
     const root = document.createElement("div");
     root.className = "sqli-overlay";
     root.style.cssText = `
       position: fixed; inset: 0; z-index: 9999;
-      display: flex; align-items: center; justify-content: center;
+      display: flex; align-items: ${isMobile ? "flex-start" : "center"}; justify-content: center;
       background: ${t.overlayBg};
       backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
       opacity: 0; transition: opacity 220ms ease;
       font-family: 'JetBrains Mono','Courier New',monospace;
       color: ${t.text};
-      padding: 20px;
+      padding: ${isMobile ? "0" : "20px"};
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
     `;
 
     const card = document.createElement("div");
     card.style.cssText = `
       max-width: 720px; width: 100%;
       background: ${t.cardBg};
-      border: 1px solid ${t.border};
-      border-radius: 12px;
-      padding: 28px 30px;
+      border: ${isMobile ? "0" : `1px solid ${t.border}`};
+      border-radius: ${isMobile ? "0" : "12px"};
+      padding: ${isMobile ? "20px 18px" : "28px 30px"};
       box-shadow: 0 24px 60px rgba(0,0,0,0.6);
       position: relative;
+      min-height: ${isMobile ? "100vh" : "auto"};
+      box-sizing: border-box;
     `;
 
     card.innerHTML = `
-      <div class="sqli-bar" style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
-        <div>
+      <div class="sqli-bar" style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:18px;gap:12px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:200px;">
           <div style="font-size:11px;letter-spacing:1px;color:${t.accent};text-transform:uppercase;">Easter Egg · Lab</div>
-          <h2 style="margin:4px 0 0;font-size:20px;">Restaurant-Reservation · Customer Login</h2>
+          <h2 style="margin:4px 0 0;font-size:${isMobile ? "16px" : "20px"};">Restaurant-Reservation · Customer Login</h2>
         </div>
-        <div style="display:flex;align-items:center;gap:6px;">
+        <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
           <button class="sqli-btn" data-theme="kali">Kali</button>
           <button class="sqli-btn" data-theme="cyber">Cyber</button>
           <button class="sqli-btn" data-theme="light">Light</button>
@@ -134,20 +158,20 @@ export class SqlInjectionLab {
       <form class="sqli-form" style="display:grid;grid-template-columns:1fr;gap:10px;">
         <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;opacity:0.8;">
           Username
-          <input class="sqli-user" type="text" autocomplete="off" spellcheck="false"
-                 style="padding:9px 11px;background:${t.inputBg};border:1px solid ${t.border};border-radius:6px;color:${t.text};font-family:inherit;font-size:14px;outline:none;" />
+          <input class="sqli-user" type="text" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off"
+                 style="padding:12px;background:${t.inputBg};border:1px solid ${t.border};border-radius:6px;color:${t.text};font-family:inherit;font-size:16px;outline:none;min-height:44px;" />
         </label>
         <label style="display:flex;flex-direction:column;gap:4px;font-size:12px;opacity:0.8;">
           Password
-          <input class="sqli-pass" type="text" autocomplete="off" spellcheck="false"
-                 style="padding:9px 11px;background:${t.inputBg};border:1px solid ${t.border};border-radius:6px;color:${t.text};font-family:inherit;font-size:14px;outline:none;" />
+          <input class="sqli-pass" type="text" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off"
+                 style="padding:12px;background:${t.inputBg};border:1px solid ${t.border};border-radius:6px;color:${t.text};font-family:inherit;font-size:16px;outline:none;min-height:44px;" />
         </label>
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;">
-          <div style="display:flex;gap:6px;">
-            <button type="button" class="sqli-btn sqli-hint">Hint (${HINTS.length} left)</button>
-            <button type="button" class="sqli-btn sqli-reset">Reset</button>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px;flex-wrap:wrap;gap:8px;">
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <button type="button" class="sqli-btn sqli-hint" style="min-height:44px;padding:8px 14px;">Hint (${HINTS.length} left)</button>
+            <button type="button" class="sqli-btn sqli-reset" style="min-height:44px;padding:8px 14px;">Reset</button>
           </div>
-          <button type="submit" class="sqli-btn sqli-submit" style="background:${t.accent};color:#000;font-weight:700;padding:8px 18px;">Login →</button>
+          <button type="submit" class="sqli-btn sqli-submit" style="background:${t.accent};color:#000;font-weight:700;padding:12px 22px;min-height:44px;font-size:14px;">Login →</button>
         </div>
       </form>
 
@@ -156,6 +180,13 @@ export class SqlInjectionLab {
         <code class="sqli-preview" style="display:block;font-size:13px;line-height:1.55;color:${t.accent};word-break:break-all;">
           (waiting for input...)
         </code>
+      </div>
+
+      <div class="sqli-levels" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px;">
+        <span class="sqli-lvl" data-level="1" style="padding:4px 9px;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid ${t.border};font-size:11px;font-family:'JetBrains Mono',monospace;opacity:0.65;">L1 Tautology</span>
+        <span class="sqli-lvl" data-level="2" style="padding:4px 9px;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid ${t.border};font-size:11px;font-family:'JetBrains Mono',monospace;opacity:0.65;">L2 Comment</span>
+        <span class="sqli-lvl" data-level="3" style="padding:4px 9px;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid ${t.border};font-size:11px;font-family:'JetBrains Mono',monospace;opacity:0.65;">L3 UNION</span>
+        <span class="sqli-lvl" data-level="4" style="padding:4px 9px;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid ${t.border};font-size:11px;font-family:'JetBrains Mono',monospace;opacity:0.65;">L4 Blind</span>
       </div>
 
       <div class="sqli-status" style="margin-top:14px;font-size:13px;min-height:20px;"></div>
@@ -232,52 +263,115 @@ export class SqlInjectionLab {
   _trySubmit() {
     const user = this.dom.userInput.value;
     const pass = this.dom.passInput.value;
-    const query = this._buildQuery();
+    const combined = `${user} ${pass}`;
 
-    // Level 2: UNION SELECT
-    if (UNION_SUCCESS.test(user) || UNION_SUCCESS.test(pass)) {
+    // ─── Level 4: Blind / Time-Based ───
+    // (vor Level 3 weil UNION-Pattern matchen würde auf "SELECT")
+    if (LEVEL4_BLIND.some((rx) => rx.test(user) || rx.test(pass))) {
+      this.state.level4Solved = true;
+      this._setStatus([
+        "⏱  Server hat 5 Sekunden gebraucht zum Antworten…",
+        "✅ Blind / Time-Based SQLi bestätigt.",
+        "",
+        "Auch wenn das Login-Response gleich aussieht — die Response-Time",
+        "verrät dir ob deine injizierte Bedingung TRUE ist. Damit kannst du",
+        "Daten Byte-für-Byte exfiltrieren, ohne sichtbare Ausgabe.",
+        "",
+        "Real fix: parametrisierte Queries + Response-Time-Constant-Time.",
+      ], "ok");
+      this._fireSuccess();
+      this._updateLevelTracker();
+      return;
+    }
+
+    // ─── Level 3: UNION-based Exfil ───
+    if (LEVEL3_UNION.test(user) || LEVEL3_UNION.test(pass)) {
+      this.state.level3Solved = true;
+      this._setStatus([
+        "✅ UNION-Attack erfolgreich — extrahierte Rows aus `users`:",
+        "  admin | 5f4dcc3b5aa765d61d8327deb882cf99   // MD5('password')",
+        "  numan | a8f5f167f44f4964e6c998dee827110c   // MD5('123456')",
+        "  guest | 098f6bcd4621d373cade4e832627b4f6   // MD5('test')",
+        "",
+        "Real fix: parametrisierte Queries (prepared statements) + Least-",
+        "Privilege auf DB-User (kein SELECT auf users für den Login-Endpoint).",
+      ], "ok");
+      this._fireSuccess();
+      this._updateLevelTracker();
+      return;
+    }
+
+    // ─── Level 2: Comment-Bypass (admin'--) ───
+    if (LEVEL2_COMMENT.some((rx) => rx.test(user))) {
       this.state.level2Solved = true;
       this._setStatus([
-        "✅ UNION attack succeeded. Exfiltrated rows:",
-        "  admin | 5f4dcc3b5aa765d61d8327deb882cf99",
-        "  numan | a8f5f167f44f4964e6c998dee827110c",
-        "  guest | 098f6bcd4621d373cade4e832627b4f6",
+        "✅ Comment-Bypass erfolgreich. Eingeloggt als admin.",
         "",
-        "Real fix: parameterized queries (prepared statements).",
+        "Das Quote schließt den Username-String, `--` kommentiert den Rest",
+        "der Query aus. Die Password-Bedingung ist nie evaluiert worden.",
+        "",
+        "Next: UNION-Exfil (' UNION SELECT username, password FROM users --)",
+        "oder Blind/Time-Based (' AND SLEEP(5) --).",
       ], "ok");
       this._fireSuccess();
+      this._updateLevelTracker();
       return;
     }
 
-    // Level 1: Classic bypass — checke ob ein VALID_BYPASS in user ODER pass passt
-    const combined = `${user} ${pass}`;
-    const bypassed = VALID_BYPASSES.some((rx) => rx.test(user) || rx.test(pass));
-    // Special-case: nur `admin'--` als user, leeres pass
-    if (bypassed) {
+    // ─── Level 1: Tautology (OR 1=1) ───
+    if (LEVEL1_TAUTOLOGY.some((rx) => rx.test(user) || rx.test(pass))) {
       this.state.level1Solved = true;
       this._setStatus([
-        "✅ Login bypassed. Welcome, admin.",
+        "✅ Login per Tautology bypassed. Welcome, admin.",
         "",
-        "The WHERE-clause evaluated to TRUE for every row, so the server",
-        "returned row #1 (the first user — usually admin).",
+        "Die WHERE-Klausel wurde für ALLE Rows zu TRUE, der Server hat die",
+        "erste Zeile zurückgegeben (= admin, weil zuerst angelegt).",
         "",
-        "Bonus: try `UNION SELECT username, password FROM users --` in the",
-        "username field to exfiltrate the password hashes.",
+        "Next-Levels:",
+        "  L2: admin'-- als Username (Comment-Bypass)",
+        "  L3: ' UNION SELECT username,password FROM users -- (Exfil)",
+        "  L4: ' AND SLEEP(5) -- (Time-Based Blind)",
       ], "ok");
       this._fireSuccess();
+      this._updateLevelTracker();
       return;
     }
 
+    // ─── Fehler / Hints ───
     if (user === "admin" && pass === "admin") {
-      this._setStatus("Login failed (correct guess on credentials, but this lab wants you to USE injection — not guess).", "err");
+      this._setStatus("Login failed. Das Lab will Injection sehen, nicht raten.", "err");
       return;
     }
     if (!user && !pass) {
-      this._setStatus("Please enter something.", "err");
+      this._setStatus("Bitte was eingeben.", "err");
       return;
     }
 
-    this._setStatus(`Login failed. Query returned 0 rows.`, "err");
+    this._setStatus("Login failed. Query gab 0 Rows zurück.", "err");
+  }
+
+  _updateLevelTracker() {
+    if (!this.dom?.root) return;
+    const map = {
+      1: this.state.level1Solved,
+      2: this.state.level2Solved,
+      3: this.state.level3Solved,
+      4: this.state.level4Solved,
+    };
+    const lvls = this.dom.root.querySelectorAll(".sqli-lvl");
+    lvls.forEach((el) => {
+      const lvl = parseInt(el.dataset.level, 10);
+      if (map[lvl]) {
+        el.style.opacity = "1";
+        el.style.background = `${this.theme.accent}22`;
+        el.style.border = `1px solid ${this.theme.accent}`;
+        el.style.color = this.theme.accent;
+        if (!el.dataset.checked) {
+          el.textContent = "✓ " + el.textContent;
+          el.dataset.checked = "1";
+        }
+      }
+    });
   }
 
   _setStatus(line, kind = "info") {

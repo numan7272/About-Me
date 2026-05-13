@@ -39,40 +39,8 @@ export class DiscoveryHud {
   }
 
   _build() {
-    // Badge — oben rechts, unter MiniMap
-    this.badge = document.createElement("div");
-    Object.assign(this.badge.style, {
-      position: "fixed",
-      top: "240px",
-      right: "20px",
-      padding: "8px 14px",
-      borderRadius: "999px",
-      border: "1px solid rgba(255, 255, 255, 0.16)",
-      background: "rgba(10, 18, 32, 0.72)",
-      backdropFilter: "blur(12px)",
-      color: "rgba(240, 245, 250, 0.95)",
-      fontFamily: "system-ui, sans-serif",
-      fontSize: "12px",
-      letterSpacing: "0.08em",
-      zIndex: "11",
-      pointerEvents: "none",
-      display: "flex",
-      alignItems: "center",
-      gap: "8px",
-    });
-
-    this.badgeIcon = document.createElement("span");
-    this.badgeIcon.textContent = "✦";
-    Object.assign(this.badgeIcon.style, {
-      fontSize: "14px",
-      color: "#fbbf24",
-    });
-
-    this.badgeLabel = document.createElement("span");
-
-    this.badge.appendChild(this.badgeIcon);
-    this.badge.appendChild(this.badgeLabel);
-    document.body.appendChild(this.badge);
+    // Badge bewusst entfernt — kein "X/4" mehr im UI. Eggs sind versteckte
+    // Surprises ohne Game-Counter. Toast bleibt für Achievement-Feedback.
 
     // Toast — oben mitte, slide-down
     this.toast = document.createElement("div");
@@ -102,11 +70,7 @@ export class DiscoveryHud {
   }
 
   _updateBadge() {
-    this.badgeLabel.textContent = `${this.found.size} / ${this.total}`;
-    if (this.found.size === this.total) {
-      this.badge.style.border = "1px solid #fbbf24";
-      this.badge.style.background = "rgba(60, 40, 10, 0.85)";
-    }
+    // Badge entfernt — siehe _build(). Kept als No-op für API-Kompatibilität.
   }
 
   /** Wird vom EasterEggs.js gerufen wenn ein neues Egg gefunden wurde. */

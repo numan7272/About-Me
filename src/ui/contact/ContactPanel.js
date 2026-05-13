@@ -236,6 +236,23 @@ export class ContactPanel {
     // Anfrage geschickt, nicht öffentlich gehostet. DSGVO + saubere
     // Bewerbungs-Praxis.)
 
+    // ── Verfügbarkeits-Hinweis (Recruiter brauchen das) ──
+    const availability = document.createElement("div");
+    availability.textContent = this._lang() === "en"
+      ? "Open to Werkstudent / internship — backend, cloud, DevOps or security. Available from 03/2026."
+      : "Offen für Werkstudent / Praktikum — Backend, Cloud, DevOps oder Security. Ab 03/2026.";
+    Object.assign(availability.style, {
+      marginTop: "22px",
+      padding: "12px 14px",
+      borderRadius: "10px",
+      background: "rgba(126, 200, 255, 0.08)",
+      border: "1px solid rgba(126, 200, 255, 0.22)",
+      fontSize: "12px",
+      lineHeight: "1.5",
+      color: "rgba(220, 235, 250, 0.92)",
+    });
+    this.panel.appendChild(availability);
+
     // ── Footer-Hint ──
     const footer = document.createElement("div");
     footer.textContent = this._lang() === "en"

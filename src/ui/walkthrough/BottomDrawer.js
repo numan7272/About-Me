@@ -182,7 +182,8 @@ export class BottomDrawer {
   _makePrimaryBtn() {
     const b = document.createElement("button");
     Object.assign(b.style, {
-      padding: "11px 18px",
+      padding: "13px 20px",
+      minHeight: "44px",          // WCAG Touch-Target
       borderRadius: "10px",
       border: "1px solid rgba(126, 200, 255, 0.45)",
       background: "linear-gradient(135deg, rgba(126,200,255,0.22), rgba(126,200,255,0.10))",
@@ -205,7 +206,8 @@ export class BottomDrawer {
     const b = document.createElement("button");
     Object.assign(b.style, {
       flex: "1",
-      padding: "8px 12px",
+      padding: "11px 14px",
+      minHeight: "44px",          // WCAG Touch-Target
       borderRadius: "8px",
       border: "1px solid rgba(255, 255, 255, 0.14)",
       background: "rgba(255, 255, 255, 0.04)",

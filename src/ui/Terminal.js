@@ -152,6 +152,25 @@ export class Terminal {
       }
       @keyframes term-blink { 50% { opacity: 0; } }
       .term-overlay ::selection { background: ${t.selBg}; }
+
+      /* ── Mobile (≤ 640px) ── */
+      @media (max-width: 640px) {
+        .term-overlay { font-size: 12px; }
+        .term-overlay > div:first-of-type {
+          flex-wrap: wrap;
+          padding: 8px 10px;
+          height: auto;
+        }
+        .term-btn {
+          padding: 6px 10px;
+          font-size: 11px;
+          min-height: 32px;
+        }
+        .term-output { padding: 12px 14px; font-size: 12px; }
+        .term-input-line { padding: 4px 14px 12px; font-size: 14px; }
+        .term-prompt { font-size: 12px; }
+        .term-cursor::after { font-size: 12px; }
+      }
     `;
     root.appendChild(style);
 
