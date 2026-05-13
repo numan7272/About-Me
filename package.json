@@ -1,29 +1,36 @@
 {
-  "name": "about-me",
-  "version": "0.2.0",
+  "name": "about-me-vite",
   "private": true,
+  "version": "0.0.0",
+  "type": "module",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "next lint"
+    "dev": "vite",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview"
   },
   "dependencies": {
-    "@react-three/drei": "^9.117.0",
-    "@react-three/fiber": "^8.17.10",
-    "@react-three/postprocessing": "^2.16.3",
-    "@react-three/rapier": "^1.5.0",
-    "framer-motion": "^11.11.17",
-    "lucide-react": "^0.460.0",
-    "next": "14.2.18",
-    "postprocessing": "^6.36.4",
+    "@dimforge/rapier3d-compat": "^0.19.3",
+    "framer-motion": "^12.38.0",
+    "lucide-react": "^1.14.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "three": "^0.170.0"
+    "three": "^0.184.0",
+    "tweakpane": "^4.0.5",
+    "zustand": "^5.0.13"
   },
   "devDependencies": {
-    "autoprefixer": "^10.4.20",
-    "postcss": "^8.4.49",
-    "tailwindcss": "^3.4.15"
+    "@eslint/js": "^10.0.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "autoprefixer": "^10.5.0",
+    "eslint": "^10.3.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.6.0",
+    "postcss": "^8.5.14",
+    "tailwindcss": "^3.4.19",
+    "vite": "^8.0.12"
   }
 }

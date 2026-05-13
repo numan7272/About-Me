@@ -1,0 +1,327 @@
+/**
+ * stations.js — Walkthrough-Daten in Cybersec-Story-Reihenfolge.
+ *
+ * Reihenfolge wurde vom HR-Recruiter-Audit festgelegt:
+ * Yek (Origin Story) → THG → HAW → Designa → HQ
+ *
+ * Pro Station drei Klick-Stufen:
+ *   1) Was — Rolle, Zeitraum, eine Kern-Headline
+ *   2) Konkret gemacht — 2-3 messbare Punkte
+ *   3) Skill-Beweis — Tech-Stack als Chips
+ *
+ * Die Building-IDs (haw, designa, yek, thg, hq) matchen die GLB-Root-Names
+ * (HAW_Root, Designa_Root, ...). Die Walkthrough-Reihenfolge ist
+ * STORY_ORDER unten — die unterscheidet sich bewusst von alphabetisch.
+ */
+
+// Story-Reihenfolge — HR hat empfohlen mit Yek-Pentest zu starten,
+// nicht chronologisch. Origin-Story-Hook ist der Differenzierer.
+export const STORY_ORDER = ["yek", "thg", "haw", "designa", "hq"];
+
+// Teleport-Punkte pro Station — vom User per Browser-Console abgelesen.
+// Beim Walkthrough-flyTo() landet das Bike hier (Vorplatz/Eingang).
+// Hq-Spawn ist der Initial-Spawn beim Pageload und gilt auch als TP-Punkt.
+export const TELEPORT_POINTS = {
+  haw:     [-20.23, 0.20, -23.78],
+  designa: [ 40.51, 0.11,  12.91],
+  yek:     [  0.54, 0.01,  39.14],
+  thg:     [-27.01, 0.03,  34.47],
+  hq:      [ -4.38, 1.00,  16.63],
+};
+
+// Cinematic Camera-Posen pro Station — vom User in der Console abgelesen.
+// Beim Walkthrough-Step fliegt die Camera an `camera` und schaut auf `lookAt`.
+// Das gibt jedem Stopp die optimale Eingang-zeigende Perspektive statt
+// generischer Iso-Position.
+export const STATION_CAMERAS = {
+  yek: {
+    camera: [9.97, 6.27, 29.27],
+    lookAt: [0.54, 1.01, 39.14],
+  },
+  thg: {
+    camera: [-7.20, 5.21, 33.14],
+    lookAt: [-26.98, 0.77, 33.60],
+  },
+  haw: {
+    camera: [-15.32, 7.01, -3.99],
+    lookAt: [-24.75, 0.52, -20.72],
+  },
+  designa: {
+    camera: [40.60, 7.67, 30.51],
+    lookAt: [42.72, 1.19, 12.40],
+  },
+  hq: {
+    camera: [12.69, 7.21, 26.25],
+    lookAt: [-4.38, 2.00, 16.63],
+  },
+};
+
+export const STATIONS = {
+  de: {
+    yek: {
+      id: "yek",
+      buildingRoot: "Yek_Root",
+      label: "Yek · Familienbetrieb",
+      title: "Wo ich Verantwortung lernen durfte",
+      subtitle: "Yek Döner & Pizzeria · Heikendorf",
+      timeframe: "01/2022 – 03/2025",
+      headline: "Drei Jahre Familienbetrieb — Service, Organisation und meine erste praktische IT-Erfahrung.",
+      bullets: [
+        "Service, Kasse und Tagesgeschäft über drei Jahre — Verantwortung schrittweise ausgebaut ab 16 Jahren.",
+        "Betriebsmanagement: Einkauf, Kalkulation, Preisanpassungen, Umsatzanalysen, Hygienevorschriften.",
+        "Schwachstellen im Betriebs-WLAN identifiziert: offene Ports, Default-Passwörter, Kameras im öffentlichen Netz.",
+        "Netzwerk segmentiert, Port-Filtering eingerichtet, Wi-Fi gehärtet, Credentials ersetzt.",
+      ],
+      skills: [
+        "Network Audit",
+        "Port Filtering",
+        "Wi-Fi Hardening",
+        "Netz-Segmentierung",
+        "Kassenführung",
+        "Einkauf & Kalkulation",
+        "Umsatzanalyse",
+        "Hygienevorschriften",
+        "Gästebetreuung",
+        "Teamarbeit",
+        "Belastbarkeit",
+        "Verantwortung",
+      ],
+      eggHint: "router",          // triggert Compromised-Router-Egg
+      color: "#fb923c",
+      accent: "#ef4444",
+    },
+    thg: {
+      id: "thg",
+      buildingRoot: "THG_Root",
+      label: "THG · Abitur",
+      title: "Allgemeine Hochschulreife",
+      subtitle: "Thor Heyerdahl Gymnasium · Kiel",
+      timeframe: "09/2016 – 07/2025",
+      headline: "Neun Jahre strukturiertes Denken — das Fundament für alles danach.",
+      bullets: [
+        "Abitur im Juli 2025, parallel zur Yek-Vollzeittätigkeit absolviert.",
+        "Selbstdisziplin und analytisches Arbeiten als Basis fürs Wirtschaftsinformatik-Studium.",
+      ],
+      skills: ["Analytisches Denken", "Selbstdisziplin", "Belastbarkeit"],
+      color: "#a78bfa",
+      accent: "#7c3aed",
+    },
+    haw: {
+      id: "haw",
+      buildingRoot: "HAW_Root",
+      label: "HAW · B.Sc. Wirtschaftsinformatik",
+      title: "B.Sc. Wirtschaftsinformatik",
+      subtitle: "HAW Kiel · 2. Semester",
+      timeframe: "seit 09/2025",
+      headline: "Wirtschaftsinformatik — Brücke zwischen Technik und Geschäft.",
+      bullets: [
+        "Schwerpunkte: technische Analyse, Programmierung, Datenbanken, Projektmanagement.",
+        "Zusätzlich: Google Cybersecurity Professional Certificate (Coursera) seit 02/2026 — Vertiefung neben dem Studium.",
+        "Frühere Praktika: GMSH Kiel (Wirtschaftspraktikum, SAP/ITwo/eVergabe, 01-02/2024) und Renault Haussner (Mechaniker-Praktikum, 06/2022).",
+      ],
+      skills: ["Wirtschaftsinformatik", "Python", "SQL", "Projektmanagement", "Cybersecurity", "Analytisches Denken"],
+      color: "#22d3ee",
+      accent: "#06b6d4",
+    },
+    designa: {
+      id: "designa",
+      buildingRoot: "Designa_Root",
+      label: "Designa · Werkstudent QA",
+      title: "Werkstudent Qualitätssicherung (TestLab)",
+      subtitle: "Designa Verkehrsleittechnik GmbH · Kiel",
+      timeframe: "seit 11/2025",
+      headline: "Erste Werkstudentenstelle — Log-Analyse, Hardware-Tests und Jira im Tagesgeschäft.",
+      bullets: [
+        "Server- und System-Logs analysiert zur Eingrenzung von Fehlerursachen in technischen Testumgebungen.",
+        "Incidents in Jira dokumentiert, Debugging unterstützt, SQL-basierte Auswertungen erstellt.",
+        "Hardware-Komponenten im Testbetrieb geprüft; zertifiziert als elektrotechnisch unterwiesene Person (EuP).",
+      ],
+      skills: ["Log-Analyse", "Jira", "SQL", "Hardware-Tests", "Fehlerdiagnose", "EuP"],
+      color: "#34d399",
+      accent: "#10b981",
+    },
+    hq: {
+      id: "hq",
+      buildingRoot: "HQ_Root",
+      label: "HQ · Eigene Projekte",
+      title: "Was ich gerade baue",
+      subtitle: "Zu Hause · self-taught",
+      timeframe: "laufend",
+      headline: "Vier eigene Projekte, alle self-hosted.",
+      bullets: [
+        "Synapser — FastAPI-Backend für intelligenten Scheduler, Optimierung mit Google OR-Tools + Heuristiken.",
+        "OmniView — News- und Threat-Intelligence-Dashboard (Next.js + GDELT + Multi-AI).",
+        "Funke — Self-hosted WebRTC-Plattform (Node.js, Socket.IO, Electron-Desktop-Client).",
+        "Dieses Portfolio — Three.js + Rapier3D + Vite, alles eigenhändig gebaut.",
+        "Python Learning Log auf GitHub — strukturierter Lernverlauf, tägliche Commits.",
+      ],
+      skills: ["Python/FastAPI", "React/Next.js", "Three.js", "Docker", "WebRTC", "Self-Hosted"],
+      eggHint: "container",          // Container-Egg = Self-Hosted-Beweis
+      color: "#f472b6",
+      accent: "#ec4899",
+    },
+  },
+
+  en: {
+    yek: {
+      id: "yek",
+      buildingRoot: "Yek_Root",
+      label: "Yek · Family Business",
+      title: "Where I Learned to Take Responsibility",
+      subtitle: "Yek Döner & Pizzeria · Heikendorf",
+      timeframe: "01/2022 – 03/2025",
+      headline: "Three years in the family business — service, operations and my first hands-on IT experience.",
+      bullets: [
+        "Service, register and daily operations over three years — responsibility steadily increased from age 16.",
+        "Operations management: purchasing, cost calculation, price adjustments, revenue analysis, hygiene compliance.",
+        "Identified vulnerabilities in the business Wi-Fi: open ports, default passwords, cameras on public network.",
+        "Segmented the network, configured port filtering, hardened Wi-Fi, replaced credentials.",
+      ],
+      skills: [
+        "Network Audit",
+        "Port Filtering",
+        "Wi-Fi Hardening",
+        "Network Segmentation",
+        "Cash Handling",
+        "Purchasing & Costing",
+        "Revenue Analysis",
+        "Hygiene Compliance",
+        "Customer Service",
+        "Teamwork",
+        "Resilience",
+        "Responsibility",
+      ],
+      eggHint: "router",
+      color: "#fb923c",
+      accent: "#ef4444",
+    },
+    thg: {
+      id: "thg",
+      buildingRoot: "THG_Root",
+      label: "THG · Abitur",
+      title: "Higher Education Entrance Qualification",
+      subtitle: "Thor Heyerdahl Gymnasium · Kiel",
+      timeframe: "09/2016 – 07/2025",
+      headline: "Nine years of structured thinking — the foundation for everything that followed.",
+      bullets: [
+        "Completed Abitur in July 2025 while working full-time at Yek.",
+        "Self-discipline and analytical work as the base for my B.Sc. studies.",
+      ],
+      skills: ["Analytical Thinking", "Self-Discipline", "Resilience"],
+      color: "#a78bfa",
+      accent: "#7c3aed",
+    },
+    haw: {
+      id: "haw",
+      buildingRoot: "HAW_Root",
+      label: "HAW · B.Sc. Business Information Systems",
+      title: "B.Sc. Business Information Systems",
+      subtitle: "HAW Kiel · 2nd Semester",
+      timeframe: "since 09/2025",
+      headline: "Business Information Systems — bridging technology and business.",
+      bullets: [
+        "Focus areas: technical analysis, programming, databases, project management.",
+        "Additional: Google Cybersecurity Professional Certificate (Coursera) since 02/2026 — extra specialization alongside studies.",
+        "Earlier internships: GMSH Kiel (business internship, SAP/ITwo/eProcurement, 01-02/2024) and Renault Haussner (mechanic internship, 06/2022).",
+      ],
+      skills: ["Business Informatics", "Python", "SQL", "Project Management", "Cybersecurity", "Analytical Thinking"],
+      color: "#22d3ee",
+      accent: "#06b6d4",
+    },
+    designa: {
+      id: "designa",
+      buildingRoot: "Designa_Root",
+      label: "Designa · QA Working Student",
+      title: "Working Student, Quality Assurance (Testing Lab)",
+      subtitle: "Designa Verkehrsleittechnik GmbH · Kiel",
+      timeframe: "since 11/2025",
+      headline: "First working-student role — log analysis, hardware testing and Jira in daily operations.",
+      bullets: [
+        "Analyzed server and system logs to narrow down root causes in technical test environments.",
+        "Documented incidents in Jira, supported debugging, ran SQL-based evaluations.",
+        "Tested hardware components in lab environments; certified as electrically instructed person (EuP).",
+      ],
+      skills: ["Log Analysis", "Jira", "SQL", "Hardware Testing", "Diagnostics", "EuP"],
+      color: "#34d399",
+      accent: "#10b981",
+    },
+    hq: {
+      id: "hq",
+      buildingRoot: "HQ_Root",
+      label: "HQ · Personal Projects",
+      title: "What I'm Building Right Now",
+      subtitle: "Home · self-taught",
+      timeframe: "Ongoing",
+      headline: "Four personal projects, all self-hosted.",
+      bullets: [
+        "Synapser — FastAPI backend for an intelligent scheduler, optimization with Google OR-Tools + heuristics.",
+        "OmniView — news and threat-intelligence dashboard (Next.js + GDELT + multiple AI providers).",
+        "Funke — self-hosted WebRTC platform (Node.js, Socket.IO, Electron desktop client).",
+        "This portfolio — Three.js + Rapier3D + Vite, built from scratch.",
+        "Python Learning Log on GitHub — structured study trace, daily commits.",
+      ],
+      skills: ["Python/FastAPI", "React/Next.js", "Three.js", "Docker", "WebRTC", "Self-Hosted"],
+      eggHint: "container",
+      color: "#f472b6",
+      accent: "#ec4899",
+    },
+  },
+};
+
+// Kontakt-Daten — werden vom ContactPanel angezeigt.
+//
+// CV-Pfade: `public/cv/` ist in .gitignore (DSGVO), die PDFs existieren nur
+// lokal. Vite kopiert sie beim `npm run build` trotzdem ins dist/, weil
+// gitignore != .vercelignore. Für GitHub-Pages-Deploys ohne Vercel müsstest
+// du diese URLs durch externe Links ersetzen (Dropbox, Drive, eigener Server).
+// Per ENV-Variable überschreibbar — siehe README.
+export const CONTACT = {
+  email: "hi@numan-yesil.com",
+  linkedin: "https://www.linkedin.com/in/numan-yesil-104654152",
+  github: "https://github.com/numan7272",
+  cvDe: import.meta.env?.VITE_CV_DE_URL || "/cv/Numan-Yesil-Lebenslauf-DE.pdf",
+  cvEn: import.meta.env?.VITE_CV_EN_URL || "/cv/Numan-Yesil-CV-EN.pdf",
+  location: "Kiel, Deutschland",
+};
+
+// Walkthrough-UI-Strings
+export const WALKTHROUGH_UI = {
+  de: {
+    start_tour: "Geführte Tour starten",
+    free_roam: "Frei erkunden",
+    next: "Weiter",
+    prev: "Zurück",
+    skip: "Tour beenden",
+    contact: "Kontakt",
+    cv_download: "Lebenslauf herunterladen",
+    step_what: "Was",
+    step_how: "Konkret gemacht",
+    step_stack: "Tech & Skills",
+    drawer_hint: "Klick „Weiter\" für die nächste Station",
+    intro_title: "Hi, ich bin Numan.",
+    intro_body: "Wirtschaftsinformatik-Student aus Kiel. Diese Tour nimmt dich mit auf meine Reise in 5 Kapiteln.",
+  },
+  en: {
+    start_tour: "Start guided tour",
+    free_roam: "Explore freely",
+    next: "Next",
+    prev: "Back",
+    skip: "End tour",
+    contact: "Contact",
+    cv_download: "Download CV",
+    step_what: "What",
+    step_how: "What I did",
+    step_stack: "Tech & Skills",
+    drawer_hint: "Click \"Next\" for the next station",
+    intro_title: "Hi, I'm Numan.",
+    intro_body: "Business Information Systems student from Kiel. This tour takes you through my journey in 5 chapters.",
+  },
+};
+
+export function getStationsForLang(lang) {
+  return STATIONS[lang === "en" ? "en" : "de"];
+}
+
+export function getWalkthroughStrings(lang) {
+  return WALKTHROUGH_UI[lang === "en" ? "en" : "de"];
+}
