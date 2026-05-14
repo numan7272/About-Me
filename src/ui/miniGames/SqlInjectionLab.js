@@ -97,9 +97,12 @@ export class SqlInjectionLab {
     if (this.dom) return;
     this._buildDom();
     document.body.appendChild(this.dom.root);
+    const isMobile = window.matchMedia("(max-width: 640px)").matches;
     requestAnimationFrame(() => {
       this.dom.root.style.opacity = "1";
-      this.dom.userInput.focus();
+      // Auto-Focus nur auf Desktop — auf Mobile triggert das Software-Keyboard
+      // sofort und scrollt das Layout kaputt.
+      if (!isMobile) this.dom.userInput.focus();
     });
   }
 
@@ -418,8 +421,9 @@ export class SqlInjectionLab {
   _fireSuccess() {
     if (this._success) return;
     this._success = true;
-    const miniGames = this.game.ui?.miniGames;
-    miniGames?.markComplete?.("container");
+    // ⚠ markComplete wird vom OUTER-Frame (NumanOS) gemacht damit es nur EINEN
+    // Toast gibt — sonst kommt "container solved" UND "HQ solved" hintereinander.
+    // SqlInjectionLab signalisiert nur Erfolg via Banner (siehe NumanOS-Wrapper).
   }
 
   setTheme(name) {

@@ -9,6 +9,8 @@
  * State wird in localStorage gespeichert damit's Reloads übersteht.
  */
 
+import { getControlMode, setControlMode } from "./controlMode.js";
+
 const STORAGE_KEY = "numan-portfolio-settings-v1";
 
 const DEFAULTS = {
@@ -122,8 +124,24 @@ export class SettingsPanel {
     this.panel.appendChild(this._buildVolumeRow());
     this.panel.appendChild(this._buildGraphicsRow());
     this.panel.appendChild(this._buildRendererRow());
+    this.panel.appendChild(this._buildControlModeRow());
 
     document.body.appendChild(this.panel);
+  }
+
+  _buildControlModeRow() {
+    const wrap = document.createElement("div");
+    wrap.appendChild(this._buildSectionLabel("Bike-Steuerung"));
+    const group = this._buildToggleGroup(
+      [
+        { value: "joystick", label: "Joystick" },
+        { value: "tap",      label: "Tap-to-Move" },
+      ],
+      getControlMode(),
+      (val) => setControlMode(val),
+    );
+    wrap.appendChild(group);
+    return wrap;
   }
 
   _buildSectionLabel(text) {

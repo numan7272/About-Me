@@ -121,6 +121,10 @@ export class EggClickHandler {
     const dy = e.clientY - this._downY;
     if (Math.hypot(dx, dy) > CLICK_DRAG_THRESHOLD) return;
 
+    // Walkthrough-Tour aktiv? Dann keine Mini-Games öffnen — sonst springt der
+    // Recruiter aus der Tour-Pose raus mitten in eine fake-Desktop-App.
+    if (this.game?.ui?.walkthrough?.active) return;
+
     const hit = this._raycastEggs(e.clientX, e.clientY);
     if (!hit) return;
     const eggId = hit.userData?.eggId;
@@ -132,6 +136,9 @@ export class EggClickHandler {
   }
 
   _openMiniGame(eggId) {
+    // One-Time-Hint dismissen — der User hat's geschnallt.
+    this.game.ui?.buildingsHint?.acknowledge?.();
+
     const miniGames = this.game.ui?.miniGames;
     if (miniGames?.open) {
       miniGames.open(eggId);

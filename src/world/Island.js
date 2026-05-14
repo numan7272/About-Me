@@ -200,10 +200,16 @@ export class Island {
           if (worldFront.lengthSq() > 1e-6) worldFront.normalize();
         }
 
-        // HQ wird als klickbares Mini-Game-Target markiert (öffnet NumanOS).
-        // Die anderen Buildings öffnen nur Walkthrough/InfoCard.
-        if (m[1] === "HQ") {
-          obj.userData.eggId = "HQ";
+        // Alle 5 Buildings sind klickbar — jeweils mit eigenem Mini-Game:
+        //   HQ      → NumanOS-Desktop (macOS)
+        //   Designa → DesignaOS-Desktop (Windows 11)
+        //   HAW     → HAW-Moodle
+        //   THG     → Allgemeinwissen-Quiz
+        //   Yek     → Kassen-System
+        // ProximityTrigger registriert die Meshes über buildings[].mesh.
+        const CLICKABLE_BUILDINGS = new Set(["HQ", "Designa", "HAW", "THG", "Yek"]);
+        if (CLICKABLE_BUILDINGS.has(m[1])) {
+          obj.userData.eggId = m[1];
           obj.userData.isClickableEgg = true;
         }
 

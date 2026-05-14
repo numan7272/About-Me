@@ -12,11 +12,20 @@
  */
 
 const GAME_MAP = {
+  // Egg-Klicks
   router:    () => import("./RouterPentest.js").then((m) => m.RouterPentest),
   Router:    () => import("./RouterPentest.js").then((m) => m.RouterPentest),
-  // HQ-Click → NumanOS-Desktop. SQLi-Lab ist als versteckte Datei dort drin.
+  // Building-Klicks (jedes Building öffnet sein eigenes Mini-Game)
   hq:        () => import("./NumanOS.js").then((m) => m.NumanOS),
   HQ:        () => import("./NumanOS.js").then((m) => m.NumanOS),
+  designa:   () => import("./DesignaOS.js").then((m) => m.DesignaOS),
+  Designa:   () => import("./DesignaOS.js").then((m) => m.DesignaOS),
+  haw:       () => import("./HAWMoodle.js").then((m) => m.HAWMoodle),
+  HAW:       () => import("./HAWMoodle.js").then((m) => m.HAWMoodle),
+  thg:       () => import("./THGQuiz.js").then((m) => m.THGQuiz),
+  THG:       () => import("./THGQuiz.js").then((m) => m.THGQuiz),
+  yek:       () => import("./YekKasse.js").then((m) => m.YekKasse),
+  Yek:       () => import("./YekKasse.js").then((m) => m.YekKasse),
 };
 
 export class MiniGames {
@@ -37,22 +46,66 @@ export class MiniGames {
   }
 
   async open(eggId) {
-    if (this.active) {
-      // Anderes Spiel läuft — schließen, dann neues starten
-      this.close();
+    if (this.active || this._opening) {
+      // Anderes Spiel läuft oder lädt — re-entrancy verhindern
+      return;
     }
+    this._opening = true;
+    // Bevor wir das Mini-Game öffnen: alle pointer-blockierenden States
+    // aus dem 3D-View entspannen. Sonst bleibt OrbitControls stuck wenn
+    // der TouchJoystick einen pointerdown gesehen hat, aber pointerup
+    // vom Mini-Game-Overlay verschluckt wird.
+    this._resetPointerStates();
+
     const loader = GAME_MAP[eggId] || GAME_MAP[String(eggId).toLowerCase()];
     if (!loader) {
       console.warn("[MiniGames] no game registered for", eggId);
+      this._opening = false;
       return;
     }
     try {
       const GameClass = await loader();
+      // Falls inzwischen ein anderes Mini-Game offen ist, abbrechen
+      if (this.active) {
+        this._opening = false;
+        return;
+      }
       this.active = new GameClass(this.game);
+      // Body-Scroll-Lock (iOS-Safari momentum-scroll-Bug)
+      this._lockBodyScroll();
+      // Monkey-patch close() so dass es auch unseren Manager-State + Pointer-
+      // Reset triggert wenn das Sub-Game intern schließt (z.B. via X-Button).
+      const origClose = this.active.close?.bind(this.active);
+      this.active.close = () => {
+        try { origClose?.(); } catch {}
+        this.active = null;
+        this._resetPointerStates();
+        this._unlockBodyScroll();
+      };
       this.active.open();
     } catch (err) {
       console.error("[MiniGames] failed to load game", eggId, err);
+    } finally {
+      this._opening = false;
     }
+  }
+
+  _lockBodyScroll() {
+    if (this._scrollLocked) return;
+    this._savedBodyStyle = {
+      overflow: document.body.style.overflow,
+      touchAction: document.body.style.touchAction,
+    };
+    document.body.style.overflow = "hidden";
+    document.body.style.touchAction = "none";
+    this._scrollLocked = true;
+  }
+
+  _unlockBodyScroll() {
+    if (!this._scrollLocked) return;
+    document.body.style.overflow = this._savedBodyStyle?.overflow || "";
+    document.body.style.touchAction = this._savedBodyStyle?.touchAction || "";
+    this._scrollLocked = false;
   }
 
   close() {
@@ -60,6 +113,93 @@ export class MiniGames {
       try { this.active.close(); } catch {}
     }
     this.active = null;
+    // Beim Schließen NOCHMAL Pointer-States resetten — der User soll nach
+    // dem Mini-Game sofort wieder die Kamera bewegen können.
+    this._resetPointerStates();
+    this._unlockBodyScroll();
+    // Plus: nach 100ms nochmal resetten — manche Browser/Mobile-Devices
+    // brauchen einen kurzen Beat um die touch-cancel zu propagieren bevor
+    // OrbitControls' Reconnect wirklich greift.
+    setTimeout(() => this._resetPointerStates(), 100);
+  }
+
+  /** Defensives Aufräumen: bricht abgehängte Pointer-Captures ab und
+   *  reaktiviert OrbitControls. Wird bei open() + close() aufgerufen.
+   *
+   *  Mobile-spezifischer Bug: nach Mini-Game-Open verliert OrbitControls
+   *  seine internen `_pointers`/`_pointerPositions`-Arrays nicht — das
+   *  touch-end-Event wird vom Overlay-DOM verschluckt. Folge: nach Close
+   *  denkt OrbitControls noch dass 1 oder 2 Finger auf dem Screen sind,
+   *  und neue Touches gehen direkt in den Pinch-Zoom-Mode statt Rotate.
+   *
+   *  Fix: OrbitControls' internal Pointer-Tracking-State manuell clearen
+   *  durch dispose()+connect() — das reattachs alle Listener und resettet
+   *  alle internen Arrays.
+   */
+  _resetPointerStates() {
+    // TouchJoystick: aktive Geste killen
+    const tj = this.game?.ui?.touchJoystick;
+    if (tj?._endGesture) {
+      try { tj._endGesture(); } catch {}
+    }
+
+    // Synthesize ein pointercancel auf den Canvas, damit OrbitControls und
+    // andere pointer-tracker den ggf. noch hängenden Pointer freigeben.
+    // Mobile-Bug: der pointerdown vom Building-Click landet beim Canvas, aber
+    // pointerup geht aufs Overlay → Canvas-Listener bleibt im "down"-State.
+    const canvas = this.game?.canvas;
+    if (canvas) {
+      try {
+        // Mit pointerId -1 cancel-en wir effektiv alle Pointer-Slots
+        const evt = new PointerEvent("pointercancel", {
+          pointerId: 1, pointerType: "touch",
+          bubbles: true, cancelable: true,
+        });
+        canvas.dispatchEvent(evt);
+      } catch {}
+    }
+
+    // OrbitControls hard-reset: dispose entfernt alle Event-Listener und
+    // resettet die internen Pointer-Arrays. connect bindet alles neu.
+    const cameraRig = this.game?.cameraRig;
+    const controls = cameraRig?.controls;
+    if (controls) {
+      try {
+        controls.dispose();
+        // Three.js r155+ hat controls.connect(domElement) — vorher war's
+        // automatisch via Constructor. Wir rufen connect mit dem Canvas
+        // damit die Listener wieder dranne sind.
+        const canvas = this.game?.canvas;
+        if (typeof controls.connect === "function" && canvas) {
+          controls.connect(canvas);
+        }
+        // Manuell die internen Pointer-Arrays leeren — manche Three.js-Versionen
+        // resetten die nicht in dispose().
+        if (Array.isArray(controls._pointers)) controls._pointers.length = 0;
+        if (Array.isArray(controls._pointerPositions)) controls._pointerPositions.length = 0;
+        if (controls._state !== undefined) controls._state = -1;   // STATE.NONE
+      } catch (err) {
+        console.warn("[MiniGames] controls.dispose/connect failed:", err);
+      }
+      controls.enabled = true;
+    }
+
+    // CameraRig's eigener pointer-drag-state zurücksetzen (sonst denkt der
+    // CameraRig wir wären mitten im Drag und followMode bleibt aus)
+    if (cameraRig) {
+      cameraRig._pointerDown = false;
+      cameraRig._pointerDragged = false;
+    }
+
+    // Canvas-Cursor zurücksetzen falls noch im pointer-Hover-Modus
+    if (canvas) canvas.style.cursor = "";
+
+    // Falls Yek-Dusk gerade gelocked ist und keine Tour läuft, Auto-Cycle
+    // wieder freigeben — sonst bleibt die Welt für immer im Sonnenuntergang.
+    const walkthrough = this.game?.ui?.walkthrough;
+    if (!walkthrough?.active) {
+      this.game?.world?.dayCycle?.releaseOverride?.();
+    }
   }
 
   /** Vom Mini-Game gerufen sobald der User es gelöst hat. */
@@ -74,13 +214,17 @@ export class MiniGames {
       );
     } catch {}
 
-    // DiscoveryHud-Toast + Counter erhöhen
+    // DiscoveryHud-Toast + Counter erhöhen (i18n-aware)
     const ui = this.game.ui;
     const discoveryHud = ui?.discoveryHud;
     if (discoveryHud?.markDiscovered) {
-      const titleMap = {
+      const lang = (typeof window !== "undefined" && window.__lang === "en") ? "en" : "de";
+      const titleMap = lang === "en" ? {
         router: "Yek Network Audit — solved",
         hq:     "NumanOS — SQLi Lab solved",
+      } : {
+        router: "Yek-Netzwerk-Audit gelöst",
+        hq:     "NumanOS — SQLi-Lab gelöst",
       };
       discoveryHud.markDiscovered(eggId, titleMap[id] || `Egg ${eggId}`);
     }

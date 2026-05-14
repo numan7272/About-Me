@@ -81,6 +81,7 @@ export class Terminal {
     this.history = [];
     this.historyIndex = -1;
     this.buffer = "";
+    this.cursor = 0;     // Cursor-Position innerhalb von this.buffer (0 .. buffer.length)
 
     this._buildDom();
   }
@@ -146,11 +147,14 @@ export class Terminal {
       .term-line.accent { color: ${t.accent}; }
       .term-line.success { color: ${t.promptColor}; font-weight: 600; }
       .term-prompt { color: ${t.promptColor}; }
-      .term-cursor::after {
-        content: "▋"; color: ${t.text};
-        animation: term-blink 1s steps(1) infinite;
+      .term-cursor-inline {
+        display: inline-block;
+        background: ${t.text};
+        color: ${t.bg};
+        min-width: 0.55em;
+        animation: term-blink 1.1s steps(1) infinite;
       }
-      @keyframes term-blink { 50% { opacity: 0; } }
+      @keyframes term-blink { 50% { background: transparent; color: ${t.text}; } }
       .term-overlay ::selection { background: ${t.selBg}; }
 
       /* ── Mobile (≤ 640px) ── */
@@ -192,8 +196,7 @@ export class Terminal {
     `;
     inputLine.innerHTML = `
       <span class="term-prompt">${this._escape(this.prompt)}</span>
-      <span class="term-buffer" style="margin-left:2px;"></span>
-      <span class="term-cursor"></span>
+      <span class="term-buffer" style="margin-left:2px;white-space:pre;"></span>
     `;
     root.appendChild(inputLine);
 
@@ -239,7 +242,16 @@ export class Terminal {
   }
 
   _renderBuffer() {
-    this.dom.bufferSpan.textContent = this.buffer;
+    // Buffer in 3 Teile splitten: vor-Cursor, an-Cursor (1 Zeichen), nach-Cursor.
+    // Damit kann der Block-Cursor mitten im Text liegen.
+    const c = Math.max(0, Math.min(this.buffer.length, this.cursor));
+    const before = this.buffer.slice(0, c);
+    const atCursor = this.buffer.slice(c, c + 1);
+    const after = this.buffer.slice(c + 1);
+    this.dom.bufferSpan.innerHTML =
+      this._escape(before) +
+      `<span class="term-cursor-inline">${this._escape(atCursor) || " "}</span>` +
+      this._escape(after);
   }
 
   _appendLine(text, cls = "out") {
@@ -261,18 +273,62 @@ export class Terminal {
   }
 
   _onKey(e) {
+    // ── Ctrl+C — laufenden Befehl abbrechen, neue Prompt-Zeile ──
+    if (e.ctrlKey && (e.key === "c" || e.key === "C")) {
+      e.preventDefault();
+      this._appendLine(`${this.prompt}${this.buffer}^C`, "in");
+      this.buffer = "";
+      this.cursor = 0;
+      this._renderBuffer();
+      return;
+    }
+    // ── Ctrl+L — clear screen (Bash-Standard) ──
+    if (e.ctrlKey && (e.key === "l" || e.key === "L")) {
+      e.preventDefault();
+      this.dom.output.innerHTML = "";
+      return;
+    }
+    // ── Ctrl+A — Cursor an Anfang ──
+    if (e.ctrlKey && (e.key === "a" || e.key === "A")) {
+      e.preventDefault();
+      this.cursor = 0;
+      this._renderBuffer();
+      return;
+    }
+    // ── Ctrl+E — Cursor ans Ende ──
+    if (e.ctrlKey && (e.key === "e" || e.key === "E")) {
+      e.preventDefault();
+      this.cursor = this.buffer.length;
+      this._renderBuffer();
+      return;
+    }
+    // ── Ctrl+U — Zeile bis Cursor löschen ──
+    if (e.ctrlKey && (e.key === "u" || e.key === "U")) {
+      e.preventDefault();
+      this.buffer = this.buffer.slice(this.cursor);
+      this.cursor = 0;
+      this._renderBuffer();
+      return;
+    }
+    // ── Ctrl+K — Zeile ab Cursor löschen ──
+    if (e.ctrlKey && (e.key === "k" || e.key === "K")) {
+      e.preventDefault();
+      this.buffer = this.buffer.slice(0, this.cursor);
+      this._renderBuffer();
+      return;
+    }
+
     if (e.key === "Enter") {
       e.preventDefault();
       const cmd = this.buffer.trim();
-      // Echo der eingegebenen Zeile
       this._appendLine(`${this.prompt}${this.buffer}`, "in");
       if (cmd) {
         this.history.push(cmd);
         this.historyIndex = this.history.length;
       }
       this.buffer = "";
+      this.cursor = 0;
       this._renderBuffer();
-      // Special: clear / exit
       if (cmd === "clear" || cmd === "cls") {
         this.dom.output.innerHTML = "";
         return;
@@ -281,7 +337,6 @@ export class Terminal {
         this.close();
         return;
       }
-      // Submit via callback
       let result;
       try {
         result = this.onSubmit(cmd);
@@ -298,7 +353,46 @@ export class Terminal {
     }
     if (e.key === "Backspace") {
       e.preventDefault();
-      this.buffer = this.buffer.slice(0, -1);
+      if (this.cursor > 0) {
+        this.buffer = this.buffer.slice(0, this.cursor - 1) + this.buffer.slice(this.cursor);
+        this.cursor--;
+        this._renderBuffer();
+      }
+      return;
+    }
+    if (e.key === "Delete") {
+      e.preventDefault();
+      if (this.cursor < this.buffer.length) {
+        this.buffer = this.buffer.slice(0, this.cursor) + this.buffer.slice(this.cursor + 1);
+        this._renderBuffer();
+      }
+      return;
+    }
+    if (e.key === "ArrowLeft") {
+      e.preventDefault();
+      if (this.cursor > 0) {
+        this.cursor--;
+        this._renderBuffer();
+      }
+      return;
+    }
+    if (e.key === "ArrowRight") {
+      e.preventDefault();
+      if (this.cursor < this.buffer.length) {
+        this.cursor++;
+        this._renderBuffer();
+      }
+      return;
+    }
+    if (e.key === "Home") {
+      e.preventDefault();
+      this.cursor = 0;
+      this._renderBuffer();
+      return;
+    }
+    if (e.key === "End") {
+      e.preventDefault();
+      this.cursor = this.buffer.length;
       this._renderBuffer();
       return;
     }
@@ -307,6 +401,7 @@ export class Terminal {
       if (this.history.length === 0) return;
       this.historyIndex = Math.max(0, this.historyIndex - 1);
       this.buffer = this.history[this.historyIndex] || "";
+      this.cursor = this.buffer.length;
       this._renderBuffer();
       return;
     }
@@ -315,6 +410,7 @@ export class Terminal {
       if (this.history.length === 0) return;
       this.historyIndex = Math.min(this.history.length, this.historyIndex + 1);
       this.buffer = this.history[this.historyIndex] || "";
+      this.cursor = this.buffer.length;
       this._renderBuffer();
       return;
     }
@@ -328,9 +424,10 @@ export class Terminal {
       this._tryComplete();
       return;
     }
-    // Normale Zeichen
+    // Normale Zeichen — an Cursor-Position einfügen
     if (e.key.length === 1 && !e.ctrlKey && !e.metaKey) {
-      this.buffer += e.key;
+      this.buffer = this.buffer.slice(0, this.cursor) + e.key + this.buffer.slice(this.cursor);
+      this.cursor++;
       this._renderBuffer();
     }
   }
@@ -339,10 +436,16 @@ export class Terminal {
     if (!this.allowTabComplete.length) return;
     const prefix = this.buffer;
     if (!prefix) return;
-    const match = this.allowTabComplete.find((s) => s.startsWith(prefix));
-    if (match) {
-      this.buffer = match;
+    const matches = this.allowTabComplete.filter((s) => s.startsWith(prefix));
+    if (matches.length === 1) {
+      // Exakt eine Möglichkeit → auto-complete
+      this.buffer = matches[0];
+      this.cursor = this.buffer.length;
       this._renderBuffer();
+    } else if (matches.length > 1) {
+      // Mehrere Möglichkeiten → wie Bash: alle anzeigen, buffer unverändert
+      this._appendLine(`${this.prompt}${this.buffer}`, "in");
+      this._appendLine(matches.join("   "), "dim");
     }
   }
 
@@ -370,8 +473,8 @@ export class Terminal {
       .term-line.accent { color: ${t.accent}; }
       .term-line.success { color: ${t.promptColor}; font-weight: 600; }
       .term-prompt { color: ${t.promptColor}; }
-      .term-cursor::after { content: "▋"; color: ${t.text}; animation: term-blink 1s steps(1) infinite; }
-      @keyframes term-blink { 50% { opacity: 0; } }
+      .term-cursor-inline { display: inline-block; background: ${t.text}; color: ${t.bg}; min-width: 0.55em; animation: term-blink 1.1s steps(1) infinite; }
+      @keyframes term-blink { 50% { background: transparent; color: ${t.text}; } }
       .term-overlay ::selection { background: ${t.selBg}; }
     `;
     root.appendChild(style);

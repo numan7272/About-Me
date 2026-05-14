@@ -213,9 +213,24 @@ export class World {
     this.proximity.spawnEggGlows();
 
     // Click-Handler für klickbare Eggs (Router-Pentest, HQ-SQL-Lab)
-    import("./EggClickHandler.js").then(({ EggClickHandler }) => {
-      this.eggClickHandler = new EggClickHandler(this.game);
-    });
+    import("./EggClickHandler.js")
+      .then(({ EggClickHandler }) => {
+        this.eggClickHandler = new EggClickHandler(this.game);
+      })
+      .catch((err) => console.error("[World] EggClickHandler import failed:", err));
+
+    // Tap-to-Move (LoL-Style). Initial disabled — UI.js setzt enabled basierend
+    // auf controlMode-Setting.
+    Promise.all([
+      import("./TapToMoveController.js"),
+      import("../ui/controlMode.js"),
+    ])
+      .then(([{ TapToMoveController }, { getControlMode }]) => {
+        this.tapToMove = new TapToMoveController(this.game);
+        // Re-apply Mode jetzt wo TapToMove existiert (UI-Init lief vorher).
+        this.game.ui?._applyControlMode?.(getControlMode());
+      })
+      .catch((err) => console.error("[World] TapToMoveController import failed:", err));
   }
 
   update() {
@@ -230,6 +245,7 @@ export class World {
     if (this.grass?.update) this.grass.update();
     if (this.ocean?.update) this.ocean.update();
     if (this.player?.update) this.player.update();
+    if (this.tapToMove?.update) this.tapToMove.update();
     if (this.proximity?.update) this.proximity.update();
     if (this.stationLabels?.update) this.stationLabels.update();
     if (this.colliderDebug?.update) this.colliderDebug.update();
@@ -244,6 +260,8 @@ export class World {
     this.player?.destroy?.();
     this.island?.destroy?.();
     this.proximity?.destroy?.();
+    this.eggClickHandler?.destroy?.();   // fixed: war geleakt
+    this.tapToMove?.destroy?.();          // fixed: war geleakt
     this.dayCycle?.destroy?.();
     this.wind?.destroy?.();
     this.stationLabels?.destroy?.();

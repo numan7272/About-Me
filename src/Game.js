@@ -120,9 +120,21 @@ export class Game {
     const res = this.world?.resources;
     if (!res) return;
 
+    // Übersetzung der Resource-Namen ins Deutsche damit der Loading-Text
+    // nicht "Lädt island" sondern "Lädt Insel" zeigt.
+    const RES_NAME_DE = {
+      island: "Insel",
+      bike:   "Fahrrad",
+      ocean:  "Ozean",
+      grass:  "Gras",
+      sky:    "Himmel",
+      world:  "Welt",
+    };
+
     res.on?.("progress", (name, ratio) => {
       const lang = (typeof window !== "undefined" && window.__lang) || "de";
-      const msg = lang === "en" ? `Loading ${name}` : `Lädt ${name}`;
+      const displayName = lang === "en" ? name : (RES_NAME_DE[name] || name);
+      const msg = lang === "en" ? `Loading ${displayName}` : `Lädt ${displayName}`;
       this.splash.setProgress(ratio, msg);
     });
 

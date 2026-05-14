@@ -69,6 +69,13 @@ export class Player {
     // kalibriert. Fallback: +Z (Standard-Three.js-Convention).
     this._forwardLocal = new THREE.Vector3(0, 0, 1);
 
+    // Tap-to-Move-Target (LoL-Style). Wenn gesetzt, fährt das Bike autonom
+    // dorthin. Wird vom TapToMoveController.js gesetzt + bei Erreichen gecleart.
+    // Form: { x, z } in Welt-Koordinaten.
+    this._tapTarget = null;
+    this._TAP_ARRIVE_RADIUS = 1.2;   // wie nahe = "angekommen"
+    this._TAP_SLOW_RADIUS = 4.0;     // ab da fängt Bike an zu bremsen
+
     // Setup body sobald Physics ready
     if (this.physics.ready) {
       this._setupBody();
@@ -80,6 +87,17 @@ export class Player {
   setBikeModel(model) {
     this.bikeModel = model;
     this._setupVisual();
+  }
+
+  /** Tap-to-Move (LoL-Style): Bike fährt autonom zum Welt-Punkt {x,z}.
+   *  Übersteuert Joystick/Keyboard solange aktiv. Wird gecleart wenn das
+   *  Bike den Punkt erreicht oder Joystick/WASD-Input kommt. */
+  setTapTarget(x, z) {
+    this._tapTarget = { x, z };
+  }
+
+  clearTapTarget() {
+    this._tapTarget = null;
   }
 
   _setupBody() {
@@ -168,6 +186,52 @@ export class Player {
     const joy = this.game?.ui?.touchJoystick?.input;
     const joyActive = !!joy?.active && joy.magnitude > 0.05;
 
+    // ── Tap-to-Move-Target (LoL-Style) ──
+    // Wenn ein Tap-Target gesetzt ist UND weder Joystick noch WASD aktiv:
+    // virtueller Joystick-Input Richtung Target. WASD/Joystick übersteuern.
+    let tapInput = null;   // { x, y, magnitude } analog joy
+    if (this._tapTarget && !joyActive && !(k.forward || k.backward || k.left || k.right)) {
+      const curT = this.body.translation();
+      const dx = this._tapTarget.x - curT.x;
+      const dz = this._tapTarget.z - curT.z;
+      const dist = Math.hypot(dx, dz);
+      if (dist < this._TAP_ARRIVE_RADIUS) {
+        // Angekommen — Target clearen
+        this._tapTarget = null;
+      } else {
+        // Throttle: in der Nähe abbremsen für sanftes Stoppen
+        const throttle = Math.min(1, dist / this._TAP_SLOW_RADIUS);
+        const nx = (dx / dist);
+        const nz = (dz / dist);
+        // Joystick-Konvention: y = camForward-Komponente, x = camRight-Komponente.
+        // Aber Tap-Target liegt direkt in Welt-Koordinaten — wir müssen ins
+        // camera-relative System konvertieren.
+        const cam = this.game.cameraRig?.camera;
+        let camFwdX = 0, camFwdZ = 1;
+        if (cam) {
+          const v = new THREE.Vector3();
+          cam.getWorldDirection(v);
+          v.y = 0;
+          const len = Math.hypot(v.x, v.z) || 1;
+          camFwdX = v.x / len;
+          camFwdZ = v.z / len;
+        }
+        const camRightX = -camFwdZ;
+        const camRightZ =  camFwdX;
+        // Heading-Welt-Vektor (nx, nz) → cam-relative (jx, jy)
+        const jx = nx * camRightX + nz * camRightZ;
+        const jy = nx * camFwdX   + nz * camFwdZ;
+        tapInput = { x: jx, y: jy, magnitude: throttle };
+      }
+    }
+    // Tap-Modus wird als Joystick-Pfad behandelt — wir injecten in den joy-Pfad:
+    const effectiveJoy = joyActive ? joy : (tapInput || null);
+    const effectiveJoyActive = joyActive || !!tapInput;
+    // Wenn WASD aktiv → Tap-Target abbrechen
+    if ((k.forward || k.backward || k.left || k.right) && this._tapTarget) {
+      this._tapTarget = null;
+    }
+
     // ── Inputs interpretieren (Keyboard-Fallback) ──
     const fwdIn = (k.forward ? 1 : 0) - (k.backward ? 1 : 0);
     const turnIn = (k.left ? 1 : 0) - (k.right ? 1 : 0);
@@ -179,7 +243,8 @@ export class Player {
     // man's jeden Frame, kann man während des Fahrens nicht draggen.
     // (Tour-Cinematic bricht NICHT mehr durch WASD ab — Tour-Sperre oben
     // verhindert dass dieser Zweig während Tour erreicht wird.)
-    const anyInput = k.forward || k.backward || k.left || k.right || joyActive;
+    const anyInput = k.forward || k.backward || k.left || k.right
+                     || joyActive || !!this._tapTarget;
     if (anyInput && !this._wasAnyInput && this.game.cameraRig) {
       this.game.cameraRig.followMode = true;
     }
@@ -225,8 +290,9 @@ export class Player {
 
     let targetVx, targetVz, angY;
 
-    if (joyActive) {
-      // ── JOYSTICK = Heading-Vector camera-relative ──
+    if (effectiveJoyActive) {
+      // ── JOYSTICK oder TAP-TARGET = Heading-Vector camera-relative ──
+      const joy = effectiveJoy;   // shadowing für minimal-invasive Änderung
       const cam = this.game.cameraRig?.camera;
       let camForwardX = 0, camForwardZ = 1;
       if (cam) {

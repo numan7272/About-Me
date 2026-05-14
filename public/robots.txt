@@ -6,5 +6,29 @@ Allow: /
 # Composer/Dev-Hilfsseiten nicht indexieren
 Disallow: /og-composer.html
 
+# Social-Preview-Crawler — explizit alles erlauben (Best-Practice)
+# damit Link-Previews in WhatsApp / Slack / LinkedIn / Discord etc. zuverlässig
+# das og-image.png lesen können.
+User-agent: facebookexternalhit
+Allow: /
+
+User-agent: Twitterbot
+Allow: /
+
+User-agent: LinkedInBot
+Allow: /
+
+User-agent: Slackbot-LinkExpanding
+Allow: /
+
+User-agent: Discordbot
+Allow: /
+
+User-agent: TelegramBot
+Allow: /
+
+User-agent: WhatsApp
+Allow: /
+
 # Verweis auf Sitemap
 Sitemap: https://numan-yesil.com/sitemap.xml

@@ -351,6 +351,36 @@ export class NumanOS {
       .nos-traffic-close { background: #ff5f57; }
       .nos-traffic-min   { background: #ffbd2e; }
       .nos-traffic-max   { background: #28c93f; }
+      .nos-traffic-btn {
+        display: inline-flex; align-items: center; justify-content: center;
+        font-size: 9px; font-weight: 700;
+        color: rgba(0,0,0,0); line-height: 1;
+        user-select: none;
+        transition: color 100ms;
+      }
+      .nos-traffic:hover .nos-traffic-btn { color: rgba(0,0,0,0.5); }
+
+      /* Resize-Handles */
+      .nos-resize-handle {
+        position: absolute;
+        z-index: 10;
+      }
+      .nos-resize-n { top: -3px; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
+      .nos-resize-s { bottom: -3px; left: 8px; right: 8px; height: 6px; cursor: ns-resize; }
+      .nos-resize-e { top: 8px; right: -3px; bottom: 8px; width: 6px; cursor: ew-resize; }
+      .nos-resize-w { top: 8px; left: -3px; bottom: 8px; width: 6px; cursor: ew-resize; }
+      .nos-resize-ne { top: -3px; right: -3px; width: 12px; height: 12px; cursor: nesw-resize; }
+      .nos-resize-nw { top: -3px; left: -3px; width: 12px; height: 12px; cursor: nwse-resize; }
+      .nos-resize-se { bottom: -3px; right: -3px; width: 12px; height: 12px; cursor: nwse-resize; }
+      .nos-resize-sw { bottom: -3px; left: -3px; width: 12px; height: 12px; cursor: nesw-resize; }
+
+      /* Minimized State — slidet ins Dock */
+      .nos-win-minimized {
+        transform: scale(0.05) translateY(800px) !important;
+        opacity: 0 !important;
+        pointer-events: none;
+        transition: transform 280ms ease, opacity 220ms;
+      }
       .nos-win-title {
         flex: 1; text-align: center; font-size: 13px;
         opacity: 0.85; font-weight: 500;
@@ -740,9 +770,13 @@ export class NumanOS {
 
   // ── Window-Management ─────────────────────────────────────────────
   _openWindow(id, contentNode) {
-    // Wenn schon offen → in den Vordergrund holen + return
+    // Wenn schon offen → in den Vordergrund + ggf. aus Minimized-Mode holen
     const existing = this.windowStack.find((w) => w.id === id);
     if (existing) {
+      if (existing.minimized) {
+        existing.el.classList.remove("nos-win-minimized");
+        existing.minimized = false;
+      }
       existing.el.style.zIndex = String(++this.zCounter);
       return;
     }
@@ -771,9 +805,9 @@ export class NumanOS {
     win.innerHTML = `
       <div class="nos-win-titlebar">
         <div class="nos-traffic">
-          <div class="nos-traffic-btn nos-traffic-close" data-action="close"></div>
-          <div class="nos-traffic-btn nos-traffic-min"></div>
-          <div class="nos-traffic-btn nos-traffic-max"></div>
+          <div class="nos-traffic-btn nos-traffic-close" data-action="close" title="Close">×</div>
+          <div class="nos-traffic-btn nos-traffic-min" data-action="minimize" title="Minimize">−</div>
+          <div class="nos-traffic-btn nos-traffic-max" data-action="maximize" title="Maximize">+</div>
         </div>
         <div class="nos-win-title">${title}</div>
         <div style="width:54px;"></div>
@@ -785,13 +819,44 @@ export class NumanOS {
     body.appendChild(contentNode);
     win.appendChild(body);
 
+    // ── Resize-Handles (4 Ecken + 4 Kanten) ──
+    for (const dir of ["n","s","e","w","ne","nw","se","sw"]) {
+      const h = document.createElement("div");
+      h.className = `nos-resize-handle nos-resize-${dir}`;
+      win.appendChild(h);
+      this._makeResizable(win, h, dir);
+    }
+
     // Drag-functionality auf titlebar
     const titlebar = win.querySelector(".nos-win-titlebar");
     this._makeDraggable(win, titlebar);
 
+    // Window-State (für Min/Max/Restore)
+    const winRef = { el: win, id, prevState: null, minimized: false, maximized: false };
+
     // Close-Button
     titlebar.querySelector("[data-action='close']")
-      .addEventListener("click", () => this._closeWindow({ el: win, id }));
+      .addEventListener("click", (e) => {
+        e.stopPropagation();
+        this._closeWindow(winRef);
+      });
+    // Minimize-Button (zum Dock)
+    titlebar.querySelector("[data-action='minimize']")
+      .addEventListener("click", (e) => {
+        e.stopPropagation();
+        this._minimizeWindow(winRef);
+      });
+    // Maximize/Restore-Button
+    titlebar.querySelector("[data-action='maximize']")
+      .addEventListener("click", (e) => {
+        e.stopPropagation();
+        this._toggleMaximize(winRef);
+      });
+    // Doppelklick auf Titlebar = Maximize
+    titlebar.addEventListener("dblclick", (e) => {
+      if (e.target.closest(".nos-traffic")) return;
+      this._toggleMaximize(winRef);
+    });
 
     // Bring to front beim Klick irgendwo aufs Window
     win.addEventListener("mousedown", () => {
@@ -800,7 +865,85 @@ export class NumanOS {
 
     this.dom.area.appendChild(win);
     requestAnimationFrame(() => win.classList.add("shown"));
-    this.windowStack.push({ el: win, id });
+    this.windowStack.push(winRef);
+  }
+
+  _minimizeWindow(winRef) {
+    if (winRef.minimized) {
+      // Restore
+      winRef.el.classList.remove("nos-win-minimized");
+      winRef.minimized = false;
+    } else {
+      winRef.el.classList.add("nos-win-minimized");
+      winRef.minimized = true;
+    }
+  }
+
+  _toggleMaximize(winRef) {
+    const el = winRef.el;
+    if (winRef.maximized) {
+      // Restore
+      const p = winRef.prevState;
+      if (p) {
+        el.style.left = p.left;
+        el.style.top = p.top;
+        el.style.width = p.width;
+        el.style.height = p.height;
+      }
+      winRef.maximized = false;
+      winRef.prevState = null;
+    } else {
+      winRef.prevState = {
+        left: el.style.left, top: el.style.top,
+        width: el.style.width, height: el.style.height,
+      };
+      const area = this.dom.area;
+      el.style.left = "0px";
+      el.style.top = "0px";
+      el.style.width = area.clientWidth + "px";
+      el.style.height = area.clientHeight + "px";
+      winRef.maximized = true;
+    }
+  }
+
+  _makeResizable(win, handle, dir) {
+    let startX = 0, startY = 0, startW = 0, startH = 0, startL = 0, startT = 0;
+    let resizing = false;
+    const onDown = (e) => {
+      // Nicht resizen wenn Fenster maximized ist
+      const rect = win.getBoundingClientRect();
+      startX = e.clientX; startY = e.clientY;
+      startW = rect.width; startH = rect.height;
+      startL = parseInt(win.style.left, 10) || 0;
+      startT = parseInt(win.style.top, 10) || 0;
+      resizing = true;
+      e.preventDefault(); e.stopPropagation();
+      win.style.zIndex = String(++this.zCounter);
+    };
+    const onMove = (e) => {
+      if (!resizing) return;
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      let newW = startW, newH = startH, newL = startL, newT = startT;
+      if (dir.includes("e")) newW = Math.max(280, startW + dx);
+      if (dir.includes("s")) newH = Math.max(180, startH + dy);
+      if (dir.includes("w")) {
+        newW = Math.max(280, startW - dx);
+        newL = startL + (startW - newW);
+      }
+      if (dir.includes("n")) {
+        newH = Math.max(180, startH - dy);
+        newT = startT + (startH - newH);
+      }
+      win.style.left = newL + "px";
+      win.style.top = newT + "px";
+      win.style.width = newW + "px";
+      win.style.height = newH + "px";
+    };
+    const onUp = () => { resizing = false; };
+    handle.addEventListener("mousedown", onDown);
+    document.addEventListener("mousemove", onMove);
+    document.addEventListener("mouseup", onUp);
   }
 
   _closeWindow(winRef) {
@@ -910,8 +1053,18 @@ export class NumanOS {
     wrap.innerHTML = `<div class="nos-term-output"></div>`;
     const output = wrap.querySelector(".nos-term-output");
     const inputLine = document.createElement("div");
-    inputLine.innerHTML = `<span class="nos-term-prompt">numan@dev ~ $</span> <input class="nos-term-input" autocomplete="off" spellcheck="false" autocapitalize="off">`;
+    inputLine.innerHTML = `<span class="nos-term-prompt">numan@dev:~$</span> <input class="nos-term-input" autocomplete="off" spellcheck="false" autocapitalize="off" autocorrect="off">`;
     wrap.appendChild(inputLine);
+
+    // ── Bash-History für ↑/↓ ──
+    const history = [];
+    let historyIndex = -1;
+    // ── Tab-Completion-Vokabular (lokale Sandbox-Commands) ──
+    const completionVocab = [
+      "help", "whoami", "uname -a", "uname -r", "uname -m", "uname -n",
+      "pwd", "ls", "cat README.txt", "cat TODO_fix_sql_injection.txt",
+      "history", "date", "clear", "exit", "echo",
+    ];
 
     for (const line of TERMINAL_BANNER) {
       const l = document.createElement("div");
@@ -931,23 +1084,88 @@ export class NumanOS {
     };
 
     input.addEventListener("keydown", (e) => {
+      // ── Ctrl+C — abbrechen ──
+      if (e.ctrlKey && (e.key === "c" || e.key === "C")) {
+        e.preventDefault();
+        printLine(`numan@dev:~$ ${input.value}^C`);
+        input.value = "";
+        return;
+      }
+      // ── Ctrl+L — clear ──
+      if (e.ctrlKey && (e.key === "l" || e.key === "L")) {
+        e.preventDefault();
+        output.innerHTML = "";
+        return;
+      }
+      // ── ↑/↓ History ──
+      if (e.key === "ArrowUp") {
+        e.preventDefault();
+        if (history.length === 0) return;
+        historyIndex = Math.max(0, historyIndex - 1);
+        input.value = history[historyIndex] || "";
+        // Cursor ans Ende
+        setTimeout(() => { input.selectionStart = input.selectionEnd = input.value.length; }, 0);
+        return;
+      }
+      if (e.key === "ArrowDown") {
+        e.preventDefault();
+        if (history.length === 0) return;
+        historyIndex = Math.min(history.length, historyIndex + 1);
+        input.value = history[historyIndex] || "";
+        setTimeout(() => { input.selectionStart = input.selectionEnd = input.value.length; }, 0);
+        return;
+      }
+      // ── Tab — Completion ──
+      if (e.key === "Tab") {
+        e.preventDefault();
+        const prefix = input.value;
+        if (!prefix) return;
+        const matches = completionVocab.filter((s) => s.startsWith(prefix));
+        if (matches.length === 1) {
+          input.value = matches[0];
+        } else if (matches.length > 1) {
+          // mehrere → wie Bash: alle anzeigen
+          printLine(`numan@dev:~$ ${prefix}`);
+          printLine(matches.join("   "));
+        }
+        return;
+      }
       if (e.key !== "Enter") return;
       const cmd = input.value.trim();
-      printLine(`numan@dev ~ $ ${cmd}`);
+      printLine(`numan@dev:~$ ${cmd}`);
       input.value = "";
+      if (cmd) {
+        history.push(cmd);
+        historyIndex = history.length;
+      }
       if (!cmd) return;
       const parts = cmd.split(/\s+/);
-      const main = parts[0];
+      const main = (parts[0] || "").toLowerCase();
       const arg = parts.slice(1).join(" ");
+      const flags = parts.slice(1).join(" ");
       if (cmd === "clear" || cmd === "cls") { output.innerHTML = ""; return; }
-      if (cmd === "exit" || cmd === "quit") {
+      if (main === "exit" || main === "quit") {
         printLine("logout");
         const win = this.windowStack.find((w) => w.id === "terminal");
         if (win) setTimeout(() => this._closeWindow(win), 380);
         return;
       }
       if (main === "uname") {
-        printLine("Darwin numan-dev 22.6.0 arm64");
+        // -a → alle Felder. Ohne flag → nur "Darwin".
+        if (flags.includes("-a")) {
+          printLine("Darwin numan-dev 23.5.0 Darwin Kernel Version 23.5.0: " +
+                    "root:xnu-10063.121.3~5/RELEASE_ARM64_T8112 arm64");
+        } else if (flags.includes("-r")) {
+          printLine("23.5.0");
+        } else if (flags.includes("-m")) {
+          printLine("arm64");
+        } else if (flags.includes("-n")) {
+          printLine("numan-dev");
+        } else if (flags.includes("-s") || !flags) {
+          printLine("Darwin");
+        } else {
+          printLine("usage: uname [-amnprsv]");
+        }
         return;
       }
       if (main === "cat") {

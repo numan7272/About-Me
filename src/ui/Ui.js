@@ -15,6 +15,9 @@ import { BottomDrawer } from "./walkthrough/BottomDrawer.js";
 import { WalkthroughController } from "./walkthrough/WalkthroughController.js";
 import { TouchJoystick } from "./TouchJoystick.js";
 import { MiniGames } from "./miniGames/MiniGames.js";
+import { BuildingsHint } from "./BuildingsHint.js";
+import { ControlModePicker } from "./ControlModePicker.js";
+import { getControlMode, subscribeControlMode } from "./controlMode.js";
 
 // InfoCard ist aktuell deaktiviert — Walkthrough nutzt BottomDrawer.
 // import { InfoCard } from "./InfoCard.js";
@@ -45,7 +48,31 @@ export class Ui {
     // Easter-Egg Mini-Games (Router-Pentest, SQL-Injection-Lab)
     // Lazy: lädt JS erst beim Egg-Click → schneller First-Paint.
     this.miniGames = new MiniGames(game);
+
+    // One-Time-Toast "Gebäude sind anklickbar"
+    this.buildingsHint = new BuildingsHint(game);
+
+    // Tutorial-Overlay: Joystick vs Tap-to-Move (nur Mobile, einmalig)
+    this.controlPicker = new ControlModePicker(game);
+
+    // Apply initial mode + subscribe für Live-Wechsel aus Settings
+    this._applyControlMode(getControlMode());
+    this._unsubControl = subscribeControlMode((m) => this._applyControlMode(m));
     // this.infoCard = new InfoCard(game);   // deaktiviert
+  }
+
+  /** Joystick / TapToMove je nach Modus an- oder ausschalten. */
+  _applyControlMode(mode) {
+    const tap = this.game?.world?.tapToMove;
+    if (mode === "tap") {
+      this.touchJoystick?.setVisible?.(false);
+      tap?.setEnabled?.(true);
+    } else {
+      // Joystick-Sichtbarkeit übernimmt TouchJoystick selbst basierend auf
+      // Touch-Device-Detection. Wir setzen nur "force-hide off".
+      this.touchJoystick?.setVisible?.(true);
+      tap?.setEnabled?.(false);
+    }
   }
 
   update() {
@@ -74,5 +101,8 @@ export class Ui {
     this.drawer?.destroy?.();
     this.touchJoystick?.destroy?.();
     this.miniGames?.destroy?.();
+    this.buildingsHint?.destroy?.();
+    this.controlPicker?.destroy?.();
+    this._unsubControl?.();
   }
 }

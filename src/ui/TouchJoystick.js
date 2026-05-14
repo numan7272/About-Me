@@ -207,15 +207,17 @@ export class TouchJoystick {
     window.addEventListener("pointerup", this._onPointerUp);
     window.addEventListener("pointercancel", this._onPointerUp);
 
-    // Tab-Blur: Geste komplett zurücksetzen
+    // Tab-Blur: Geste komplett zurücksetzen — Refs für sauberen Cleanup speichern
     this._onBlur = () => this._endGesture();
-    window.addEventListener("blur", this._onBlur);
-    document.addEventListener("visibilitychange", () => {
+    this._onVisibilityChange = () => {
       if (document.hidden) this._endGesture();
-    });
+    };
+    window.addEventListener("blur", this._onBlur);
+    document.addEventListener("visibilitychange", this._onVisibilityChange);
   }
 
   _endGesture() {
+    const hadGesture = this.input.active || this._controlsWasEnabled !== undefined;
     this.input.active = false;
     this.input.x = 0;
     this.input.y = 0;
@@ -227,11 +229,17 @@ export class TouchJoystick {
       }
     }
     this._applyToInputs(0, 0);
-    // OrbitControls wieder aktivieren
-    const controls = this.game?.cameraRig?.controls;
-    if (controls && this._controlsWasEnabled !== undefined) {
-      controls.enabled = this._controlsWasEnabled;
-      this._controlsWasEnabled = undefined;
+    // OrbitControls NUR reaktivieren wenn wir sie auch deaktiviert haben.
+    // Sonst überschreiben wir andere UI-Code-Pfade (Mini-Games, Settings) die
+    // OrbitControls aus eigenen Gründen aus haben.
+    if (hadGesture) {
+      const controls = this.game?.cameraRig?.controls;
+      if (controls) {
+        controls.enabled = (this._controlsWasEnabled !== undefined)
+          ? this._controlsWasEnabled
+          : true;
+        this._controlsWasEnabled = undefined;
+      }
     }
   }
 
@@ -392,6 +400,25 @@ export class TouchJoystick {
   }
 
   destroy() {
+    // Alle Event-Listener entfernen (vorher leakten window-level pointer-Events)
+    const canvas = this.game?.canvas;
+    if (canvas && this._onPointerDown) {
+      canvas.removeEventListener("pointerdown", this._onPointerDown);
+    }
+    if (this._onPointerMove) {
+      window.removeEventListener("pointermove", this._onPointerMove);
+    }
+    if (this._onPointerUp) {
+      window.removeEventListener("pointerup", this._onPointerUp);
+      window.removeEventListener("pointercancel", this._onPointerUp);
+    }
+    if (this._onBlur) {
+      window.removeEventListener("blur", this._onBlur);
+    }
+    if (this._onVisibilityChange) {
+      document.removeEventListener("visibilitychange", this._onVisibilityChange);
+    }
+
     this.scene?.remove?.(this.group);
     this.outerRing?.geometry?.dispose?.();
     this.outerRing?.material?.dispose?.();
@@ -401,6 +428,5 @@ export class TouchJoystick {
     }
     this.captureDisc?.geometry?.dispose?.();
     this.captureDisc?.material?.dispose?.();
-    window.removeEventListener("blur", this._onBlur);
   }
 }

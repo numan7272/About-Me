@@ -358,9 +358,27 @@ export class WalkthroughController {
       fontSize: "14px",
       lineHeight: "1.55",
       color: "rgba(220, 230, 240, 0.85)",
-      marginBottom: "26px",
+      marginBottom: "18px",
     });
     card.appendChild(body);
+
+    // Hint-Box: Buildings sind anklickbar — kleiner Tipp damit Recruiter es
+    // entdecken. Sichtbar im Welcome-Overlay UND beim Wieder-Sehen der Tour.
+    const hintBox = document.createElement("div");
+    hintBox.innerHTML = lang === "en"
+      ? "💡 Tip: each building is clickable — try it after the tour."
+      : "💡 Tipp: Jedes Gebäude ist anklickbar — probier's nach der Tour.";
+    Object.assign(hintBox.style, {
+      padding: "10px 12px",
+      background: "rgba(126, 200, 255, 0.08)",
+      border: "1px solid rgba(126, 200, 255, 0.22)",
+      borderRadius: "8px",
+      fontSize: "12px",
+      lineHeight: "1.5",
+      color: "rgba(220, 235, 250, 0.85)",
+      marginBottom: "20px",
+    });
+    card.appendChild(hintBox);
 
     const btnRow = document.createElement("div");
     Object.assign(btnRow.style, {
@@ -504,7 +522,8 @@ export class WalkthroughController {
     btn.appendChild(icon);
 
     const label = document.createElement("span");
-    label.textContent = this._lang() === "en" ? "Tour" : "Tour";
+    // "Tour" ist in DE und EN das gleiche Wort — bewusst keine Übersetzung.
+    label.textContent = "Tour";
     btn.appendChild(label);
 
     btn.addEventListener("mouseenter", () => {

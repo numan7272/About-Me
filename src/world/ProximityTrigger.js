@@ -106,10 +106,11 @@ export class ProximityTrigger {
       registerMesh(e.id, e.mesh);
     }
 
-    // HQ-Building (kein Egg, aber als Click-Target registriert für NumanOS)
-    const hq = (island.buildings || []).find((b) => b.id === "HQ");
-    if (hq?.mesh) {
-      registerMesh("HQ", hq.mesh);
+    // Alle klickbaren Buildings registrieren — jedes öffnet sein eigenes Mini-Game.
+    const CLICKABLE_BUILDINGS = ["HQ", "Designa", "HAW", "THG", "Yek"];
+    for (const bid of CLICKABLE_BUILDINGS) {
+      const b = (island.buildings || []).find((x) => x.id === bid);
+      if (b?.mesh) registerMesh(bid, b.mesh);
     }
 
     console.log(`[Proximity] registered ${this.eggMeshes.size} clickable meshes`);
