@@ -266,6 +266,264 @@ export class ContactPanel {
       textAlign: "center",
     });
     this.panel.appendChild(footer);
+
+    // ── Impressum-Link (§5 TMG) ──
+    const legal = document.createElement("button");
+    legal.type = "button";
+    legal.textContent = this._lang() === "en" ? "Imprint" : "Impressum";
+    Object.assign(legal.style, {
+      marginTop: "6px",
+      padding: "4px 8px",
+      background: "transparent",
+      border: "none",
+      color: "rgba(140, 160, 180, 0.65)",
+      fontSize: "11px",
+      letterSpacing: "0.04em",
+      cursor: "pointer",
+      textDecoration: "underline",
+      textUnderlineOffset: "3px",
+      alignSelf: "center",
+    });
+    legal.addEventListener("mouseenter", () => {
+      legal.style.color = "rgba(200, 220, 240, 0.85)";
+    });
+    legal.addEventListener("mouseleave", () => {
+      legal.style.color = "rgba(140, 160, 180, 0.65)";
+    });
+    legal.addEventListener("click", () => this._openImprint());
+    this.panel.appendChild(legal);
+  }
+
+  /**
+   * Impressum nach §5 TMG.
+   * TODO vor Deploy: ladungsfähige Anschrift (Straße + PLZ) eintragen —
+   * ohne diese ist das Impressum nicht rechtskonform.
+   */
+  _openImprint() {
+    if (this._imprintOverlay) {
+      this._imprintOverlay.remove();
+      this._imprintOverlay = null;
+    }
+
+    const overlay = document.createElement("div");
+    Object.assign(overlay.style, {
+      position: "fixed",
+      inset: "0",
+      zIndex: String(Z_INDEX_PANEL + 2),
+      background: "rgba(4, 8, 16, 0.72)",
+      backdropFilter: "blur(8px)",
+      WebkitBackdropFilter: "blur(8px)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      padding: "20px",
+      opacity: "0",
+      transition: "opacity 0.2s",
+    });
+
+    const card = document.createElement("div");
+    Object.assign(card.style, {
+      position: "relative",
+      maxWidth: "560px",
+      width: "100%",
+      maxHeight: "85vh",
+      overflowY: "auto",
+      background: "rgba(10, 18, 32, 0.96)",
+      border: "1px solid rgba(126, 200, 255, 0.25)",
+      borderRadius: "14px",
+      padding: "32px 32px 28px 32px",
+      color: "rgba(235, 245, 255, 0.92)",
+      fontFamily: "system-ui, -apple-system, sans-serif",
+      fontSize: "13px",
+      lineHeight: "1.6",
+      boxShadow: "0 20px 60px rgba(0, 0, 0, 0.6)",
+    });
+
+    const closeBtn = document.createElement("button");
+    closeBtn.innerHTML = "&times;";
+    closeBtn.setAttribute("aria-label", "Close");
+    Object.assign(closeBtn.style, {
+      position: "absolute",
+      top: "12px",
+      right: "12px",
+      width: "32px",
+      height: "32px",
+      borderRadius: "50%",
+      border: "1px solid rgba(255, 255, 255, 0.14)",
+      background: "rgba(255, 255, 255, 0.05)",
+      color: "rgba(220, 230, 240, 0.85)",
+      fontSize: "20px",
+      cursor: "pointer",
+      lineHeight: "1",
+    });
+    closeBtn.addEventListener("click", () => closeImprint());
+    card.appendChild(closeBtn);
+
+    const isEn = this._lang() === "en";
+
+    const title = document.createElement("h2");
+    title.textContent = isEn ? "Imprint" : "Impressum";
+    Object.assign(title.style, {
+      fontSize: "22px",
+      fontWeight: "700",
+      margin: "0 0 4px 0",
+      color: "rgba(245, 250, 255, 0.98)",
+    });
+    card.appendChild(title);
+
+    const sub = document.createElement("div");
+    sub.textContent = isEn
+      ? "Information according to §5 TMG (German Telemedia Act)"
+      : "Angaben gemäß §5 TMG";
+    Object.assign(sub.style, {
+      fontSize: "11px",
+      color: "rgba(126, 200, 255, 0.75)",
+      letterSpacing: "0.06em",
+      textTransform: "uppercase",
+      marginBottom: "20px",
+    });
+    card.appendChild(sub);
+
+    const section = (heading, lines) => {
+      const h = document.createElement("div");
+      h.textContent = heading;
+      Object.assign(h.style, {
+        fontSize: "12px",
+        fontWeight: "700",
+        letterSpacing: "0.04em",
+        textTransform: "uppercase",
+        color: "rgba(170, 200, 230, 0.7)",
+        marginTop: "16px",
+        marginBottom: "6px",
+      });
+      card.appendChild(h);
+      const body = document.createElement("div");
+      lines.forEach((l, i) => {
+        const row = document.createElement("div");
+        row.textContent = l;
+        if (i === 0) row.style.fontWeight = "600";
+        body.appendChild(row);
+      });
+      card.appendChild(body);
+    };
+
+    // Verantwortlich / Responsible
+    section(isEn ? "Responsible for content" : "Verantwortlich für den Inhalt", [
+      "Numan Yesil",
+      "[Straße und Hausnummer]",
+      "[PLZ] Kiel",
+      isEn ? "Germany" : "Deutschland",
+    ]);
+
+    // Kontakt
+    section(isEn ? "Contact" : "Kontakt", [
+      `E-Mail: ${CONTACT.email}`,
+    ]);
+
+    // Verantwortlich nach §18 Abs. 2 MStV (für journalistisch-redaktionelle Inhalte)
+    section(
+      isEn
+        ? "Responsible under §18 (2) MStV"
+        : "Verantwortlich nach §18 Abs. 2 MStV",
+      [
+        "Numan Yesil",
+        "[Adresse wie oben]",
+      ]
+    );
+
+    // Haftungsausschluss
+    const disclaimerH = document.createElement("div");
+    disclaimerH.textContent = isEn ? "Disclaimer" : "Haftungsausschluss";
+    Object.assign(disclaimerH.style, {
+      fontSize: "12px",
+      fontWeight: "700",
+      letterSpacing: "0.04em",
+      textTransform: "uppercase",
+      color: "rgba(170, 200, 230, 0.7)",
+      marginTop: "20px",
+      marginBottom: "6px",
+    });
+    card.appendChild(disclaimerH);
+
+    const disclaimer = document.createElement("p");
+    disclaimer.textContent = isEn
+      ? "The contents of this site have been created with the greatest possible care. However, no guarantee can be given for the accuracy, completeness, or topicality of the content. External links lead to third-party websites; their operators are solely responsible for their content."
+      : "Die Inhalte dieser Seite wurden mit größtmöglicher Sorgfalt erstellt. Für die Richtigkeit, Vollständigkeit und Aktualität der Inhalte kann jedoch keine Gewähr übernommen werden. Externe Links führen zu Inhalten fremder Anbieter, für deren Inhalte ausschließlich die jeweiligen Betreiber verantwortlich sind.";
+    Object.assign(disclaimer.style, {
+      margin: "0 0 12px 0",
+      fontSize: "12px",
+      color: "rgba(200, 215, 230, 0.78)",
+    });
+    card.appendChild(disclaimer);
+
+    // Datenschutz-Hinweis
+    const privacyH = document.createElement("div");
+    privacyH.textContent = isEn ? "Privacy" : "Datenschutz";
+    Object.assign(privacyH.style, {
+      fontSize: "12px",
+      fontWeight: "700",
+      letterSpacing: "0.04em",
+      textTransform: "uppercase",
+      color: "rgba(170, 200, 230, 0.7)",
+      marginTop: "12px",
+      marginBottom: "6px",
+    });
+    card.appendChild(privacyH);
+
+    const privacy = document.createElement("p");
+    privacy.textContent = isEn
+      ? "This site does not use cookies, tracking, or third-party analytics. No personal data is collected, stored, or shared. Static assets are served via Vercel; standard server logs (IP, user agent, timestamp) may be processed by the hosting provider for operational purposes."
+      : "Diese Seite verwendet keine Cookies, kein Tracking und keine Third-Party-Analytics. Es werden keine personenbezogenen Daten erhoben, gespeichert oder weitergegeben. Statische Inhalte werden über Vercel ausgeliefert; übliche Server-Logs (IP, User-Agent, Zeitstempel) können vom Hosting-Provider zu Betriebszwecken verarbeitet werden.";
+    Object.assign(privacy.style, {
+      margin: "0",
+      fontSize: "12px",
+      color: "rgba(200, 215, 230, 0.78)",
+    });
+    card.appendChild(privacy);
+
+    const footerHint = document.createElement("div");
+    footerHint.textContent = isEn
+      ? "ESC to close"
+      : "ESC zum Schließen";
+    Object.assign(footerHint.style, {
+      marginTop: "22px",
+      fontSize: "10px",
+      color: "rgba(140, 160, 180, 0.5)",
+      textAlign: "center",
+      letterSpacing: "0.08em",
+      textTransform: "uppercase",
+    });
+    card.appendChild(footerHint);
+
+    overlay.appendChild(card);
+
+    const closeImprint = () => {
+      overlay.style.opacity = "0";
+      window.removeEventListener("keydown", onKey);
+      setTimeout(() => {
+        overlay.remove();
+        if (this._imprintOverlay === overlay) this._imprintOverlay = null;
+      }, 180);
+    };
+
+    const onKey = (e) => {
+      if (e.code === "Escape") {
+        e.preventDefault();
+        e.stopPropagation();
+        closeImprint();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+
+    overlay.addEventListener("click", (e) => {
+      if (e.target === overlay) closeImprint();
+    });
+
+    document.body.appendChild(overlay);
+    this._imprintOverlay = overlay;
+    requestAnimationFrame(() => {
+      overlay.style.opacity = "1";
+    });
   }
 
   _buildEmailRow() {
@@ -442,5 +700,7 @@ export class ContactPanel {
     this.btn?.remove?.();
     this.panel?.remove?.();
     this.backdrop?.remove?.();
+    this._imprintOverlay?.remove?.();
+    this._imprintOverlay = null;
   }
 }
