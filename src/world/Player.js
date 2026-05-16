@@ -314,16 +314,15 @@ export class Player {
       desZ /= desLen;
 
       // Desired Yaw via P-Controller.
-      // Wir wollen body-yaw so dass _forwardLocal.applyQuat(yaw) = des.
-      // Welt-Yaw eines Vektors (x,z): atan2(x, z).
-      // des hat Welt-Yaw atan2(desX, desZ).
-      // _forwardLocal bei body-yaw=0 hat Welt-Yaw atan2(_forwardLocal.x, _forwardLocal.z).
-      // Differenz = body-yaw der ihn dorthin rotiert.
+      // Aktuelle Welt-Yaw direkt aus dem schon-rotierten _tmpForward ableiten
+      // statt aus _tmpEuler — Euler-XYZ-Extraktion driftet bei kleinen
+      // Quaternion-Ungenauigkeiten, was zu einem steady-state Offset führt
+      // ("Bike lenkt nicht ganz zum Ziel"). atan2 vom Forward-Vektor ist
+      // exakt, weil _forwardLocal=(0,0,1) bereits durch die Body-Quat
+      // rotiert wurde.
       const desYawWorld = Math.atan2(desX, desZ);
-      const fwdYawLocal = Math.atan2(this._forwardLocal.x, this._forwardLocal.z);
-      const desiredYaw = desYawWorld - fwdYawLocal;
-      this._tmpEuler.setFromQuaternion(this._tmpQuat);
-      let dy = desiredYaw - this._tmpEuler.y;
+      const curYawWorld = Math.atan2(this._tmpForward.x, this._tmpForward.z);
+      let dy = desYawWorld - curYawWorld;
       while (dy >  Math.PI) dy -= Math.PI * 2;
       while (dy < -Math.PI) dy += Math.PI * 2;
 
