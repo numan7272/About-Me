@@ -333,31 +333,15 @@ export class TouchJoystick {
   /**
    * Joystick-State wird primär über this.input.x/y gelesen (Player.js).
    * Wir setzen keine fake-Keyboard-Tasten mehr — der Joystick-Pfad in
-   * Player.js ist explizit getrennt. Lediglich Brake wird forwarded für
-   * den Sonderfall "Finger sehr weit nach unten" → spürbares Bremsen.
+   * Player.js ist explizit getrennt. Brake passiert automatisch beim
+   * Loslassen (keine Velocity → Bike rollt aus). Ein "Finger nach unten
+   * = brake"-Override würde mit dem Heading-Vector-Konzept kollidieren:
+   * im Heading-Style ist "unten am Screen" eine Fahrt-Richtung, kein Stop.
    */
   _applyToInputs(nx, nz) {
     const inputs = this.game?.inputs;
     if (!inputs?.keys) return;
-
-    const mag = Math.hypot(nx, nz);
-    if (mag < DEAD_ZONE) {
-      inputs.keys.brake = false;
-      return;
-    }
-
-    // Backward = brake via deutliches Zurückziehen
-    inputs.keys.brake = nz < -0.7;
-    return;
-    // Alter Tank-Style-Code unten ist unreachable (return darüber).
-    // keinen Joystick-Input-Pfad hat. Sobald Player.js this.input.* liest,
-    // kann das hier deaktiviert werden.
-    inputs.keys.forward  = nz >  DEAD_ZONE * 0.5;
-    inputs.keys.backward = nz < -DEAD_ZONE * 0.5;
-    inputs.keys.left     = nx < -DEAD_ZONE * 0.5;
-    inputs.keys.right    = nx >  DEAD_ZONE * 0.5;
-    // Hartes Bremsen wenn Finger stark zurückgezogen
-    inputs.keys.brake    = nz < -0.7;
+    inputs.keys.brake = false;
   }
 
   /** Jeden Frame: Group dem Bike folgen lassen + cam-relative orientieren */
