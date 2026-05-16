@@ -270,8 +270,16 @@ export class TouchJoystick {
 
     // INVERTIERTER Z-Flip: Finger nach oben am Screen → outY > 0 (vorwärts).
     // Normalisierung gegen RING_R — bei diesem Radius = magnitude=1 (volle Auslenkung).
-    const nx = THREE.MathUtils.clamp(lx / RING_R, -1, 1);
-    const nz = THREE.MathUtils.clamp(-lz / RING_R, -1, 1);
+    // Wichtig: erst die *Magnitude* cappen, dann die Achsen. Achsen einzeln zu
+    // clampen verzerrt die Richtung außerhalb des Rings (Finger 30° vom Forward,
+    // weit gezogen → Joystick liest 45° = Diagonal-Snap-Bug).
+    let nx = lx / RING_R;
+    let nz = -lz / RING_R;
+    const rawMag = Math.hypot(nx, nz);
+    if (rawMag > 1) {
+      nx /= rawMag;
+      nz /= rawMag;
+    }
 
     const mag = Math.hypot(nx, nz);
     const dz  = DEAD_ZONE;
