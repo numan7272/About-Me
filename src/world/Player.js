@@ -333,8 +333,10 @@ export class Player {
       // Throttle = volle Leistung sobald der Joystick aus der Dead-Zone ist.
       // Wie auf PC mit W-Taste: kein analoges Skalieren. Heading-Alignment bleibt
       // damit das Bike bei seitlicher Richtung sanft in die Kurve geht (sonst
-      // schießt es in die alte Richtung weiter).
-      const alignment = 0.5 + 0.5 * Math.cos(dy);
+      // schießt es in die alte Richtung weiter). Floor bei 0.4 damit das Bike
+      // bei 90°/180°-Lenken nicht komplett zum Stillstand kommt — es soll
+      // während der Drehung weiter rollen.
+      const alignment = Math.max(0.4, 0.5 + 0.5 * Math.cos(dy));
       const targetSpeed = MAX_SPEED * alignment;
       targetVx = this._tmpForward.x * targetSpeed;
       targetVz = this._tmpForward.z * targetSpeed;
