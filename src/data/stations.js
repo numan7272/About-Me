@@ -282,7 +282,7 @@ export const WALKTHROUGH_UI = {
     step_stack: "Tech & Skills",
     drawer_hint: "Klick „Weiter\" für die nächste Station",
     intro_title: "Hi, ich bin Numan.",
-    intro_body: "19, aus Kiel, studier Wirtschaftsinformatik. Ich nehm dich kurz mit durch 5 Stationen — Schule, Familienbetrieb, Studium, Werkstudent-Job, eigene Projekte.",
+    intro_body: "20, aus Kiel, studiere Wirtschaftsinformatik. Ich nehme dich kurz mit durch 5 Stationen: Schule, Familienbetrieb, Studium, Werkstudentenjob, eigene Projekte.",
   },
   en: {
     start_tour: "Start guided tour",
@@ -296,7 +296,7 @@ export const WALKTHROUGH_UI = {
     step_stack: "Tech & Skills",
     drawer_hint: "Click \"Next\" for the next station",
     intro_title: "Hi, I'm Numan.",
-    intro_body: "19, from Kiel, studying Business Information Systems. Let me take you through 5 quick stops — school, family business, university, working student job, side projects.",
+    intro_body: "20, from Kiel, studying Business Information Systems. Let me take you through 5 quick stops: school, family business, university, working student job, side projects.",
   },
 };
 
