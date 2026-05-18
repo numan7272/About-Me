@@ -238,26 +238,24 @@ export class BottomDrawer {
 
   _applyResponsive() {
     if (this._mq.matches) {
-      // Mobile compact: Drawer darf NICHT mehr als ~36vh blockieren — sonst
-      // sieht der Recruiter das gerade-geframte Gebäude nicht. Innere Scroll
-      // statt unendliches Wachstum. Joystick-Abstand auf 76px reduziert
-      // (Joystick liegt unten-mittig, Drawer rückt knapp darüber).
-      this.root.style.padding = "0 10px 76px 10px";
+      // Mobile compact: gekürzte Bullets (max 3 single-line) passen jetzt
+      // ohne Scroll in den Drawer. Padding-Bottom 64px reicht (in-world
+      // Joystick stört nicht). Drawer-Höhe nicht mehr gecappt → kein Scroll.
+      this.root.style.padding = "0 10px 64px 10px";
       this.panel.style.gridTemplateColumns = "1fr";
-      this.panel.style.gap = "10px";
-      this.panel.style.padding = "12px 14px 10px";
-      this.panel.style.maxHeight = "min(38vh, 320px)";
-      this.panel.style.overflowY = "auto";
-      this.panel.style.WebkitOverflowScrolling = "touch";
+      this.panel.style.gap = "8px";
+      this.panel.style.padding = "10px 14px 10px";
+      this.panel.style.maxHeight = "";
+      this.panel.style.overflowY = "visible";
+      this.leftCol.style.display = "flex";
       this.leftCol.style.flexDirection = "row";
       this.leftCol.style.flexWrap = "wrap";
       this.leftCol.style.alignItems = "baseline";
       this.leftCol.style.gap = "8px";
       this.center.style.minHeight = "auto";
-      // Buttons in EINE Zeile auf Mobile statt vertikal stacked
       if (this.rightCol) {
         this.rightCol.style.flexDirection = "row-reverse";
-        this.rightCol.style.gap = "8px";
+        this.rightCol.style.gap = "6px";
         this.rightCol.style.alignItems = "stretch";
       }
     } else {
@@ -463,49 +461,69 @@ export class BottomDrawer {
 
   _renderHow(s, strings) {
     this.center.appendChild(this._stepHeader(strings.step_how));
-    const list = document.createElement("ul");
+    const accent = s.accent || s.color || "var(--signal)";
+    const list = document.createElement("ol");
     Object.assign(list.style, {
       margin: "0",
       padding: "0",
       listStyle: "none",
       display: "flex",
       flexDirection: "column",
-      gap: "4px",
+      gap: "5px",
     });
-    for (const bullet of (s.bullets || []).slice(0, 4)) {
+    const bullets = (s.bullets || []).slice(0, 4);
+    bullets.forEach((bullet, i) => {
       const li = document.createElement("li");
       Object.assign(li.style, {
-        fontSize: "13px",
+        display: "grid",
+        gridTemplateColumns: "26px 1fr",
+        gap: "8px",
+        fontSize: "12.5px",
         lineHeight: "1.5",
         color: "var(--paper)",
         fontFamily: "var(--font-mono)",
       });
-      li.textContent = `> ${bullet}`;
+      const num = document.createElement("span");
+      num.textContent = String(i + 1).padStart(2, "0");
+      Object.assign(num.style, {
+        color: accent,
+        fontVariantNumeric: "tabular-nums",
+      });
+      const text = document.createElement("span");
+      text.textContent = bullet;
+      li.append(num, text);
       list.appendChild(li);
-    }
+    });
     this.center.appendChild(list);
   }
 
   _renderStack(s, strings) {
     this.center.appendChild(this._stepHeader(strings.step_stack));
     const wrap = document.createElement("ul");
+    wrap.dataset.skillsGrid = "1";
     Object.assign(wrap.style, {
       margin: "0",
       padding: "0",
       listStyle: "none",
       display: "grid",
-      gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
-      gap: "2px 16px",
+      gridTemplateColumns: this._mq?.matches
+        ? "1fr 1fr"
+        : "repeat(auto-fill, minmax(140px, 1fr))",
+      columnGap: "16px",
+      rowGap: "2px",
     });
     for (const skill of (s.skills || [])) {
       const item = document.createElement("li");
-      item.textContent = `> ${skill}`;
       Object.assign(item.style, {
         fontSize: "12px",
         color: "var(--paper-muted)",
         fontFamily: "var(--font-mono)",
-        lineHeight: "1.6",
+        lineHeight: "1.55",
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+        textOverflow: "ellipsis",
       });
+      item.textContent = skill;
       wrap.appendChild(item);
     }
     this.center.appendChild(wrap);

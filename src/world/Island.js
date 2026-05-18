@@ -160,6 +160,33 @@ export class Island {
     this.root.traverse((obj) => {
       const name = obj.name || "";
 
+      // GLB-Defensive (gilt für JEDES Egg_*-Mesh inkl. Sub-Meshes):
+      // - Sketchfab-Whale im Egg_Container_Whale_* hat emissive=[1,1,1]
+      //   gebacken (reinweiß), gleich wie das Bike.
+      // - Pure-metallic Egg-Meshes ohne HDR-Env clippen weiß.
+      // Wir strippen Emissive und cappen Metalness/Roughness auf allen
+      // Egg-Sub-Materials, ohne den Click-Match anzufassen.
+      if (name.startsWith("Egg_") && obj.isMesh) {
+        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+        for (const m of mats) {
+          if (!m) continue;
+          // Lampen im Container-Whale (Egg_Container_Whale_Lamp) sollen
+          // theoretisch glühen können — aber der Sketchfab-Bake hat dort
+          // auch [1,1,1] Emissive. Wir strippen auch hier, weil das Glow
+          // optisch nicht überlebenswichtig ist.
+          m.emissive?.setRGB?.(0, 0, 0);
+          if ("emissiveIntensity" in m) m.emissiveIntensity = 0;
+          if (m.emissiveMap) m.emissiveMap = null;
+          if ("metalness" in m && typeof m.metalness === "number" && m.metalness > 0.85) {
+            m.metalness = 0.85;
+          }
+          if ("roughness" in m && typeof m.roughness === "number" && m.roughness < 0.3) {
+            m.roughness = 0.3;
+          }
+          m.needsUpdate = true;
+        }
+      }
+
       // Blockout-Meshes + Deko-Krempel — komplett ausblenden.
       // Erkennt: Blockout_*, *_blockout, Marker_*, Cube*, plato_*,
       //         mesh-reduced_*, Curve.*, HQ_Mesh_Hedge, Ocean (eigenes Mesh)
@@ -251,28 +278,8 @@ export class Island {
         obj.userData.eggId = eggId;
         obj.userData.isClickableEgg = true;
         obj.userData.baseY = tmpPos.y;
-
-        // GLB-Defensive: Egg-Meshes (z.B. Docker-Container-Whale) haben
-        // dasselbe USDZ-Bake-Problem wie das Bike — Emissive auf [1,1,1]
-        // gebacken + Mirror-Metallic ohne Sky-Env. Wir strippen emissive
-        // und cappen die PBR-Werte damit der Wal nicht reinweiß strahlt.
-        obj.traverse((sub) => {
-          if (!sub.isMesh) return;
-          const mats = Array.isArray(sub.material) ? sub.material : [sub.material];
-          for (const m of mats) {
-            if (!m) continue;
-            m.emissive?.setRGB?.(0, 0, 0);
-            if ("emissiveIntensity" in m) m.emissiveIntensity = 0;
-            if (m.emissiveMap) m.emissiveMap = null;
-            if ("metalness" in m && typeof m.metalness === "number" && m.metalness > 0.85) {
-              m.metalness = 0.85;
-            }
-            if ("roughness" in m && typeof m.roughness === "number" && m.roughness < 0.3) {
-              m.roughness = 0.3;
-            }
-            m.needsUpdate = true;
-          }
-        });
+        // (Defensive Material-Fix für Egg_*-Sub-Meshes läuft oben im
+        //  Traversal, gilt auch für Egg_Container_Whale_* Sketchfab-Krempel.)
         // Auch in eggs[] eintragen (überschreibt evtl. EasterEgg_-Eintrag)
         const existing = this.eggs.findIndex((e) => e.id === eggId);
         const entry = {
