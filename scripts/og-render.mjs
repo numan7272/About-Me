@@ -58,35 +58,23 @@ const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"
         stroke="${RULE}" stroke-width="1" />
 
   <!-- CENTER: Italic-Mono Display Headline, zwei Zeilen.
-       Zweite Zeile in Signal-Coral als One-Word-Hierarchie. -->
+       Erste Zeile = Verb-Trilogie, "find." in Signal-Coral als Hierarchie-
+       Endpunkt. Zweite Zeile in muted Paper, ruhiger Statement-Closer.
+       dx="0.5em" gibt einen sauberen Space zwischen "click." und "find."
+       (librsvg kollabiert sonst den literal-Space zwischen tspans). -->
   <text x="80" y="290" font-family="${MONO}" font-size="78"
-        font-style="italic" fill="${PAPER}" letter-spacing="-0.02em">
-    drive my portfolio.
-  </text>
+        font-style="italic" fill="${PAPER}" letter-spacing="-0.02em"
+    ><tspan>ride. click.</tspan><tspan fill="${SIGNAL}" dx="0.5em">find.</tspan></text>
   <text x="80" y="378" font-family="${MONO}" font-size="78"
-        font-style="italic" fill="${SIGNAL}" letter-spacing="-0.02em">
-    hack the easter eggs.
+        font-style="italic" fill="${PAPER_MUTED}" letter-spacing="-0.02em">
+    this is my portfolio.
   </text>
 
   <line x1="80" y1="448" x2="${W - 80}" y2="448"
         stroke="${RULE}" stroke-width="1" />
 
-  <!-- BOTTOM-LEFT: Speed-HUD-Referenz (gleiche Komponente wie im Site-UI).
-       25 = aktueller Top-Speed-Cap des Bikes. -->
-  <g transform="translate(80 528)">
-    <text font-family="${MONO}" font-size="44" fill="${PAPER}"
-          letter-spacing="-0.02em" font-weight="bold">
-      <tspan fill="${PAPER_MUTED}">▌</tspan><tspan dx="6">25</tspan>
-      <tspan dx="10" font-size="16" fill="${PAPER_MUTED}"
-             letter-spacing="0.06em">KM/H</tspan>
-    </text>
-    <text y="32" font-family="${MONO}" font-size="13"
-          fill="${PAPER_DIM}" letter-spacing="0.08em">
-      &gt; ride · click · explore
-    </text>
-  </g>
-
-  <!-- BOTTOM-RIGHT: Author -->
+  <!-- BOTTOM-RIGHT: Author. Bottom-left bewusst leer — Asymmetrie ist
+       brutalist-konform und der Author bekommt mehr visuelles Gewicht. -->
   <g transform="translate(${W - 80} 510)" text-anchor="end">
     <text font-family="${MONO}" font-size="22" fill="${PAPER}"
           letter-spacing="-0.01em" font-weight="bold">
