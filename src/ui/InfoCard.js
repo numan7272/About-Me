@@ -22,8 +22,12 @@ export class InfoCard {
   }
 
   _build() {
+    // InfoCard ist ein Lese-Moment (Werdegang, Egg-Story). Bekommt die
+    // Paper-Surface analog zu den 3D-Labels. Dunkle Tinte auf Cream,
+    // Variety gegenüber dem ink-basierten HUD. Station-Akzent als 3px
+    // links (wird in show() pro Karte gesetzt).
     this.root = document.createElement("aside");
-    this.root.className = "hud-bracket";
+    this.root.className = "hud-bracket paper";
     this.root.setAttribute("role", "dialog");
     this.root.setAttribute("aria-labelledby", "info-card-title");
     this.root.setAttribute("aria-hidden", "true");
@@ -32,17 +36,18 @@ export class InfoCard {
       top: "50%",
       right: "24px",
       transform: "translateY(-50%) translateX(calc(100% + 48px))",
-      width: "min(360px, calc(100vw - 32px))",
+      width: "min(380px, calc(100vw - 32px))",
       maxHeight: "82vh",
       overflow: "auto",
-      padding: "22px 22px 20px",
+      padding: "22px 24px 20px",
       fontFamily: "var(--font-mono)",
       fontSize: "13px",
-      color: "var(--paper)",
+      color: "var(--ink-text)",
       zIndex: "13",
       pointerEvents: "auto",
       opacity: "0",
       transition: "transform 340ms var(--ease), opacity 220ms var(--ease)",
+      borderLeft: "3px solid transparent",
     });
     this.root.append(this._cornerSpan("tr"), this._cornerSpan("bl"));
 
@@ -56,7 +61,7 @@ export class InfoCard {
       right: "12px",
       background: "transparent",
       border: "0",
-      color: "var(--paper-muted)",
+      color: "var(--ink-text-muted)",
       fontFamily: "var(--font-mono)",
       fontSize: "11px",
       cursor: "pointer",
@@ -67,7 +72,7 @@ export class InfoCard {
       this.closeBtn.style.color = "var(--signal)";
     });
     this.closeBtn.addEventListener("mouseleave", () => {
-      this.closeBtn.style.color = "var(--paper-muted)";
+      this.closeBtn.style.color = "var(--ink-text-muted)";
     });
     this.closeBtn.addEventListener("click", () => this.hide());
     this.root.appendChild(this.closeBtn);
@@ -75,7 +80,7 @@ export class InfoCard {
     this.timeframeEl = document.createElement("div");
     Object.assign(this.timeframeEl.style, {
       fontSize: "11px",
-      color: "var(--paper-muted)",
+      color: "var(--ink-text-muted)",
       marginBottom: "10px",
       marginTop: "8px",
     });
@@ -86,31 +91,37 @@ export class InfoCard {
     Object.assign(this.titleEl.style, {
       fontSize: "22px",
       fontWeight: "400",
-      lineHeight: "1.2",
+      lineHeight: "1.25",
       marginBottom: "4px",
       letterSpacing: "-0.01em",
+      color: "var(--ink-text)",
     });
     this.root.appendChild(this.titleEl);
 
     this.subtitleEl = document.createElement("div");
     Object.assign(this.subtitleEl.style, {
       fontSize: "13px",
-      color: "var(--paper-muted)",
+      color: "var(--ink-text-muted)",
       marginBottom: "14px",
+      fontStyle: "italic",
     });
     this.root.appendChild(this.subtitleEl);
 
     const rule = document.createElement("hr");
-    rule.className = "hud-rule";
-    rule.style.margin = "0 0 14px";
+    Object.assign(rule.style, {
+      height: "1px",
+      background: "var(--ink-rule)",
+      border: "0",
+      margin: "0 0 14px",
+    });
     this.root.appendChild(rule);
 
     this.textEl = document.createElement("div");
     Object.assign(this.textEl.style, {
       fontSize: "13px",
-      lineHeight: "1.55",
+      lineHeight: "1.6",
       marginBottom: "18px",
-      color: "var(--paper)",
+      color: "var(--ink-text)",
     });
     this.root.appendChild(this.textEl);
 
@@ -121,7 +132,7 @@ export class InfoCard {
       margin: "0",
       display: "flex",
       flexDirection: "column",
-      gap: "4px",
+      gap: "3px",
     });
     this.root.appendChild(this.skillsEl);
 
@@ -146,6 +157,10 @@ export class InfoCard {
     this.visible = true;
     this.root.setAttribute("aria-hidden", "false");
 
+    // Station-Akzent als 3px linker Identitäts-Stripe. Fallback signal.
+    const accent = card.accent || card.color || "var(--signal)";
+    this.root.style.borderLeftColor = accent;
+
     this.timeframeEl.textContent = card.timeframe || "";
     this.titleEl.textContent = card.title || "";
     this.subtitleEl.textContent = card.subtitle || "";
@@ -156,8 +171,9 @@ export class InfoCard {
       const li = document.createElement("li");
       Object.assign(li.style, {
         fontSize: "12px",
-        color: "var(--paper-muted)",
+        color: "var(--ink-text-muted)",
         fontFamily: "var(--font-mono)",
+        lineHeight: "1.55",
       });
       li.textContent = `> ${s}`;
       this.skillsEl.appendChild(li);

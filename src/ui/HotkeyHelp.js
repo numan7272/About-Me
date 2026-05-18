@@ -41,13 +41,18 @@ export class HotkeyHelp {
     this.btn.setAttribute("aria-label", "show keyboard shortcuts");
     const isTouch = window.matchMedia?.("(pointer: coarse)")?.matches
       || "ontouchstart" in window;
+    // Chrome-Tier: dezent text-only, kein ink-solid Frame.
     Object.assign(this.btn.style, {
       position: "fixed",
-      bottom: "20px",
-      left: "20px",
+      bottom: "18px",
+      left: "18px",
       zIndex: "12",
       display: isTouch ? "none" : "inline-flex",
-      background: "var(--ink-solid)",
+      fontSize: "11px",
+      color: "var(--paper-muted)",
+      padding: "6px 8px",
+      minHeight: "32px",
+      background: "transparent",
     });
     this.btn.addEventListener("click", () => this.toggle());
     document.body.appendChild(this.btn);

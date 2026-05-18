@@ -317,18 +317,21 @@ export class WalkthroughController {
       pointerEvents: "auto",
     });
 
+    // Tour-Welcome ist ein Lese-Moment (intro text, scope-Erwartung). Paper
+    // statt ink — kohärent mit InfoCard + 3D-Labels.
     const card = document.createElement("section");
-    card.className = "hud-bracket";
+    card.className = "hud-bracket paper";
     card.setAttribute("role", "dialog");
     card.setAttribute("aria-modal", "true");
     card.setAttribute("aria-labelledby", "tour-overlay-title");
     Object.assign(card.style, {
-      maxWidth: "460px",
+      maxWidth: "480px",
       width: "calc(100% - 40px)",
-      padding: "28px 28px 22px",
-      background: "var(--ink-solid)",
-      color: "var(--paper)",
+      padding: "30px 30px 24px",
+      background: "var(--paper-bg)",
+      color: "var(--ink-text)",
       textAlign: "left",
+      borderLeft: "3px solid var(--signal)",
     });
     card.append(this._cornerSpan("tr"), this._cornerSpan("bl"));
 
@@ -336,7 +339,7 @@ export class WalkthroughController {
     eyebrow.textContent = `> ${lang === "en" ? "welcome" : "willkommen"}`;
     Object.assign(eyebrow.style, {
       fontSize: "11px",
-      color: "var(--paper-muted)",
+      color: "var(--ink-text-muted)",
       marginBottom: "10px",
     });
     card.appendChild(eyebrow);
@@ -346,11 +349,11 @@ export class WalkthroughController {
     title.textContent = strings.intro_title;
     Object.assign(title.style, {
       margin: "0 0 10px",
-      fontSize: "24px",
+      fontSize: "26px",
       fontWeight: "400",
       lineHeight: "1.2",
       letterSpacing: "-0.01em",
-      color: "var(--paper)",
+      color: "var(--ink-text)",
     });
     card.appendChild(title);
 
@@ -359,14 +362,18 @@ export class WalkthroughController {
     Object.assign(body.style, {
       margin: "0 0 16px",
       fontSize: "13px",
-      lineHeight: "1.55",
-      color: "var(--paper-muted)",
+      lineHeight: "1.6",
+      color: "var(--ink-text-muted)",
     });
     card.appendChild(body);
 
     const rule = document.createElement("hr");
-    rule.className = "hud-rule";
-    rule.style.margin = "0 0 14px";
+    Object.assign(rule.style, {
+      height: "1px",
+      background: "var(--ink-rule)",
+      border: "0",
+      margin: "0 0 14px",
+    });
     card.appendChild(rule);
 
     const hintBox = document.createElement("div");
@@ -378,9 +385,10 @@ export class WalkthroughController {
       borderLeft: "2px solid var(--signal)",
       background: "transparent",
       fontSize: "12px",
-      lineHeight: "1.5",
-      color: "var(--paper)",
+      lineHeight: "1.55",
+      color: "var(--ink-text)",
       marginBottom: "18px",
+      fontStyle: "italic",
     });
     card.appendChild(hintBox);
 
@@ -415,7 +423,7 @@ export class WalkthroughController {
     Object.assign(hint.style, {
       marginTop: "14px",
       fontSize: "11px",
-      color: "var(--paper-dim)",
+      color: "var(--ink-text-dim)",
     });
     card.appendChild(hint);
 
@@ -471,14 +479,17 @@ export class WalkthroughController {
   }
 
   _makeSecondaryButton(label) {
+    // Paper-context: dunkle Hairline auf Cream. Wird nur im Welcome-Overlay
+    // genutzt — wenn ich den später auf einem Ink-Surface brauche, wird ein
+    // Variant-Flag eingeführt. Bis dahin: dark.
     const b = document.createElement("button");
     b.type = "button";
     b.textContent = label.toLowerCase();
     Object.assign(b.style, {
       padding: "12px 18px",
-      border: "1px solid var(--rule-strong)",
+      border: "1px solid var(--ink-rule-strong)",
       background: "transparent",
-      color: "var(--paper-muted)",
+      color: "var(--ink-text-muted)",
       fontFamily: "var(--font-mono)",
       fontSize: "13px",
       cursor: "pointer",
@@ -486,12 +497,12 @@ export class WalkthroughController {
       minHeight: "44px",
     });
     b.addEventListener("mouseenter", () => {
-      b.style.color = "var(--paper)";
-      b.style.borderColor = "var(--paper-muted)";
+      b.style.color = "var(--ink-text)";
+      b.style.borderColor = "var(--ink-text-muted)";
     });
     b.addEventListener("mouseleave", () => {
-      b.style.color = "var(--paper-muted)";
-      b.style.borderColor = "var(--rule-strong)";
+      b.style.color = "var(--ink-text-muted)";
+      b.style.borderColor = "var(--ink-rule-strong)";
     });
     return b;
   }

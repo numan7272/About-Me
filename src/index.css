@@ -23,6 +23,16 @@
   --signal: oklch(72% 0.22 25);
   --signal-dim: oklch(72% 0.22 25 / 0.25);
 
+  /* Paper-Register für Lese-Inhalte (InfoCard, Tour-Welcome, 3D-Labels).
+     Dunkle Tinte auf warmem Cream, separate Hierarchie vom ink-HUD. */
+  --paper-bg: oklch(94% 0.018 75 / 0.96);
+  --paper-bg-solid: oklch(94% 0.018 75);
+  --ink-text: oklch(18% 0.012 250);
+  --ink-text-muted: oklch(45% 0.015 70);
+  --ink-text-dim: oklch(60% 0.012 70);
+  --ink-rule: oklch(18% 0.012 250 / 0.18);
+  --ink-rule-strong: oklch(18% 0.012 250 / 0.42);
+
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
   --font-mono: "Departure Mono", "JetBrains Mono", ui-monospace, "SF Mono",
                Menlo, monospace;
@@ -62,12 +72,17 @@ html, body {
 /* ── Shared chrome primitives ───────────────────────────────────────── */
 
 /* Corner-bracket frame. Drawn as 4 pseudo-element L-shapes around the
-   container. Use sparingly: one bracketed surface per viewport region. */
+   container. Use sparingly: one bracketed surface per viewport region.
+   `.hud-bracket.paper` switches to dark-on-cream for Lese-Inhalte. */
 .hud-bracket {
   position: relative;
   background: var(--ink-solid);
   color: var(--paper);
   font-family: var(--font-mono);
+}
+.hud-bracket.paper {
+  background: var(--paper-bg);
+  color: var(--ink-text);
 }
 .hud-bracket::before,
 .hud-bracket::after {
@@ -77,6 +92,12 @@ html, body {
   height: 12px;
   border: 1px solid var(--rule-strong);
   pointer-events: none;
+}
+.hud-bracket.paper::before,
+.hud-bracket.paper::after,
+.hud-bracket.paper > .hud-bracket-tr,
+.hud-bracket.paper > .hud-bracket-bl {
+  border-color: var(--ink-rule-strong);
 }
 .hud-bracket::before {
   top: -1px;

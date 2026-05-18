@@ -67,12 +67,19 @@ export class SettingsPanel {
     this.btn.textContent = "settings";
     this.btn.setAttribute("aria-expanded", "false");
     this.btn.setAttribute("aria-controls", "settings-panel");
+    // Settings ist Chrome-Tier: kleinere Schrift, kein ink-solid Frame,
+    // damit Tour + Kontakt prominenter wirken. Plain text-link mit
+    // hover-underline (kommt aus .hud-btn).
     Object.assign(this.btn.style, {
       position: "fixed",
-      top: "20px",
-      left: "20px",
+      top: "22px",
+      left: "18px",
       zIndex: "12",
-      background: "var(--ink-solid)",
+      fontSize: "11px",
+      color: "var(--paper-muted)",
+      padding: "6px 8px",
+      minHeight: "32px",
+      background: "transparent",
     });
     this.btn.addEventListener("click", () => this.toggle());
     document.body.appendChild(this.btn);

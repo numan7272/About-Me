@@ -9,10 +9,26 @@ import { useEffect, useState } from "react";
 
 const SIGNAL_FPS_THRESHOLD = 55;
 
+/**
+ * FPS counter for the dev/debug-aware. Hidden on mobile by default to avoid
+ * showing telemetry to recruiters. Opt in on touch devices via ?fps=1.
+ */
+function shouldShowFps() {
+  if (typeof window === "undefined") return false;
+  try {
+    if (new URL(window.location.href).searchParams.has("fps")) return true;
+  } catch {}
+  const isTouch = window.matchMedia?.("(pointer: coarse)")?.matches
+    || "ontouchstart" in window;
+  return !isTouch;
+}
+
 export function App() {
   const [fps, setFps] = useState(0);
+  const [visible] = useState(shouldShowFps);
 
   useEffect(() => {
+    if (!visible) return undefined;
     let last = performance.now();
     let frames = 0;
     let rafId;
@@ -28,8 +44,9 @@ export function App() {
     };
     rafId = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafId);
-  }, []);
+  }, [visible]);
 
+  if (!visible) return null;
   const isLow = fps > 0 && fps < SIGNAL_FPS_THRESHOLD;
 
   return (

@@ -40,10 +40,13 @@ const POSITION_OVERRIDES = {
   thg:     { worldPos: [-29.87,  8.0,  32.40] },   // X -2.5 gesamt nach links
   hq:      { worldPos: [ -3.79,  7.5,  15.82] },
 };
-const FADE_NEAR = 4;                 // unter dieser Distanz → fade aus
-const FADE_FAR = 80;                 // über dieser Distanz → fade aus
-const FADE_PEAK_NEAR = 12;           // unter dieser Distanz hat das Label volle Sichtbarkeit
-const FADE_PEAK_FAR = 45;
+// Proximity-only Labels: nicht permanent in der Skyline, sondern als
+// Entdecker-Affordance beim Nähern. Pre-User-Feedback war 80m, viel zu
+// breit — Free-Roam wurde von 5 floating Labels dominiert.
+const FADE_NEAR = 4;                 // unter dieser Distanz → fade aus (zu nah)
+const FADE_FAR = 32;                 // über dieser Distanz → unsichtbar
+const FADE_PEAK_NEAR = 10;           // ab dieser Distanz voll sichtbar
+const FADE_PEAK_FAR = 22;            // bis hierher voll, dann fade out
 
 // Canvas-Texture-Dimension. Höhere W:H Ratio jetzt (Landscape), damit mehr
 // Platz für den italic-mono Title bei kleinerer Vertikal-Höhe in der 3D-Welt.

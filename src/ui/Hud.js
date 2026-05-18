@@ -2,17 +2,23 @@
  * Hud — Speed-Anzeige unten-links + Recenter-Button.
  *
  * Brutalist-Game-HUD register:
- *   - Speed anchored bottom-left (nicht zentriert)
- *   - Corner-brackets statt rounded card
+ *   - Speed anchored bottom-left, auto-hide bei 0 km/h + Idle
  *   - Numeral wechselt zu --signal bei ≥ SIGNAL_THRESHOLD km/h
- *   - Recenter-Button als reiner Text mit hover-underline
+ *   - Recenter klein, bottom-right, auto-fade nach 8s ohne Interaktion
  */
 
-const SIGNAL_THRESHOLD = 25;
+const MAX_DISPLAY_SPEED = 25;          // Top-Speed-Anzeige cappt bei 25 km/h
+const SIGNAL_THRESHOLD = MAX_DISPLAY_SPEED;  // Coral wenn flat-out
+const SPEED_IDLE_HIDE_DELAY = 1200;   // ms ohne Bewegung bevor Speed-HUD ausblendet
+const RECENTER_AUTO_HIDE_DELAY = 8000; // ms bis Recenter-Hint sich versteckt
 
 export class Hud {
   constructor(game) {
     this.game = game;
+    this._lastNonZeroSpeed = 0;
+    this._speedVisible = false;
+    this._recenterShownAt = 0;
+    this._recenterUserHidden = false;
 
     this.root = document.createElement("div");
     this.root.id = "hud-root";
@@ -43,6 +49,9 @@ export class Hud {
       alignItems: "baseline",
       gap: "8px",
       pointerEvents: "none",
+      opacity: "0",
+      transform: "translateY(8px)",
+      transition: "opacity 240ms var(--ease), transform 240ms var(--ease)",
     });
     wrap.append(this._cornerSpan("tr"), this._cornerSpan("bl"));
 
@@ -79,24 +88,46 @@ export class Hud {
     this.speedHud = wrap;
   }
 
+  _setSpeedVisible(visible) {
+    if (visible === this._speedVisible) return;
+    this._speedVisible = visible;
+    this.speedHud.style.opacity = visible ? "1" : "0";
+    this.speedHud.style.transform = visible
+      ? "translateY(0)"
+      : "translateY(8px)";
+  }
+
   _buildRecenterButton() {
     const btn = document.createElement("button");
     btn.type = "button";
-    btn.className = "hud-btn";
     btn.setAttribute("aria-label", "recenter camera");
     btn.textContent = "↺ recenter";
     Object.assign(btn.style, {
       position: "absolute",
-      bottom: "100px",
-      left: "50%",
-      transform: "translateX(-50%)",
+      bottom: "16px",
+      right: "16px",
+      padding: "8px 10px",
       pointerEvents: "auto",
       display: "none",
+      background: "transparent",
+      border: "0",
+      color: "var(--paper-muted)",
+      fontFamily: "var(--font-mono)",
+      fontSize: "12px",
       letterSpacing: "0.04em",
-      background: "var(--ink-solid)",
+      cursor: "pointer",
+      opacity: "0",
+      transition: "opacity 240ms var(--ease), color 180ms var(--ease)",
+    });
+    btn.addEventListener("mouseenter", () => {
+      btn.style.color = "var(--signal)";
+    });
+    btn.addEventListener("mouseleave", () => {
+      btn.style.color = "var(--paper-muted)";
     });
     btn.addEventListener("click", () => {
       if (this.game.cameraRig) this.game.cameraRig.recenter();
+      this._recenterUserHidden = true;   // nach Click verstecken bis followMode wieder false
     });
 
     this.root.appendChild(btn);
@@ -111,20 +142,47 @@ export class Hud {
 
   update() {
     const player = this.game.world?.player;
+    const tourActive = !!this.game?.ui?.walkthrough?.active;
+
+    // ── Speed-Anzeige ──
+    // Top-Speed bei 25 km/h cappen (war 32). Skalierung: 4.5 m/s physischer
+    // Top → 25 km/h Display. Math.min schützt gegen kurze Physics-Spikes.
+    let kmh = 0;
     if (player?.body && this.speedValue) {
       const v = player.body.linvel();
-      const SPEED_DISPLAY_SCALE = 32 / (4.5 * 3.6);
-      const kmh = Math.hypot(v.x, v.z) * 3.6 * SPEED_DISPLAY_SCALE;
+      const SCALE = MAX_DISPLAY_SPEED / (4.5 * 3.6);
+      kmh = Math.min(MAX_DISPLAY_SPEED, Math.hypot(v.x, v.z) * 3.6 * SCALE);
       this.speedValue.textContent = kmh.toFixed(0);
       this.speedValue.style.color =
         kmh >= SIGNAL_THRESHOLD ? "var(--signal)" : "var(--paper)";
     }
 
+    // Speed-HUD auto-hide: sichtbar wenn aktuelle Speed > 0.5 oder kürzlich
+    // > 0 (Idle-Delay) oder Tour aktiv (Telemetrie-Kontext soll im Tour-
+    // Modus sichtbar bleiben, auch wenn das Bike gefroren ist).
+    const now = performance.now();
+    if (kmh > 0.5) this._lastNonZeroSpeed = now;
+    const recentlyMoved = (now - this._lastNonZeroSpeed) < SPEED_IDLE_HIDE_DELAY;
+    this._setSpeedVisible(tourActive || recentlyMoved);
+
+    // ── Recenter-Button ──
+    // Sichtbar wenn followMode=false UND noch nicht user-hidden. Auto-fade
+    // nach RECENTER_AUTO_HIDE_DELAY damit der Hint nicht ewig dasteht.
     if (this.recenterBtn && this.game.cameraRig) {
-      const show = !this.game.cameraRig.followMode;
-      this.recenterBtn.style.display = show ? "inline-flex" : "none";
-      const drawerOpen = !!this.game?.ui?.drawer?.isOpen;
-      this.recenterBtn.style.bottom = drawerOpen ? "280px" : "100px";
+      const followOff = !this.game.cameraRig.followMode;
+      if (followOff && this._recenterShownAt === 0) {
+        this._recenterShownAt = now;
+        this._recenterUserHidden = false;
+      }
+      if (!followOff) {
+        this._recenterShownAt = 0;
+        this._recenterUserHidden = false;
+      }
+      const age = this._recenterShownAt > 0 ? now - this._recenterShownAt : 0;
+      const autoHidden = age >= RECENTER_AUTO_HIDE_DELAY;
+      const shouldShow = followOff && !this._recenterUserHidden && !autoHidden;
+      this.recenterBtn.style.display = shouldShow ? "inline-block" : "none";
+      this.recenterBtn.style.opacity = shouldShow ? "1" : "0";
     }
   }
 
