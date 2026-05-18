@@ -45,6 +45,11 @@ export class Inputs {
   }
 
   _onKeyDown(e) {
+    // Wenn der User in ein Eingabefeld tippt (z.B. SQLi-Lab, Settings),
+    // NICHT die Bike-Steuerung triggern UND NICHT preventDefault feuern.
+    // Sonst kann er kein Space, keine Pfeiltasten in <input>/<textarea>
+    // benutzen.
+    if (this._isEditingTarget(e.target)) return;
     // K7-Fix: Space/Pfeiltasten scrollen die Page sonst.
     // Wir fangen alle Bewegungs-Keys ab, sobald sie unsere Steuerung treffen.
     if (this._isGameKey(e.code)) {
@@ -53,10 +58,19 @@ export class Inputs {
     this._setKey(e.code, true);
   }
   _onKeyUp(e) {
+    if (this._isEditingTarget(e.target)) return;
     if (this._isGameKey(e.code)) {
       e.preventDefault();
     }
     this._setKey(e.code, false);
+  }
+
+  _isEditingTarget(target) {
+    if (!target) return false;
+    const tag = target.tagName;
+    if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return true;
+    if (target.isContentEditable) return true;
+    return false;
   }
 
   _isGameKey(code) {
