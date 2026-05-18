@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630"
+                  viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#101218" />
+
+  <!-- Frame: 4 Corner-Brackets, 48px Inset -->
+  <path d="M 48 74 L 48 48 L 74 48"
+                fill="none" stroke="rgba(241,239,234,0.40)" stroke-width="2" />
+  <path d="M 1152 74 L 1152 48 L 1126 48"
+                fill="none" stroke="rgba(241,239,234,0.40)" stroke-width="2" />
+  <path d="M 48 556 L 48 582 L 74 582"
+                fill="none" stroke="rgba(241,239,234,0.40)" stroke-width="2" />
+  <path d="M 1152 556 L 1152 582 L 1126 582"
+                fill="none" stroke="rgba(241,239,234,0.40)" stroke-width="2" />
+
+  <!-- TOP ROW: domain (links), status-marker mit signal-caret (rechts) -->
+  <text x="80" y="108" font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="22"
+        fill="#a59f96" letter-spacing="0.02em">
+    // numan-yesil.com
+  </text>
+  <text x="1120" y="108" font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="20"
+        fill="#f1efea" text-anchor="end" letter-spacing="0.08em">
+    <tspan fill="#ff5a3c">▌</tspan><tspan dx="6">3D PORTFOLIO</tspan>
+  </text>
+
+  <line x1="80" y1="148" x2="1120" y2="148"
+        stroke="rgba(241,239,234,0.18)" stroke-width="1" />
+
+  <!-- CENTER: Italic-Mono Display Headline, zwei Zeilen.
+       Zweite Zeile in Signal-Coral als One-Word-Hierarchie. -->
+  <text x="80" y="290" font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="78"
+        font-style="italic" fill="#f1efea" letter-spacing="-0.02em">
+    drive my portfolio.
+  </text>
+  <text x="80" y="378" font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="78"
+        font-style="italic" fill="#ff5a3c" letter-spacing="-0.02em">
+    hack the easter eggs.
+  </text>
+
+  <line x1="80" y1="448" x2="1120" y2="448"
+        stroke="rgba(241,239,234,0.18)" stroke-width="1" />
+
+  <!-- BOTTOM-LEFT: Speed-HUD-Referenz (gleiche Komponente wie im Site-UI).
+       25 = aktueller Top-Speed-Cap des Bikes. -->
+  <g transform="translate(80 528)">
+    <text font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="44" fill="#f1efea"
+          letter-spacing="-0.02em" font-weight="bold">
+      <tspan fill="#a59f96">▌</tspan><tspan dx="6">25</tspan>
+      <tspan dx="10" font-size="16" fill="#a59f96"
+             letter-spacing="0.06em">KM/H</tspan>
+    </text>
+    <text y="32" font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13"
+          fill="#736f68" letter-spacing="0.08em">
+      &gt; ride · click · explore
+    </text>
+  </g>
+
+  <!-- BOTTOM-RIGHT: Author -->
+  <g transform="translate(1120 510)" text-anchor="end">
+    <text font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="22" fill="#f1efea"
+          letter-spacing="-0.01em" font-weight="bold">
+      NUMAN YESIL
+    </text>
+    <text y="28" font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="14"
+          fill="#a59f96" letter-spacing="0.03em">
+      wirtschaftsinformatik · haw kiel
+    </text>
+    <text y="52" font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13"
+          fill="#736f68" letter-spacing="0.03em">
+      github.com/numan7272
+    </text>
+  </g>
+</svg>
