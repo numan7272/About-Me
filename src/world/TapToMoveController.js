@@ -3,25 +3,25 @@
  *
  * User tippt/klickt irgendwo auf den Boden → Bike fährt autonom dorthin.
  *
- * Mechanismus:
- *   1. PointerUp auf Canvas (kein Drag, keine Building-Click-Geste)
- *   2. Raycast gegen eine unsichtbare Ground-Plane (Y=0)
- *   3. Treffer-Punkt = Tap-Target an Player weitergeben
- *   4. Visuelles Feedback: pulsierender Ring am Spot + Linie vom Bike
- *      für 1.5s, dann fade-out
+ * Visuelles Feedback im Brutalist-HUD register: vier corner-brackets
+ * (statt Ring) in Signal-Coral + zentrales Crosshair + dünne Coral-Linie
+ * vom Bike zum Target. Kohärent mit dem HUD (hud-bracket Primitive in CSS).
  *
  * Aktiv nur wenn settings.controlMode === "tap". Sonst no-op.
- *
- * Konflikte mit anderen Click-Targets sind sauber gelöst:
- *   - Walkthrough-Tour aktiv → no-op
- *   - Building-Click (EggClickHandler) → trifft Mesh erst, läuft vorher
- *   - Joystick-Geste → TouchJoystick captured pointerdown, kein conflict
  */
 
 import * as THREE from "three";
 
 const CLICK_DRAG_THRESHOLD = 6;
-const RING_LIFETIME_MS = 1500;
+const MARKER_LIFETIME_MS = 1500;
+
+// Signal-Coral aus dem UI-Token-System (oklch(72% .22 25) ≈ #ff5a3c).
+// toneMapped:false sorgt dafür dass es trotz ACES nicht ins Orange-Braun
+// fadet — die Linie/das Crosshair sollen über Tag UND Nacht-Cycle gleich
+// kräftig leuchten.
+const SIGNAL_HEX = 0xff5a3c;
+const MARKER_SIZE = 1.0;       // halbe Kantenlänge des Bracket-Quadrats in Welt-Metern
+const BRACKET_ARM = 0.32;      // Länge der L-Bracket-Arme
 
 export class TapToMoveController {
   constructor(game) {
@@ -78,7 +78,7 @@ export class TapToMoveController {
     if (!player?.body) return;
 
     player.setTapTarget(groundPoint.x, groundPoint.z);
-    this._spawnRingAt(groundPoint.x, groundPoint.z);
+    this._spawnMarkerAt(groundPoint.x, groundPoint.z);
   }
 
   _hitClickableBuilding(clientX, clientY) {
@@ -111,15 +111,18 @@ export class TapToMoveController {
   // ─── Visuals ────────────────────────────────────────────────────────
 
   _buildLineMesh() {
-    // Eine dünne Linie vom Bike zum Tap-Target.
+    // Dünne Coral-Linie vom Bike zum Tap-Target. Renderorder hoch damit sie
+    // über Grass/Road liegt; depthTest:false sorgt dafür dass kleine Höhen-
+    // varianzen (Hügel) sie nicht abschneiden.
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(new Float32Array(6), 3));
     const mat = new THREE.LineBasicMaterial({
-      color: 0x7ec8ff,
+      color: SIGNAL_HEX,
       transparent: true,
-      opacity: 0.6,
+      opacity: 0.65,
       depthTest: false,
       depthWrite: false,
+      toneMapped: false,
     });
     this._lineMesh = new THREE.Line(geo, mat);
     this._lineMesh.renderOrder = 60;
@@ -127,39 +130,81 @@ export class TapToMoveController {
     this.scene.add(this._lineMesh);
   }
 
-  _spawnRingAt(x, z) {
-    // Ring auf der Ground-Plane bei Tap-Spot
-    const RING_R_OUTER = 0.95;
-    const RING_R_INNER = 0.55;
-    const geo = new THREE.RingGeometry(RING_R_INNER, RING_R_OUTER, 48);
-    const mat = new THREE.MeshBasicMaterial({
-      color: 0x7ec8ff,
+  /**
+   * Brutalist Bracket-Marker. Vier L-förmige Corner-Brackets bilden ein
+   * Quadrat, plus zentrales Crosshair. Statt MeshRing → LineSegments mit
+   * scharfen 90°-Ecken, kohärent mit dem .hud-bracket CSS-Primitive.
+   *
+   * Layout (Top-Down, X→right, Z→down):
+   *
+   *     ┌─        ─┐
+   *
+   *           ✛
+   *
+   *     └─        ─┘
+   *
+   * `+` Crosshair-Marker exact am Spot, 4 L-Brackets in MARKER_SIZE Distanz.
+   */
+  _spawnMarkerAt(x, z) {
+    const S = MARKER_SIZE;
+    const A = BRACKET_ARM;
+
+    // Eckpunkt-Paare für die 4 L-Brackets. Jeder Bracket = 2 Line-Segments
+    // (4 Vertices). 4 Brackets × 4 = 16 Vertices.
+    const bracketPts = [
+      // top-left: vertical down + horizontal right
+      -S, 0, -S,     -S, 0, -S + A,
+      -S, 0, -S,     -S + A, 0, -S,
+      // top-right
+       S, 0, -S,      S, 0, -S + A,
+       S, 0, -S,      S - A, 0, -S,
+      // bottom-left
+      -S, 0,  S,     -S, 0,  S - A,
+      -S, 0,  S,     -S + A, 0,  S,
+      // bottom-right
+       S, 0,  S,      S, 0,  S - A,
+       S, 0,  S,      S - A, 0,  S,
+    ];
+    const bracketGeo = new THREE.BufferGeometry();
+    bracketGeo.setAttribute(
+      "position",
+      new THREE.BufferAttribute(new Float32Array(bracketPts), 3),
+    );
+    const bracketMat = new THREE.LineBasicMaterial({
+      color: SIGNAL_HEX,
       transparent: true,
-      opacity: 0.95,
+      opacity: 1.0,
       depthTest: false,
       depthWrite: false,
       toneMapped: false,
-      side: THREE.DoubleSide,
     });
-    const ring = new THREE.Mesh(geo, mat);
-    ring.rotation.x = -Math.PI / 2;
-    ring.position.set(x, 0.05, z);
-    ring.renderOrder = 60;
-    ring.userData._spawnTime = performance.now();
-    this.scene.add(ring);
+    const brackets = new THREE.LineSegments(bracketGeo, bracketMat);
+    brackets.position.set(x, 0.06, z);
+    brackets.renderOrder = 60;
+    brackets.userData._spawnTime = performance.now();
+    brackets.userData._kind = "brackets";
+    this.scene.add(brackets);
 
-    // Sekundärer kleiner Punkt in der Mitte
-    const dotGeo = new THREE.CircleGeometry(0.18, 24);
-    const dot = new THREE.Mesh(dotGeo, mat.clone());
-    dot.rotation.x = -Math.PI / 2;
-    dot.position.set(x, 0.06, z);
-    dot.renderOrder = 60;
-    dot.userData._spawnTime = performance.now();
-    this.scene.add(dot);
+    // Zentrales Crosshair (+) am Spot, halb so prominent wie die Brackets.
+    const C = 0.22;       // Arm-Länge des Crosshair
+    const crossPts = [
+      -C, 0, 0,   C, 0, 0,    // horizontal
+       0, 0,-C,   0, 0, C,    // vertical
+    ];
+    const crossGeo = new THREE.BufferGeometry();
+    crossGeo.setAttribute(
+      "position",
+      new THREE.BufferAttribute(new Float32Array(crossPts), 3),
+    );
+    const cross = new THREE.LineSegments(crossGeo, bracketMat.clone());
+    cross.position.set(x, 0.07, z);
+    cross.renderOrder = 60;
+    cross.userData._spawnTime = performance.now();
+    cross.userData._kind = "cross";
+    this.scene.add(cross);
 
-    // Alte Ringe entfernen (nur ein Target gleichzeitig aktiv)
     this._clearRings();
-    this._ringMeshes.push(ring, dot);
+    this._ringMeshes.push(brackets, cross);
   }
 
   _clearRings() {
@@ -184,20 +229,29 @@ export class TapToMoveController {
     }
     const now = performance.now();
 
-    // Ring-Animation: pulsieren + fade-out
+    // Bracket + Cross Animation: kein Soft-Sin-Pulse mehr (zu weich für
+    // brutalist register), sondern:
+    //   Brackets: snappy expand 1.0 → 1.18 in 240ms, dann linear fade.
+    //   Cross:    bleibt stabil mittig, linear fade.
+    // Beide ease-out-expo damit der Snap-Effekt sich technisch anfühlt.
     const toRemove = [];
+    const easeOutExpo = (t) => (t === 1 ? 1 : 1 - Math.pow(2, -10 * t));
     for (const r of this._ringMeshes) {
       const age = now - r.userData._spawnTime;
-      if (age > RING_LIFETIME_MS) {
+      if (age > MARKER_LIFETIME_MS) {
         toRemove.push(r);
         continue;
       }
-      const t = age / RING_LIFETIME_MS;
-      // Scale-Pulse: 1.0 → 1.4 dann wieder runter
-      const pulse = 1.0 + Math.sin(t * Math.PI) * 0.3;
-      r.scale.set(pulse, pulse, pulse);
-      // Opacity: 0.95 → 0
-      r.material.opacity = 0.95 * (1 - t);
+      const t = age / MARKER_LIFETIME_MS;
+      if (r.userData._kind === "brackets") {
+        // Schneller Expand (0..0.16 = 0..1), dann hold.
+        const expandT = Math.min(1, age / 240);
+        const scale = 1.0 + easeOutExpo(expandT) * 0.18;
+        r.scale.set(scale, 1, scale);
+      }
+      // Opacity-Curve: voll für die ersten 35%, dann linear fade.
+      const fade = t < 0.35 ? 1 : 1 - (t - 0.35) / 0.65;
+      r.material.opacity = Math.max(0, fade);
     }
     for (const r of toRemove) {
       this.scene.remove(r);

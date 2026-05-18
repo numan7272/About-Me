@@ -160,30 +160,55 @@ export class Island {
     this.root.traverse((obj) => {
       const name = obj.name || "";
 
-      // GLB-Defensive (gilt für JEDES Egg_*-Mesh inkl. Sub-Meshes):
-      // - Sketchfab-Whale im Egg_Container_Whale_* hat emissive=[1,1,1]
-      //   gebacken (reinweiß), gleich wie das Bike.
-      // - Pure-metallic Egg-Meshes ohne HDR-Env clippen weiß.
-      // Wir strippen Emissive und cappen Metalness/Roughness auf allen
-      // Egg-Sub-Materials, ohne den Click-Match anzufassen.
-      if (name.startsWith("Egg_") && obj.isMesh) {
-        const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-        for (const m of mats) {
-          if (!m) continue;
-          // Lampen im Container-Whale (Egg_Container_Whale_Lamp) sollen
-          // theoretisch glühen können — aber der Sketchfab-Bake hat dort
-          // auch [1,1,1] Emissive. Wir strippen auch hier, weil das Glow
-          // optisch nicht überlebenswichtig ist.
-          m.emissive?.setRGB?.(0, 0, 0);
-          if ("emissiveIntensity" in m) m.emissiveIntensity = 0;
-          if (m.emissiveMap) m.emissiveMap = null;
-          if ("metalness" in m && typeof m.metalness === "number" && m.metalness > 0.85) {
-            m.metalness = 0.85;
+      // GLB-Defensive (gilt für JEDES Egg_*-Mesh + Sub-Meshes):
+      // - Sketchfab-Whale (Egg_Container_Whale_*) hat MeshBasicMaterial mit
+      //   weißer color → rendert reinweiß, egal was die Beleuchtung macht.
+      //   emissive-Strip wirkt da nicht; wir müssen color direkt setzen.
+      // - PBR-Materials mit emissive=[1,1,1] gebacken → strippen.
+      // - Pure-mirror metallic ohne HDR-Env → cappen.
+      // Wir traversen NACH UNTEN: jedes Sub-Mesh eines Egg_*-Nodes wird
+      // bearbeitet, auch wenn das Sub-Mesh selbst keinen Egg_*-Namen hat.
+      if (name.startsWith("Egg_")) {
+        let touched = 0, recolored = 0;
+        obj.traverse((sub) => {
+          if (!sub.isMesh) return;
+          const mats = Array.isArray(sub.material) ? sub.material : [sub.material];
+          for (const m of mats) {
+            if (!m) continue;
+            // Emissive raus (PBR / Phong / Lambert)
+            m.emissive?.setRGB?.(0, 0, 0);
+            if ("emissiveIntensity" in m) m.emissiveIntensity = 0;
+            if (m.emissiveMap) m.emissiveMap = null;
+            // PBR-Caps
+            if ("metalness" in m && typeof m.metalness === "number" && m.metalness > 0.85) {
+              m.metalness = 0.85;
+            }
+            if ("roughness" in m && typeof m.roughness === "number" && m.roughness < 0.3) {
+              m.roughness = 0.3;
+            }
+            // Whale-Fix: MeshBasicMaterial (Sketchfab unlit) ignoriert Lights;
+            // wenn color near-white UND keine baseColorTexture → force dark.
+            // Sub-Mesh-Heuristik: alles unter Egg_Container_Whale_* bekommt
+            // einen Wal-Blau-Grau Tint; andere Whites werden mit muted-gray
+            // ersetzt um Blow-out zu verhindern.
+            if (m.color && !m.map) {
+              const c = m.color;
+              if (c.r > 0.85 && c.g > 0.85 && c.b > 0.85) {
+                if (sub.name.toLowerCase().includes("whale") ||
+                    name.toLowerCase().includes("whale")) {
+                  c.setHex(0x4f6470);   // muted whale blue-gray
+                } else {
+                  c.setHex(0x6a7280);   // generic slate
+                }
+                recolored++;
+              }
+            }
+            m.needsUpdate = true;
+            touched++;
           }
-          if ("roughness" in m && typeof m.roughness === "number" && m.roughness < 0.3) {
-            m.roughness = 0.3;
-          }
-          m.needsUpdate = true;
+        });
+        if (touched > 0) {
+          console.log(`[Island] Egg defensive: ${name} → ${touched} mats touched, ${recolored} recolored`);
         }
       }
 
