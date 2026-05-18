@@ -1,26 +1,28 @@
 /**
  * HotkeyHelp — Overlay mit Liste aller Shortcuts.
  *
- * Toggle mit ? (Shift+Slash) oder Slash. Schließt sich auch mit Escape.
+ * Brutalist-Game-HUD register:
+ *   - "[F1]" text-button unten-links statt floating ?-circle
+ *   - Solid ink dialog mit corner-brackets, kein blur
+ *   - kbd-tags als hairline-boxed mono
  *
- * Bewusst NICHT permanent angezeigt — User soll auf den Hilfe-Button klicken
- * (kleiner ?-Knopf unten rechts) oder die Taste drücken.
+ * Toggle: F1, ? oder /. Schließt mit Esc / Click outside.
  */
 
 const HOTKEYS = [
-  { keys: ["W", "↑"],   label: "Forward" },
-  { keys: ["S", "↓"],   label: "Backward" },
-  { keys: ["A", "←"],   label: "Turn Left" },
-  { keys: ["D", "→"],   label: "Turn Right" },
-  { keys: ["Space"],     label: "Brake" },
-  { keys: ["F"],         label: "Toggle Headlight" },
-  { keys: ["C"],         label: "Toggle Collider Debug" },
-  { keys: ["T"],         label: "Pause Day/Night Cycle" },
-  { keys: ["M"],         label: "Snap to Day" },
-  { keys: ["N"],         label: "Snap to Night" },
-  { keys: ["B"],         label: "Resume Auto-Cycle" },
-  { keys: ["H"],         label: "Toggle Debug GUI (debug mode)" },
-  { keys: ["?", "/"],    label: "Show this help" },
+  { keys: ["W", "↑"],   label: "forward" },
+  { keys: ["S", "↓"],   label: "backward" },
+  { keys: ["A", "←"],   label: "turn left" },
+  { keys: ["D", "→"],   label: "turn right" },
+  { keys: ["Space"],     label: "brake" },
+  { keys: ["F"],         label: "toggle headlight" },
+  { keys: ["C"],         label: "toggle collider debug" },
+  { keys: ["T"],         label: "pause day/night cycle" },
+  { keys: ["M"],         label: "snap to day" },
+  { keys: ["N"],         label: "snap to night" },
+  { keys: ["B"],         label: "resume auto-cycle" },
+  { keys: ["H"],         label: "toggle debug gui" },
+  { keys: ["F1", "?"],   label: "show this help" },
 ];
 
 export class HotkeyHelp {
@@ -32,79 +34,59 @@ export class HotkeyHelp {
   }
 
   _buildUI() {
-    // ── ?-Button unten rechts ──
     this.btn = document.createElement("button");
-    this.btn.innerHTML = "?";
-    this.btn.title = "Shortcuts (?)";
-    // Auf Touch-Devices nicht anzeigen (Tastatur-Help ist da sinnlos und
-    // würde mit dem TouchJoystick kollidieren).
+    this.btn.type = "button";
+    this.btn.className = "hud-btn";
+    this.btn.textContent = "[F1] help";
+    this.btn.setAttribute("aria-label", "show keyboard shortcuts");
     const isTouch = window.matchMedia?.("(pointer: coarse)")?.matches
       || "ontouchstart" in window;
     Object.assign(this.btn.style, {
       position: "fixed",
       bottom: "20px",
       left: "20px",
-      width: "38px",
-      height: "38px",
-      borderRadius: "50%",
-      border: "1px solid rgba(255, 255, 255, 0.18)",
-      background: "rgba(0, 0, 0, 0.45)",
-      backdropFilter: "blur(10px)",
-      color: "rgba(240, 245, 250, 0.92)",
-      fontSize: "18px",
-      cursor: "pointer",
       zIndex: "12",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      transition: "background 0.15s, transform 0.2s",
-      display: isTouch ? "none" : "flex",
-      alignItems: "center",
-      justifyContent: "center",
-    });
-    this.btn.addEventListener("mouseenter", () => {
-      this.btn.style.background = "rgba(255, 255, 255, 0.12)";
-    });
-    this.btn.addEventListener("mouseleave", () => {
-      this.btn.style.background = "rgba(0, 0, 0, 0.45)";
+      display: isTouch ? "none" : "inline-flex",
+      background: "var(--ink-solid)",
     });
     this.btn.addEventListener("click", () => this.toggle());
     document.body.appendChild(this.btn);
 
-    // ── Modal-Overlay ──
     this.overlay = document.createElement("div");
     Object.assign(this.overlay.style, {
       position: "fixed",
       inset: "0",
-      background: "rgba(4, 8, 16, 0.55)",
-      backdropFilter: "blur(6px)",
+      background: "oklch(13% 0.015 250 / 0.55)",
       zIndex: "15",
       display: "none",
       alignItems: "center",
       justifyContent: "center",
-      fontFamily: "system-ui, -apple-system, sans-serif",
+      fontFamily: "var(--font-mono)",
     });
     this.overlay.addEventListener("click", (e) => {
       if (e.target === this.overlay) this.toggle();
     });
 
     const panel = document.createElement("div");
+    panel.className = "hud-bracket";
+    panel.setAttribute("role", "dialog");
+    panel.setAttribute("aria-modal", "true");
+    panel.setAttribute("aria-label", "keyboard shortcuts");
     Object.assign(panel.style, {
       minWidth: "320px",
-      padding: "24px 28px",
-      borderRadius: "16px",
-      border: "1px solid rgba(255, 255, 255, 0.16)",
-      background: "rgba(10, 18, 32, 0.85)",
-      color: "rgba(240, 245, 250, 0.92)",
-      fontSize: "14px",
-      boxShadow: "0 16px 48px rgba(0, 0, 0, 0.55)",
+      maxWidth: "min(440px, calc(100vw - 32px))",
+      padding: "22px 24px 20px",
+      background: "var(--ink-solid)",
+      color: "var(--paper)",
+      fontSize: "13px",
     });
+    panel.append(this._cornerSpan("tr"), this._cornerSpan("bl"));
 
     const title = document.createElement("div");
-    title.textContent = "Shortcuts";
+    title.textContent = "> shortcuts";
     Object.assign(title.style, {
       fontSize: "11px",
-      textTransform: "uppercase",
-      letterSpacing: "0.18em",
-      color: "rgba(180, 195, 210, 0.8)",
+      color: "var(--paper-muted)",
       marginBottom: "14px",
     });
     panel.appendChild(title);
@@ -113,44 +95,42 @@ export class HotkeyHelp {
     Object.assign(list.style, {
       display: "grid",
       gridTemplateColumns: "auto 1fr",
-      gap: "10px 22px",
+      gap: "8px 20px",
       alignItems: "center",
     });
     for (const row of HOTKEYS) {
       const keysCell = document.createElement("div");
-      keysCell.style.display = "flex";
-      keysCell.style.gap = "4px";
+      Object.assign(keysCell.style, { display: "flex", gap: "4px" });
       for (const k of row.keys) {
         const kbd = document.createElement("kbd");
         kbd.textContent = k;
         Object.assign(kbd.style, {
-          padding: "2px 8px",
-          borderRadius: "5px",
-          border: "1px solid rgba(255, 255, 255, 0.22)",
-          background: "rgba(255, 255, 255, 0.06)",
-          fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace",
-          fontSize: "12px",
-          color: "rgba(240, 245, 250, 0.96)",
-          minWidth: "26px",
+          padding: "2px 7px",
+          border: "1px solid var(--rule-strong)",
+          background: "transparent",
+          fontFamily: "var(--font-mono)",
+          fontSize: "11px",
+          color: "var(--paper)",
+          minWidth: "24px",
           textAlign: "center",
         });
         keysCell.appendChild(kbd);
       }
       const labelCell = document.createElement("div");
       labelCell.textContent = row.label;
-      labelCell.style.color = "rgba(220, 230, 240, 0.85)";
+      labelCell.style.color = "var(--paper)";
       list.appendChild(keysCell);
       list.appendChild(labelCell);
     }
     panel.appendChild(list);
 
     const hint = document.createElement("div");
-    hint.textContent = "Press ? or click outside to close";
+    hint.textContent = "[esc] close";
     Object.assign(hint.style, {
       marginTop: "16px",
       fontSize: "11px",
-      color: "rgba(160, 180, 200, 0.55)",
-      textAlign: "center",
+      color: "var(--paper-dim)",
+      textAlign: "right",
     });
     panel.appendChild(hint);
 
@@ -158,13 +138,18 @@ export class HotkeyHelp {
     document.body.appendChild(this.overlay);
   }
 
+  _cornerSpan(corner) {
+    const s = document.createElement("span");
+    s.className = `hud-bracket-${corner}`;
+    return s;
+  }
+
   _bindKeys() {
     this._onKey = (e) => {
-      // Bei Eingabefeld nicht reagieren
       const tag = document.activeElement?.tagName?.toLowerCase();
       if (tag === "input" || tag === "textarea") return;
 
-      if ((e.key === "?" || e.key === "/") && !e.repeat) {
+      if ((e.key === "?" || e.key === "/" || e.key === "F1") && !e.repeat) {
         e.preventDefault();
         this.toggle();
       } else if (e.code === "Escape" && this.isOpen) {
@@ -177,6 +162,7 @@ export class HotkeyHelp {
   toggle() {
     this.isOpen = !this.isOpen;
     this.overlay.style.display = this.isOpen ? "flex" : "none";
+    this.btn.dataset.active = String(this.isOpen);
   }
 
   destroy() {

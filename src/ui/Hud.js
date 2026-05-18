@@ -1,20 +1,19 @@
 /**
- * Hud — Top-Level HUD-Overlay.
+ * Hud — Speed-Anzeige unten-links + Recenter-Button.
  *
- * Sub-Elemente:
- *   - HintBar (oben Mitte: "Drive with WASD")
- *   - SpeedHud (unten Mitte: aktuelle Geschwindigkeit in km/h)
- *   - RecenterButton (Mitte unten: nur sichtbar wenn followMode = false)
- *
- * Alle HTML-Elemente werden in einen overlay-Container am body angehängt
- * — pointer-events: none auf dem Container, opt-in pro Element.
+ * Brutalist-Game-HUD register:
+ *   - Speed anchored bottom-left (nicht zentriert)
+ *   - Corner-brackets statt rounded card
+ *   - Numeral wechselt zu --signal bei ≥ SIGNAL_THRESHOLD km/h
+ *   - Recenter-Button als reiner Text mit hover-underline
  */
+
+const SIGNAL_THRESHOLD = 25;
 
 export class Hud {
   constructor(game) {
     this.game = game;
 
-    // Wrapper div — fullscreen overlay
     this.root = document.createElement("div");
     this.root.id = "hud-root";
     Object.assign(this.root.style, {
@@ -22,150 +21,108 @@ export class Hud {
       inset: "0",
       pointerEvents: "none",
       zIndex: "10",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      color: "white",
+      fontFamily: "var(--font-mono)",
+      color: "var(--paper)",
       userSelect: "none",
     });
     document.body.appendChild(this.root);
 
-    // Hint-Bar bewusst entfernt — Controls werden via HotkeyHelp (?-Button
-    // unten rechts) erklärt. Bildschirm bleibt clean.
     this._buildSpeedHud();
     this._buildRecenterButton();
   }
 
-  _buildHintBar() {
-    const wrap = document.createElement("div");
-    Object.assign(wrap.style, {
-      position: "absolute",
-      top: "20px",
-      left: "50%",
-      transform: "translateX(-50%)",
-      textAlign: "center",
-      pointerEvents: "none",
-      // Dezent, dunkel-gefärbt, fadet nach ein paar Sekunden weg
-      padding: "7px 16px",
-      borderRadius: "999px",
-      background: "rgba(4, 8, 16, 0.42)",
-      border: "1px solid rgba(255, 255, 255, 0.08)",
-      backdropFilter: "blur(8px)",
-      WebkitBackdropFilter: "blur(8px)",
-      fontSize: "12px",
-      color: "rgba(220, 225, 230, 0.85)",
-      transition: "opacity 0.6s ease",
-    });
-    wrap.textContent = "W A S D · Space = Brake · F = Headlight";
-
-    this.root.appendChild(wrap);
-    this.hintBar = wrap;
-
-    // Auto-fade nach 8 Sekunden — Recruiter weiß dann wie's geht, und der
-    // Bildschirm wird sauberer für den Rest der Session.
-    this._hintFadeTimer = setTimeout(() => {
-      wrap.style.opacity = "0";
-      // Nach Fade komplett ausblenden damit kein space-claim mehr
-      setTimeout(() => { wrap.style.display = "none"; }, 700);
-    }, 8000);
-  }
-
   _buildSpeedHud() {
     const wrap = document.createElement("div");
+    wrap.className = "hud-bracket";
     Object.assign(wrap.style, {
       position: "absolute",
       bottom: "24px",
-      left: "50%",
-      transform: "translateX(-50%)",
+      left: "24px",
+      padding: "10px 14px 8px",
       display: "flex",
-      flexDirection: "column",
-      alignItems: "center",
-      gap: "2px",
+      alignItems: "baseline",
+      gap: "8px",
       pointerEvents: "none",
-      padding: "8px 18px",
-      background: "rgba(0, 0, 0, 0.35)",
-      backdropFilter: "blur(8px)",
-      borderRadius: "12px",
-      border: "1px solid rgba(255, 255, 255, 0.12)",
+    });
+    wrap.append(this._cornerSpan("tr"), this._cornerSpan("bl"));
+
+    const caret = document.createElement("span");
+    caret.textContent = "▌";
+    Object.assign(caret.style, {
+      color: "var(--paper-muted)",
+      fontSize: "14px",
+      lineHeight: "1",
+      marginRight: "2px",
     });
 
-    this.speedValue = document.createElement("div");
+    this.speedValue = document.createElement("span");
     this.speedValue.textContent = "0";
     Object.assign(this.speedValue.style, {
-      fontSize: "28px",
-      fontWeight: "600",
+      fontSize: "clamp(40px, 6vw, 64px)",
+      fontWeight: "400",
       lineHeight: "1",
       fontVariantNumeric: "tabular-nums",
+      letterSpacing: "-0.02em",
+      transition: "color 180ms var(--ease)",
     });
 
-    const unit = document.createElement("div");
+    const unit = document.createElement("span");
     unit.textContent = "km/h";
     Object.assign(unit.style, {
-      fontSize: "10px",
-      textTransform: "uppercase",
-      letterSpacing: "0.25em",
-      color: "rgba(200, 210, 220, 0.75)",
+      fontSize: "11px",
+      color: "var(--paper-muted)",
+      letterSpacing: "0.06em",
     });
 
-    wrap.appendChild(this.speedValue);
-    wrap.appendChild(unit);
+    wrap.append(caret, this.speedValue, unit);
     this.root.appendChild(wrap);
     this.speedHud = wrap;
   }
 
   _buildRecenterButton() {
     const btn = document.createElement("button");
-    btn.textContent = "↺  Recenter Camera";
+    btn.type = "button";
+    btn.className = "hud-btn";
+    btn.setAttribute("aria-label", "recenter camera");
+    btn.textContent = "↺ recenter";
     Object.assign(btn.style, {
       position: "absolute",
       bottom: "100px",
       left: "50%",
       transform: "translateX(-50%)",
-      padding: "10px 22px",
-      borderRadius: "999px",
-      border: "1px solid rgba(255, 255, 255, 0.18)",
-      background: "rgba(0, 0, 0, 0.45)",
-      backdropFilter: "blur(10px)",
-      color: "rgba(240, 245, 250, 0.92)",
-      fontSize: "12px",
-      letterSpacing: "0.05em",
-      cursor: "pointer",
       pointerEvents: "auto",
-      display: "none",   // Sichtbarkeit wird in update() gesteuert
-      transition: "background 0.15s, transform 0.1s",
-    });
-    btn.addEventListener("mouseenter", () => {
-      btn.style.background = "rgba(255, 255, 255, 0.12)";
-    });
-    btn.addEventListener("mouseleave", () => {
-      btn.style.background = "rgba(0, 0, 0, 0.45)";
+      display: "none",
+      letterSpacing: "0.04em",
+      background: "var(--ink-solid)",
     });
     btn.addEventListener("click", () => {
-      if (this.game.cameraRig) {
-        this.game.cameraRig.recenter();
-      }
+      if (this.game.cameraRig) this.game.cameraRig.recenter();
     });
 
     this.root.appendChild(btn);
     this.recenterBtn = btn;
   }
 
+  _cornerSpan(corner) {
+    const s = document.createElement("span");
+    s.className = `hud-bracket-${corner}`;
+    return s;
+  }
+
   update() {
-    // Speed-Update
     const player = this.game.world?.player;
     if (player?.body && this.speedValue) {
       const v = player.body.linvel();
-      // m/s → km/h, dann skaliert damit Top-Speed (4.5 m/s) bei 32 km/h liegt
-      // Skalierung: 32 km/h Anzeige / (4.5 m/s * 3.6) ≈ 1.975
       const SPEED_DISPLAY_SCALE = 32 / (4.5 * 3.6);
       const kmh = Math.hypot(v.x, v.z) * 3.6 * SPEED_DISPLAY_SCALE;
       this.speedValue.textContent = kmh.toFixed(0);
+      this.speedValue.style.color =
+        kmh >= SIGNAL_THRESHOLD ? "var(--signal)" : "var(--paper)";
     }
 
-    // Recenter-Button-Sichtbarkeit + Position relativ zum Drawer
-    // (Drawer ist auf Mobile bottom-fixed, darum heben wir den Button höher
-    //  wenn der Drawer gerade offen ist).
     if (this.recenterBtn && this.game.cameraRig) {
       const show = !this.game.cameraRig.followMode;
-      this.recenterBtn.style.display = show ? "block" : "none";
+      this.recenterBtn.style.display = show ? "inline-flex" : "none";
       const drawerOpen = !!this.game?.ui?.drawer?.isOpen;
       this.recenterBtn.style.bottom = drawerOpen ? "280px" : "100px";
     }

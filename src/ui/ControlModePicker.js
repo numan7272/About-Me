@@ -1,17 +1,17 @@
 /**
  * ControlModePicker — Welcome-Overlay beim ersten Mobile-Start.
  *
- * Zeigt 2 Karten:
- *   - "Joystick" — In-World-3D-Steuerung wie Bruno Simon
- *   - "Tap-to-Move" — League-of-Legends-Style: tap → Bike fährt hin
+ * Brutalist-Game-HUD register:
+ *   - Solid ink dialog mit corner-brackets
+ *   - Zwei Optionen als hairline-Rahmen-Boxen, recommended = signal-border
+ *   - Plain mono text-buttons, kein gradient, kein blur
  *
- * Nur einmal sichtbar (localStorage). Im Settings-Panel jederzeit änderbar.
- * Auf Desktop standardmäßig nicht angezeigt — Settings bleibt dort der Weg.
+ * Nur Mobile/Touch, einmalig pro User (localStorage).
  */
 
 import { setControlMode, markPickerSeen, hasPickerBeenSeen } from "./controlMode.js";
 
-const SHOW_DELAY_MS = 900;     // kurz warten bis Splash weg ist
+const SHOW_DELAY_MS = 900;
 
 export class ControlModePicker {
   constructor(game) {
@@ -19,7 +19,6 @@ export class ControlModePicker {
     this.dom = null;
     this._timer = null;
 
-    // Wann zeigen? Nur auf Mobile/Touch + nur wenn noch nie gesehen.
     if (hasPickerBeenSeen()) return;
     if (!this._isTouchDevice()) return;
 
@@ -41,106 +40,105 @@ export class ControlModePicker {
 
     const lang = (typeof window !== "undefined" && window.__lang === "en") ? "en" : "de";
     const strings = lang === "en" ? {
-      title: "Choose your controls",
-      sub: "How do you want to ride the bike? You can switch any time in settings.",
-      joystickTitle: "On-Bike Joystick",
-      joystickDesc: "A virtual joystick lives around the bike. Drag in any direction to steer. Recommended.",
-      tapTitle: "Tap to Move",
-      tapDesc: "Tap a spot on the ground — the bike rides there on its own. Like a top-down RPG.",
-      pick: "Pick",
+      meta: "> tutorial",
+      title: "choose your controls",
+      sub: "how do you want to ride the bike. you can switch any time in settings.",
+      joystickTitle: "on-bike joystick",
+      joystickDesc: "a virtual joystick sits under the bike. drag in any direction to steer. recommended.",
+      tapTitle: "tap to move",
+      tapDesc: "tap a spot on the ground. the bike rides there on its own. like a top-down rpg.",
+      pick: "pick",
+      recommended: "recommended",
     } : {
-      title: "Wähl deine Steuerung",
-      sub: "Wie willst du das Fahrrad steuern? Du kannst jederzeit in den Einstellungen wechseln.",
-      joystickTitle: "Joystick am Bike",
-      joystickDesc: "Ein virtueller Joystick liegt unter dem Fahrrad. Ziehe in eine Richtung zum Lenken. Empfohlen.",
-      tapTitle: "Tippen statt Steuern",
-      tapDesc: "Tippe eine Stelle am Boden — das Fahrrad fährt von selbst dorthin. Wie bei einem Top-Down-RPG.",
-      pick: "Wählen",
+      meta: "> tutorial",
+      title: "wähl deine steuerung",
+      sub: "wie willst du das fahrrad steuern. du kannst jederzeit in den einstellungen wechseln.",
+      joystickTitle: "joystick am bike",
+      joystickDesc: "ein virtueller joystick liegt unter dem fahrrad. ziehe in eine richtung zum lenken. empfohlen.",
+      tapTitle: "tippen statt steuern",
+      tapDesc: "tippe eine stelle am boden. das fahrrad fährt von selbst dorthin. wie bei einem top-down-rpg.",
+      pick: "wählen",
+      recommended: "empfohlen",
     };
 
     const root = document.createElement("div");
-    root.className = "cmp-overlay";
     root.style.cssText = `
       position: fixed; inset: 0; z-index: 9998;
-      background: rgba(4, 8, 16, 0.86);
-      backdrop-filter: blur(12px);
-      -webkit-backdrop-filter: blur(12px);
+      background: oklch(13% 0.015 250 / 0.55);
       display: flex; align-items: center; justify-content: center;
       padding: 20px;
-      opacity: 0; transition: opacity 280ms ease;
-      font-family: system-ui, -apple-system, sans-serif;
-      color: #f0f5fa;
+      opacity: 0;
+      transition: opacity 280ms var(--ease);
+      font-family: var(--font-mono);
+      color: var(--paper);
     `;
 
     const card = document.createElement("div");
+    card.className = "hud-bracket";
+    card.setAttribute("role", "dialog");
+    card.setAttribute("aria-modal", "true");
+    card.setAttribute("aria-labelledby", "cmp-title");
     card.style.cssText = `
       max-width: 720px; width: 100%;
-      background: rgba(10, 18, 32, 0.95);
-      border: 1px solid rgba(126, 200, 255, 0.20);
-      border-radius: 18px;
-      padding: 28px 26px;
-      box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+      background: var(--ink-solid);
+      color: var(--paper);
+      padding: 26px 24px 22px;
     `;
 
     card.innerHTML = `
-      <div style="font-size:11px;letter-spacing:0.25em;text-transform:uppercase;color:#7ec8ff;margin-bottom:10px;">
-        TUTORIAL
-      </div>
-      <h2 style="margin:0 0 8px;font-size:24px;font-weight:700;line-height:1.15;">${strings.title}</h2>
-      <p style="margin:0 0 22px;font-size:14px;line-height:1.5;color:rgba(200,212,228,0.85);">
-        ${strings.sub}
-      </p>
-      <div class="cmp-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
-        ${this._renderCard("joystick", strings.joystickTitle, strings.joystickDesc, strings.pick, true)}
-        ${this._renderCard("tap", strings.tapTitle, strings.tapDesc, strings.pick, false)}
+      <span class="hud-bracket-tr"></span>
+      <span class="hud-bracket-bl"></span>
+      <div style="font-size:11px;color:var(--paper-muted);margin-bottom:10px;">${strings.meta}</div>
+      <h2 id="cmp-title" style="margin:0 0 8px;font-size:22px;font-weight:400;line-height:1.15;letter-spacing:-0.01em;color:var(--paper);">${strings.title}</h2>
+      <p style="margin:0 0 18px;font-size:13px;line-height:1.5;color:var(--paper-muted);">${strings.sub}</p>
+      <hr class="hud-rule" style="margin:0 0 18px;" />
+      <div data-cmp-grid style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        ${this._renderCard("joystick", strings.joystickTitle, strings.joystickDesc, strings.pick, strings.recommended, true)}
+        ${this._renderCard("tap", strings.tapTitle, strings.tapDesc, strings.pick, strings.recommended, false)}
       </div>
     `;
 
     const style = document.createElement("style");
     style.textContent = `
       .cmp-card {
-        padding: 18px 16px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid rgba(255, 255, 255, 0.10);
-        border-radius: 12px;
+        padding: 16px 14px;
+        background: transparent;
+        border: 1px solid var(--rule);
         display: flex; flex-direction: column;
         gap: 10px;
         text-align: left;
+        font-family: var(--font-mono);
       }
-      .cmp-card.recommended {
-        border-color: rgba(126, 200, 255, 0.40);
-        background: rgba(126, 200, 255, 0.06);
-      }
-      .cmp-card-icon { font-size: 32px; line-height: 1; }
-      .cmp-card-title { font-size: 16px; font-weight: 700; margin: 0; }
-      .cmp-card-desc { font-size: 12.5px; line-height: 1.5; color: rgba(200,212,228,0.78); margin: 0; }
+      .cmp-card.recommended { border-color: var(--signal); }
+      .cmp-card-title { font-size: 14px; font-weight: 400; margin: 0; color: var(--paper); }
+      .cmp-card-desc { font-size: 12px; line-height: 1.5; color: var(--paper-muted); margin: 0; flex: 1; }
       .cmp-card-pick {
         margin-top: auto;
-        padding: 11px 14px;
-        background: linear-gradient(135deg, rgba(126,200,255,0.30), rgba(126,200,255,0.12));
-        border: 1px solid rgba(126, 200, 255, 0.50);
-        color: #f0f5fa;
-        font-weight: 600;
-        font-size: 13px;
-        border-radius: 8px;
+        padding: 12px 14px;
+        background: transparent;
+        border: 1px solid var(--rule-strong);
+        color: var(--paper);
+        font-family: var(--font-mono);
+        font-size: 12px;
         cursor: pointer;
-        font-family: inherit;
         min-height: 44px;
+        text-transform: lowercase;
+        transition: border-color 180ms var(--ease), color 180ms var(--ease);
       }
-      .cmp-card-pick:hover { filter: brightness(1.15); }
+      .cmp-card-pick:hover,
+      .cmp-card-pick:focus-visible {
+        border-color: var(--signal);
+        color: var(--signal);
+      }
+      .cmp-card.recommended .cmp-card-pick { border-color: var(--signal); color: var(--signal); }
       .cmp-badge {
         display: inline-block;
-        padding: 2px 8px;
         font-size: 10px;
-        letter-spacing: 0.06em;
-        color: #7ec8ff;
-        background: rgba(126, 200, 255, 0.15);
-        border-radius: 999px;
-        font-weight: 600;
-        text-transform: uppercase;
+        color: var(--signal);
+        padding: 0;
       }
       @media (max-width: 640px) {
-        .cmp-grid { grid-template-columns: 1fr !important; }
+        [data-cmp-grid] { grid-template-columns: 1fr !important; }
       }
     `;
     root.appendChild(style);
@@ -161,18 +159,18 @@ export class ControlModePicker {
     });
   }
 
-  _renderCard(mode, title, desc, pickLabel, recommended) {
-    const icon = mode === "joystick" ? "🕹️" : "🎯";
-    const badge = recommended ? `<span class="cmp-badge">Empfohlen</span>` : "";
+  _renderCard(mode, title, desc, pickLabel, recommendedLabel, recommended) {
+    const badge = recommended
+      ? `<span class="cmp-badge">[ ${recommendedLabel} ]</span>`
+      : "";
     return `
       <div class="cmp-card ${recommended ? "recommended" : ""}">
-        <div class="cmp-card-icon">${icon}</div>
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;gap:8px;">
           <h3 class="cmp-card-title">${title}</h3>
           ${badge}
         </div>
         <p class="cmp-card-desc">${desc}</p>
-        <button class="cmp-card-pick" data-mode="${mode}">${pickLabel}</button>
+        <button class="cmp-card-pick" data-mode="${mode}">${pickLabel}  →</button>
       </div>
     `;
   }

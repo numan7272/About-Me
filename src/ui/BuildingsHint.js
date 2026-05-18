@@ -1,19 +1,16 @@
 /**
  * BuildingsHint — One-Time-Toast: "Jedes Gebäude ist anklickbar".
  *
- * Erscheint 6 Sekunden nach dem ersten Mal Free-Roam (also nicht während
- * der Tour, nicht im LoadingSplash). Schließt sich automatisch nach 7 Sekunden
- * oder bei Klick auf X. Wird nur EINMAL pro User gezeigt (localStorage).
+ * Brutalist-Game-HUD register:
+ *   - Solid ink, hairline signal border-left, kein blur/glow
+ *   - Lowercase mono text, "[x] dismiss" affordance
  *
- * Trigger zum permanenten Wegblenden:
- *   - User klickt das erste Building → wir merken's
- *   - User klickt den Close-X am Toast
- *   - User klickt "Start Tour" (Tour-Hinweis enthält die Info eh)
+ * Erscheint 6s nach Free-Roam-Start, autodismiss nach 9s, einmalig.
  */
 
 const STORAGE_KEY = "numan-portfolio-buildings-hint-seen-v1";
-const SHOW_DELAY_MS = 6000;     // 6s nach Init warten
-const AUTO_HIDE_MS = 9000;      // 9s sichtbar
+const SHOW_DELAY_MS = 6000;
+const AUTO_HIDE_MS = 9000;
 
 export class BuildingsHint {
   constructor(game) {
@@ -23,8 +20,6 @@ export class BuildingsHint {
     this._hideTimer = null;
 
     if (this._alreadySeen()) return;
-
-    // Warte bis Free-Roam (kein LoadingSplash, kein Tour) und zeig dann
     this._timer = setTimeout(() => this._maybeShow(), SHOW_DELAY_MS);
   }
 
@@ -37,9 +32,7 @@ export class BuildingsHint {
   }
 
   _maybeShow() {
-    // Nicht zeigen wenn gerade Tour läuft oder ein Mini-Game offen ist
     if (this.game?.ui?.walkthrough?.active) {
-      // Warte nochmal 6s
       this._timer = setTimeout(() => this._maybeShow(), 6000);
       return;
     }
@@ -54,67 +47,64 @@ export class BuildingsHint {
     if (this.dom) return;
     const lang = (typeof window !== "undefined" && window.__lang === "en") ? "en" : "de";
     const text = lang === "en"
-      ? "Tip: each building on the island is clickable. Try riding up + tapping one."
-      : "Tipp: Jedes Gebäude auf der Insel ist anklickbar. Fahr hin und klick drauf.";
+      ? "tip. every building on the island is clickable. ride up, tap one."
+      : "tipp. jedes gebäude auf der insel ist anklickbar. fahr hin, klick drauf.";
 
-    const closeLabel = lang === "en" ? "Got it" : "Verstanden";
     const root = document.createElement("div");
-    root.className = "bld-hint";
-    root.innerHTML = `
-      <div class="bld-hint-icon">🏢</div>
-      <div class="bld-hint-text">${text}</div>
-      <button class="bld-hint-close" title="${closeLabel}">✕</button>
-    `;
+    root.setAttribute("role", "status");
     Object.assign(root.style, {
       position: "fixed",
       top: "20px",
       right: "20px",
       maxWidth: "320px",
-      padding: "12px 14px",
-      paddingRight: "40px",
-      background: "rgba(10, 18, 32, 0.92)",
-      backdropFilter: "blur(14px)",
-      WebkitBackdropFilter: "blur(14px)",
-      border: "1px solid rgba(126, 200, 255, 0.35)",
-      borderRadius: "10px",
-      color: "rgba(240, 245, 250, 0.94)",
-      fontSize: "13px",
-      lineHeight: "1.4",
+      padding: "12px 16px 12px 18px",
+      background: "var(--ink-solid)",
+      borderLeft: "2px solid var(--signal)",
+      color: "var(--paper)",
+      fontFamily: "var(--font-mono)",
+      fontSize: "12px",
+      lineHeight: "1.5",
       zIndex: "15",
-      boxShadow: "0 8px 28px rgba(0, 0, 0, 0.45)",
       display: "flex",
-      gap: "10px",
+      gap: "12px",
       alignItems: "flex-start",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      transform: "translateY(-10px)",
+      transform: "translateY(-12px)",
       opacity: "0",
-      transition: "opacity 320ms ease, transform 320ms ease",
+      transition: "opacity 320ms var(--ease), transform 320ms var(--ease)",
     });
-    // Sub-elements stylen
+
+    const textEl = document.createElement("div");
+    textEl.textContent = text;
+    textEl.style.flex = "1";
+    root.appendChild(textEl);
+
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.textContent = "[x]";
+    closeBtn.setAttribute("aria-label", "dismiss hint");
+    Object.assign(closeBtn.style, {
+      background: "transparent",
+      border: "0",
+      color: "var(--paper-muted)",
+      fontFamily: "var(--font-mono)",
+      fontSize: "11px",
+      cursor: "pointer",
+      padding: "0 4px",
+      transition: "color 180ms var(--ease)",
+    });
+    closeBtn.addEventListener("mouseenter", () => {
+      closeBtn.style.color = "var(--signal)";
+    });
+    closeBtn.addEventListener("mouseleave", () => {
+      closeBtn.style.color = "var(--paper-muted)";
+    });
+    closeBtn.addEventListener("click", () => this._dismiss());
+    root.appendChild(closeBtn);
+
     const style = document.createElement("style");
     style.textContent = `
-      .bld-hint-icon { font-size: 22px; line-height: 1; flex-shrink: 0; }
-      .bld-hint-text { flex: 1; }
-      .bld-hint-close {
-        position: absolute;
-        top: 6px; right: 8px;
-        background: transparent;
-        border: 0;
-        color: rgba(220, 230, 240, 0.55);
-        font-size: 14px;
-        cursor: pointer;
-        padding: 4px 6px;
-        border-radius: 4px;
-        line-height: 1;
-      }
-      .bld-hint-close:hover {
-        background: rgba(255, 255, 255, 0.08);
-        color: rgba(240, 245, 250, 0.95);
-      }
-
-      /* Auf Mobile etwas anders positionieren — unter MiniMap + Egg-Counter */
       @media (max-width: 640px) {
-        .bld-hint {
+        [data-bld-hint] {
           top: auto !important;
           bottom: 100px !important;
           right: 14px !important;
@@ -123,6 +113,7 @@ export class BuildingsHint {
         }
       }
     `;
+    root.dataset.bldHint = "1";
     document.head.appendChild(style);
     this._extraStyle = style;
     document.body.appendChild(root);
@@ -133,7 +124,6 @@ export class BuildingsHint {
       root.style.transform = "translateY(0)";
     });
 
-    root.querySelector(".bld-hint-close").addEventListener("click", () => this._dismiss());
     this._hideTimer = setTimeout(() => this._dismiss(), AUTO_HIDE_MS);
   }
 
@@ -141,7 +131,7 @@ export class BuildingsHint {
     if (!this.dom) return;
     this._markSeen();
     this.dom.style.opacity = "0";
-    this.dom.style.transform = "translateY(-10px)";
+    this.dom.style.transform = "translateY(-12px)";
     const r = this.dom;
     const s = this._extraStyle;
     this.dom = null;
@@ -149,7 +139,6 @@ export class BuildingsHint {
     clearTimeout(this._hideTimer);
   }
 
-  /** Wird von EggClickHandler gerufen wenn der User ein Building geklickt hat. */
   acknowledge() {
     this._markSeen();
     this._dismiss();

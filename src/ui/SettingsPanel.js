@@ -1,12 +1,12 @@
 /**
- * SettingsPanel — Zahnrad oben links, klappbares Panel.
+ * SettingsPanel — Text-Button oben-links, ausklappbares Panel.
  *
- * Inhalt:
- *   - Sprache: DE / EN (Toggle)
- *   - Audio: Volume-Slider 0-100
- *   - Grafik: Low / High (Toggle — beeinflusst Shadow-Map-Size + AA)
+ * Brutalist-Game-HUD register:
+ *   - "settings" als Lowercase-Wort statt rotierender Zahnrad
+ *   - Toggle-Groups als plain text-buttons mit Hairline-Underline auf active
+ *   - Solid ink surface, kein backdrop-blur
  *
- * State wird in localStorage gespeichert damit's Reloads übersteht.
+ * State wird in localStorage gespeichert.
  */
 
 import { getControlMode, setControlMode } from "./controlMode.js";
@@ -16,8 +16,8 @@ const STORAGE_KEY = "numan-portfolio-settings-v1";
 const DEFAULTS = {
   lang: "de",
   volume: 0.7,
-  graphics: "high",     // "low" | "high"
-  renderer: "webgl",    // "webgl" (default) oder "webgpu"
+  graphics: "high",
+  renderer: "webgl",
 };
 
 export class SettingsPanel {
@@ -29,20 +29,18 @@ export class SettingsPanel {
     this._buildUI();
     this._applySettings();
 
-    // K1-Fix: Renderer ist evtl. async (WebGPU). _applySettings setzt
-    // PixelRatio + shadowMap, was nur funktioniert wenn renderer.instance
-    // existiert. Wir hängen uns an renderer.ready und re-applyen.
     if (this.game?.renderer?.ready?.then) {
       this.game.renderer.ready.then(() => {
         this._applySettings();
         if (this._rendererHint) {
           this._rendererHint.textContent =
-            "Active: " + (this.game?.renderer?.mode || "unknown");
+            "active: " + (this.game?.renderer?.mode || "unknown");
         }
       }).catch((err) => {
         console.warn("[Settings] renderer.ready failed:", err?.message);
         if (this._rendererHint) {
-          this._rendererHint.textContent = "Renderer init failed — using WebGL fallback";
+          this._rendererHint.textContent =
+            "renderer init failed. using webgl fallback";
         }
       });
     }
@@ -51,9 +49,7 @@ export class SettingsPanel {
   _loadSettings() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) {
-        return { ...DEFAULTS, ...JSON.parse(raw) };
-      }
+      if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
     } catch (e) {}
     return { ...DEFAULTS };
   }
@@ -65,151 +61,136 @@ export class SettingsPanel {
   }
 
   _buildUI() {
-    // ── Zahnrad-Button ──
     this.btn = document.createElement("button");
-    this.btn.innerHTML = "⚙";
-    this.btn.title = "Settings";
+    this.btn.type = "button";
+    this.btn.className = "hud-btn";
+    this.btn.textContent = "settings";
+    this.btn.setAttribute("aria-expanded", "false");
+    this.btn.setAttribute("aria-controls", "settings-panel");
     Object.assign(this.btn.style, {
       position: "fixed",
       top: "20px",
       left: "20px",
-      width: "42px",
-      height: "42px",
-      borderRadius: "50%",
-      border: "1px solid rgba(255, 255, 255, 0.18)",
-      background: "rgba(0, 0, 0, 0.45)",
-      backdropFilter: "blur(10px)",
-      color: "rgba(240, 245, 250, 0.92)",
-      fontSize: "22px",
-      cursor: "pointer",
       zIndex: "12",
-      transition: "transform 0.2s, background 0.15s",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      lineHeight: "1",
-    });
-    this.btn.addEventListener("mouseenter", () => {
-      this.btn.style.background = "rgba(255, 255, 255, 0.12)";
-    });
-    this.btn.addEventListener("mouseleave", () => {
-      this.btn.style.background = "rgba(0, 0, 0, 0.45)";
+      background: "var(--ink-solid)",
     });
     this.btn.addEventListener("click", () => this.toggle());
     document.body.appendChild(this.btn);
 
-    // ── Panel ──
     this.panel = document.createElement("div");
+    this.panel.id = "settings-panel";
+    this.panel.className = "hud-bracket";
     Object.assign(this.panel.style, {
       position: "fixed",
-      top: "72px",
+      top: "76px",
       left: "20px",
       width: "240px",
-      padding: "16px",
-      borderRadius: "14px",
-      border: "1px solid rgba(255, 255, 255, 0.14)",
-      background: "rgba(10, 18, 32, 0.78)",
-      backdropFilter: "blur(14px)",
-      color: "rgba(240, 245, 250, 0.92)",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      fontSize: "13px",
-      boxShadow: "0 8px 32px rgba(0, 0, 0, 0.45)",
+      padding: "16px 16px 14px",
+      fontFamily: "var(--font-mono)",
+      fontSize: "12px",
+      color: "var(--paper)",
       zIndex: "12",
       display: "none",
       flexDirection: "column",
       gap: "16px",
     });
+    this.panel.append(this._cornerSpan("tr"), this._cornerSpan("bl"));
 
     this.panel.appendChild(this._buildLanguageRow());
+    this.panel.appendChild(this._hairline());
     this.panel.appendChild(this._buildVolumeRow());
+    this.panel.appendChild(this._hairline());
     this.panel.appendChild(this._buildGraphicsRow());
+    this.panel.appendChild(this._hairline());
     this.panel.appendChild(this._buildRendererRow());
+    this.panel.appendChild(this._hairline());
     this.panel.appendChild(this._buildControlModeRow());
 
     document.body.appendChild(this.panel);
   }
 
-  _buildControlModeRow() {
-    const wrap = document.createElement("div");
-    wrap.appendChild(this._buildSectionLabel("Bike-Steuerung"));
-    const group = this._buildToggleGroup(
-      [
-        { value: "joystick", label: "Joystick" },
-        { value: "tap",      label: "Tap-to-Move" },
-      ],
-      getControlMode(),
-      (val) => setControlMode(val),
-    );
-    wrap.appendChild(group);
-    return wrap;
+  _cornerSpan(corner) {
+    const s = document.createElement("span");
+    s.className = `hud-bracket-${corner}`;
+    return s;
   }
 
-  _buildSectionLabel(text) {
+  _hairline() {
+    const hr = document.createElement("hr");
+    hr.className = "hud-rule";
+    hr.style.margin = "0";
+    return hr;
+  }
+
+  _sectionLabel(text) {
     const lbl = document.createElement("div");
-    lbl.textContent = text;
+    lbl.textContent = `> ${text}`;
     Object.assign(lbl.style, {
-      fontSize: "10px",
-      textTransform: "uppercase",
-      letterSpacing: "0.18em",
-      color: "rgba(180, 195, 210, 0.7)",
-      marginBottom: "6px",
+      fontSize: "11px",
+      color: "var(--paper-muted)",
+      marginBottom: "8px",
     });
     return lbl;
   }
 
-  _buildToggleGroup(options, currentValue, onChange) {
+  _buildControlModeRow() {
+    const wrap = document.createElement("div");
+    wrap.appendChild(this._sectionLabel("bike control"));
+    wrap.appendChild(this._textToggleGroup(
+      [
+        { value: "joystick", label: "joystick" },
+        { value: "tap",      label: "tap-to-move" },
+      ],
+      getControlMode(),
+      (val) => setControlMode(val),
+    ));
+    return wrap;
+  }
+
+  _textToggleGroup(options, currentValue, onChange) {
     const group = document.createElement("div");
+    group.setAttribute("role", "radiogroup");
     Object.assign(group.style, {
       display: "flex",
-      gap: "6px",
-      background: "rgba(0, 0, 0, 0.3)",
-      padding: "4px",
-      borderRadius: "8px",
+      gap: "4px",
+      margin: "0 -10px",
     });
     const buttons = {};
+    const apply = (active) => {
+      for (const v in buttons) {
+        buttons[v].dataset.active = String(v === active);
+        buttons[v].setAttribute("aria-checked", String(v === active));
+      }
+    };
     for (const opt of options) {
       const b = document.createElement("button");
+      b.type = "button";
+      b.className = "hud-btn";
       b.textContent = opt.label;
+      b.setAttribute("role", "radio");
       Object.assign(b.style, {
         flex: "1",
-        padding: "6px 10px",
-        border: "none",
-        borderRadius: "5px",
-        background: "transparent",
-        color: "rgba(220, 230, 240, 0.85)",
-        cursor: "pointer",
-        fontSize: "12px",
-        transition: "background 0.15s",
+        padding: "8px 10px",
+        minHeight: "44px",
       });
       b.addEventListener("click", () => {
         onChange(opt.value);
-        for (const v in buttons) {
-          buttons[v].style.background =
-            v === opt.value ? "rgba(255, 255, 255, 0.16)" : "transparent";
-          buttons[v].style.color =
-            v === opt.value ? "white" : "rgba(220, 230, 240, 0.85)";
-        }
+        apply(opt.value);
       });
       buttons[opt.value] = b;
       group.appendChild(b);
     }
-    // Initial styling
-    for (const v in buttons) {
-      buttons[v].style.background =
-        v === currentValue ? "rgba(255, 255, 255, 0.16)" : "transparent";
-      buttons[v].style.color =
-        v === currentValue ? "white" : "rgba(220, 230, 240, 0.85)";
-    }
+    apply(currentValue);
     return group;
   }
 
   _buildLanguageRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._buildSectionLabel("Language"));
-    wrap.appendChild(this._buildToggleGroup(
+    wrap.appendChild(this._sectionLabel("language"));
+    wrap.appendChild(this._textToggleGroup(
       [
-        { label: "Deutsch", value: "de" },
-        { label: "English", value: "en" },
+        { label: "de", value: "de" },
+        { label: "en", value: "en" },
       ],
       this.settings.lang,
       (val) => {
@@ -223,10 +204,10 @@ export class SettingsPanel {
 
   _buildVolumeRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._buildSectionLabel("Volume"));
+    wrap.appendChild(this._sectionLabel("volume"));
 
-    const sliderRow = document.createElement("div");
-    Object.assign(sliderRow.style, {
+    const row = document.createElement("div");
+    Object.assign(row.style, {
       display: "flex",
       alignItems: "center",
       gap: "10px",
@@ -237,41 +218,42 @@ export class SettingsPanel {
     slider.min = "0";
     slider.max = "100";
     slider.value = String(this.settings.volume * 100);
+    slider.setAttribute("aria-label", "volume");
     Object.assign(slider.style, {
       flex: "1",
-      accentColor: "#7ec8ff",
+      accentColor: "oklch(72% 0.22 25)",
     });
 
     const valueLabel = document.createElement("span");
-    valueLabel.textContent = `${Math.round(this.settings.volume * 100)}%`;
+    valueLabel.textContent = `${Math.round(this.settings.volume * 100)}`;
     Object.assign(valueLabel.style, {
-      width: "38px",
+      width: "32px",
       textAlign: "right",
       fontVariantNumeric: "tabular-nums",
-      color: "rgba(220, 230, 240, 0.85)",
+      color: "var(--paper-muted)",
     });
 
     slider.addEventListener("input", () => {
       const v = parseInt(slider.value, 10) / 100;
       this.settings.volume = v;
-      valueLabel.textContent = `${Math.round(v * 100)}%`;
+      valueLabel.textContent = `${Math.round(v * 100)}`;
       this._saveSettings();
       this._applySettings();
     });
 
-    sliderRow.appendChild(slider);
-    sliderRow.appendChild(valueLabel);
-    wrap.appendChild(sliderRow);
+    row.appendChild(slider);
+    row.appendChild(valueLabel);
+    wrap.appendChild(row);
     return wrap;
   }
 
   _buildGraphicsRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._buildSectionLabel("Graphics"));
-    wrap.appendChild(this._buildToggleGroup(
+    wrap.appendChild(this._sectionLabel("graphics"));
+    wrap.appendChild(this._textToggleGroup(
       [
-        { label: "Low", value: "low" },
-        { label: "High", value: "high" },
+        { label: "low", value: "low" },
+        { label: "high", value: "high" },
       ],
       this.settings.graphics,
       (val) => {
@@ -285,50 +267,41 @@ export class SettingsPanel {
 
   _buildRendererRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._buildSectionLabel("Renderer"));
-    wrap.appendChild(this._buildToggleGroup(
+    wrap.appendChild(this._sectionLabel("renderer"));
+    wrap.appendChild(this._textToggleGroup(
       [
-        { label: "WebGL", value: "webgl" },
-        { label: "WebGPU", value: "webgpu" },
+        { label: "webgl", value: "webgl" },
+        { label: "webgpu", value: "webgpu" },
       ],
       this.settings.renderer,
       (val) => {
         if (val === this.settings.renderer) return;
         this.settings.renderer = val;
         this._saveSettings();
-        // Render-Mode benötigt Page-Reload — wir geben ein subtiles Feedback
         if (this._rendererHint) {
-          this._rendererHint.textContent = `Reload page to apply (${val})…`;
-          this._rendererHint.style.opacity = "1";
+          this._rendererHint.textContent = `reloading. ${val}`;
           setTimeout(() => location.reload(), 500);
         }
       },
     ));
     const hint = document.createElement("div");
-    hint.textContent = "";
     Object.assign(hint.style, {
       marginTop: "6px",
       fontSize: "10px",
-      color: "rgba(180, 200, 220, 0.55)",
-      transition: "opacity 0.2s",
-      opacity: "0.55",
+      color: "var(--paper-dim)",
     });
-    hint.textContent = "Active: " + (this.game?.renderer?.mode || "loading…");
+    hint.textContent = "active: " + (this.game?.renderer?.mode || "loading");
     wrap.appendChild(hint);
     this._rendererHint = hint;
     return wrap;
   }
 
   _applySettings() {
-    // Audio-Volume — global hooken + AudioManager refreshen
     if (typeof window !== "undefined") {
       window.__masterVolume = this.settings.volume;
     }
     this.game?.audio?.refreshVolume?.();
 
-    // Grafik — Shadow-Map-Size + Pixel-Ratio anpassen
-    // K1-Fix: renderer.instance ist evtl. noch null (WebGPU init läuft).
-    // In dem Fall überspringen — renderer.ready-Hook re-applyt später.
     const renderer = this.game?.renderer?.instance;
     if (renderer) {
       try {
@@ -344,12 +317,9 @@ export class SettingsPanel {
       }
     }
 
-    // Sprache — für i18n hooken + UI-Komponenten benachrichtigen
     if (typeof window !== "undefined") {
       const prevLang = window.__lang;
       window.__lang = this.settings.lang;
-      // Nur refreshen wenn sich was geändert hat — vermeidet teure
-      // CanvasTexture-Neuzeichnung beim initial Apply.
       if (prevLang && prevLang !== this.settings.lang) {
         this.game?.ui?.refreshLang?.();
       }
@@ -359,7 +329,8 @@ export class SettingsPanel {
   toggle() {
     this.isOpen = !this.isOpen;
     this.panel.style.display = this.isOpen ? "flex" : "none";
-    this.btn.style.transform = this.isOpen ? "rotate(60deg)" : "rotate(0deg)";
+    this.btn.setAttribute("aria-expanded", String(this.isOpen));
+    this.btn.dataset.active = String(this.isOpen);
   }
 
   destroy() {

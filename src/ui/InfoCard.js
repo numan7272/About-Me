@@ -1,13 +1,16 @@
 /**
- * InfoCard — Slide-in-Karte am rechten Bildschirmrand mit
- * Werdegang-Station- oder Easter-Egg-Inhalten.
+ * InfoCard — Slide-in-Panel rechts mit Werdegang- / Easter-Egg-Inhalten.
  *
- * Wird gerufen via:
- *   ui.infoCard.show({ title, subtitle, timeframe, text, skills, color, accent })
+ * Brutalist-Game-HUD register:
+ *   - Solides Ink-Surface, kein backdrop-blur, keine rounded card
+ *   - Corner-brackets statt border-radius
+ *   - Hairline statt accent-gradient
+ *   - Skills als terminal-style `> tag` items, keine Pill-Chips
+ *
+ * Public API:
+ *   ui.infoCard.show({ title, subtitle, timeframe, text, skills }, id)
  *   ui.infoCard.hide()
  */
-
-import { t } from "../data/content.js";
 
 export class InfoCard {
   constructor(game) {
@@ -15,123 +18,134 @@ export class InfoCard {
     this.visible = false;
     this.currentId = null;
     this._build();
+    this._bindKeys();
   }
 
   _build() {
-    this.root = document.createElement("div");
+    this.root = document.createElement("aside");
+    this.root.className = "hud-bracket";
+    this.root.setAttribute("role", "dialog");
+    this.root.setAttribute("aria-labelledby", "info-card-title");
+    this.root.setAttribute("aria-hidden", "true");
     Object.assign(this.root.style, {
       position: "fixed",
       top: "50%",
       right: "24px",
-      transform: "translateY(-50%) translateX(120%)",
-      width: "360px",
+      transform: "translateY(-50%) translateX(calc(100% + 48px))",
+      width: "min(360px, calc(100vw - 32px))",
       maxHeight: "82vh",
       overflow: "auto",
-      padding: "22px 24px",
-      borderRadius: "16px",
-      border: "1px solid rgba(255, 255, 255, 0.14)",
-      background: "rgba(10, 18, 32, 0.85)",
-      backdropFilter: "blur(16px)",
-      color: "rgba(240, 245, 250, 0.95)",
-      fontFamily: "system-ui, -apple-system, sans-serif",
+      padding: "22px 22px 20px",
+      fontFamily: "var(--font-mono)",
       fontSize: "13px",
-      boxShadow: "0 12px 40px rgba(0, 0, 0, 0.55)",
+      color: "var(--paper)",
       zIndex: "13",
       pointerEvents: "auto",
       opacity: "0",
-      transition: "transform 0.35s cubic-bezier(.2,.7,.2,1), opacity 0.25s",
+      transition: "transform 340ms var(--ease), opacity 220ms var(--ease)",
     });
+    this.root.append(this._cornerSpan("tr"), this._cornerSpan("bl"));
 
-    // Close button
     this.closeBtn = document.createElement("button");
-    this.closeBtn.innerHTML = "✕";
+    this.closeBtn.type = "button";
+    this.closeBtn.textContent = "[ esc ] close";
+    this.closeBtn.setAttribute("aria-label", "close info card");
     Object.assign(this.closeBtn.style, {
       position: "absolute",
-      top: "12px",
+      top: "10px",
       right: "12px",
-      width: "30px",
-      height: "30px",
-      borderRadius: "50%",
-      border: "1px solid rgba(255, 255, 255, 0.14)",
-      background: "rgba(0, 0, 0, 0.3)",
-      color: "rgba(220, 230, 240, 0.85)",
-      fontSize: "14px",
+      background: "transparent",
+      border: "0",
+      color: "var(--paper-muted)",
+      fontFamily: "var(--font-mono)",
+      fontSize: "11px",
       cursor: "pointer",
-      transition: "background 0.15s",
+      padding: "4px 6px",
+      transition: "color 180ms var(--ease)",
     });
     this.closeBtn.addEventListener("mouseenter", () => {
-      this.closeBtn.style.background = "rgba(255, 80, 80, 0.25)";
+      this.closeBtn.style.color = "var(--signal)";
     });
     this.closeBtn.addEventListener("mouseleave", () => {
-      this.closeBtn.style.background = "rgba(0, 0, 0, 0.3)";
+      this.closeBtn.style.color = "var(--paper-muted)";
     });
     this.closeBtn.addEventListener("click", () => this.hide());
     this.root.appendChild(this.closeBtn);
 
-    this.accentBar = document.createElement("div");
-    Object.assign(this.accentBar.style, {
-      width: "40px",
-      height: "3px",
-      borderRadius: "2px",
-      background: "#888",
-      marginBottom: "12px",
-    });
-    this.root.appendChild(this.accentBar);
-
     this.timeframeEl = document.createElement("div");
     Object.assign(this.timeframeEl.style, {
-      fontSize: "10px",
-      textTransform: "uppercase",
-      letterSpacing: "0.22em",
-      color: "rgba(180, 195, 210, 0.7)",
-      marginBottom: "6px",
+      fontSize: "11px",
+      color: "var(--paper-muted)",
+      marginBottom: "10px",
+      marginTop: "8px",
     });
     this.root.appendChild(this.timeframeEl);
 
     this.titleEl = document.createElement("div");
+    this.titleEl.id = "info-card-title";
     Object.assign(this.titleEl.style, {
-      fontSize: "20px",
-      fontWeight: "600",
+      fontSize: "22px",
+      fontWeight: "400",
       lineHeight: "1.2",
       marginBottom: "4px",
+      letterSpacing: "-0.01em",
     });
     this.root.appendChild(this.titleEl);
 
     this.subtitleEl = document.createElement("div");
     Object.assign(this.subtitleEl.style, {
       fontSize: "13px",
-      color: "rgba(180, 200, 220, 0.78)",
+      color: "var(--paper-muted)",
       marginBottom: "14px",
     });
     this.root.appendChild(this.subtitleEl);
+
+    const rule = document.createElement("hr");
+    rule.className = "hud-rule";
+    rule.style.margin = "0 0 14px";
+    this.root.appendChild(rule);
 
     this.textEl = document.createElement("div");
     Object.assign(this.textEl.style, {
       fontSize: "13px",
       lineHeight: "1.55",
-      marginBottom: "16px",
-      color: "rgba(230, 235, 240, 0.92)",
+      marginBottom: "18px",
+      color: "var(--paper)",
     });
     this.root.appendChild(this.textEl);
 
-    this.skillsEl = document.createElement("div");
+    this.skillsEl = document.createElement("ul");
     Object.assign(this.skillsEl.style, {
+      listStyle: "none",
+      padding: "0",
+      margin: "0",
       display: "flex",
-      flexWrap: "wrap",
-      gap: "6px",
+      flexDirection: "column",
+      gap: "4px",
     });
     this.root.appendChild(this.skillsEl);
 
     document.body.appendChild(this.root);
   }
 
+  _bindKeys() {
+    this._onKey = (e) => {
+      if (e.code === "Escape" && this.visible) this.hide();
+    };
+    window.addEventListener("keydown", this._onKey);
+  }
+
+  _cornerSpan(corner) {
+    const s = document.createElement("span");
+    s.className = `hud-bracket-${corner}`;
+    return s;
+  }
+
   show(card, id) {
     this.currentId = id;
     this.visible = true;
-    const color = card.color || "#7ec8ff";
-    const accent = card.accent || color;
+    this.root.setAttribute("aria-hidden", "false");
 
-    this.accentBar.style.background = `linear-gradient(90deg, ${color}, ${accent})`;
     this.timeframeEl.textContent = card.timeframe || "";
     this.titleEl.textContent = card.title || "";
     this.subtitleEl.textContent = card.subtitle || "";
@@ -139,17 +153,14 @@ export class InfoCard {
 
     this.skillsEl.innerHTML = "";
     for (const s of (card.skills || [])) {
-      const chip = document.createElement("span");
-      chip.textContent = s;
-      Object.assign(chip.style, {
-        padding: "4px 10px",
-        borderRadius: "999px",
-        fontSize: "11px",
-        border: `1px solid ${color}40`,
-        background: `${color}15`,
-        color: "rgba(240, 245, 250, 0.95)",
+      const li = document.createElement("li");
+      Object.assign(li.style, {
+        fontSize: "12px",
+        color: "var(--paper-muted)",
+        fontFamily: "var(--font-mono)",
       });
-      this.skillsEl.appendChild(chip);
+      li.textContent = `> ${s}`;
+      this.skillsEl.appendChild(li);
     }
 
     requestAnimationFrame(() => {
@@ -164,12 +175,15 @@ export class InfoCard {
     if (!this.visible) return;
     this.visible = false;
     this.currentId = null;
+    this.root.setAttribute("aria-hidden", "true");
     this.root.style.opacity = "0";
-    this.root.style.transform = "translateY(-50%) translateX(120%)";
+    this.root.style.transform =
+      "translateY(-50%) translateX(calc(100% + 48px))";
     this.game.audio?.playInfoClose?.();
   }
 
   destroy() {
+    window.removeEventListener("keydown", this._onKey);
     this.root?.remove?.();
   }
 }

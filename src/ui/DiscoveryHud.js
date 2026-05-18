@@ -1,9 +1,10 @@
 /**
- * DiscoveryHud — Easter-Egg-Counter + Toast-Notification.
+ * DiscoveryHud — Toast oben-mitte bei Easter-Egg-Discovery.
  *
- * Zeigt:
- *   - Badge (oben rechts, unter MiniMap): "X / 4" gefundene Eier
- *   - Toast (oben mitte): kurzes "Easter Egg gefunden!" für ~3s
+ * Brutalist-Game-HUD register:
+ *   - Hairline-Akzent links (signal coral), kein glow shadow
+ *   - Solid ink surface, kein backdrop-blur
+ *   - Lowercase mono terminal-line: "> discovered. egg_title"
  *
  * Persistent via localStorage: gefundene IDs werden gespeichert.
  */
@@ -18,7 +19,6 @@ export class DiscoveryHud {
     this.total = total;
     this.found = this._loadFound();
     this._build();
-    this._updateBadge();
   }
 
   _loadFound() {
@@ -39,46 +39,34 @@ export class DiscoveryHud {
   }
 
   _build() {
-    // Badge bewusst entfernt — kein "X/4" mehr im UI. Eggs sind versteckte
-    // Surprises ohne Game-Counter. Toast bleibt für Achievement-Feedback.
-
-    // Toast — oben mitte, slide-down
     this.toast = document.createElement("div");
+    this.toast.setAttribute("role", "status");
+    this.toast.setAttribute("aria-live", "polite");
     Object.assign(this.toast.style, {
       position: "fixed",
       top: "70px",
       left: "50%",
-      transform: "translateX(-50%) translateY(-150%)",
-      padding: "12px 22px",
-      borderRadius: "14px",
-      border: "1px solid rgba(255, 200, 100, 0.35)",
-      background: "rgba(40, 30, 10, 0.88)",
-      backdropFilter: "blur(14px)",
-      color: "#fff4d0",
-      fontFamily: "system-ui, sans-serif",
-      fontSize: "13px",
-      fontWeight: "500",
+      transform: "translateX(-50%) translateY(-200%)",
+      padding: "10px 16px 10px 18px",
+      background: "var(--ink-solid)",
+      borderLeft: "2px solid var(--signal)",
+      color: "var(--paper)",
+      fontFamily: "var(--font-mono)",
+      fontSize: "12px",
+      letterSpacing: "0.02em",
       zIndex: "14",
       pointerEvents: "none",
       opacity: "0",
-      transition: "transform 0.4s cubic-bezier(.2,.7,.2,1), opacity 0.3s",
-      boxShadow: "0 8px 32px rgba(255, 180, 80, 0.2)",
+      transition: "transform 280ms var(--ease), opacity 200ms var(--ease)",
     });
     document.body.appendChild(this.toast);
-
     this._toastTimer = null;
   }
 
-  _updateBadge() {
-    // Badge entfernt — siehe _build(). Kept als No-op für API-Kompatibilität.
-  }
-
-  /** Wird vom EasterEggs.js gerufen wenn ein neues Egg gefunden wurde. */
   markDiscovered(id, eggTitle) {
-    if (this.found.has(id)) return false;   // schon gefunden
+    if (this.found.has(id)) return false;
     this.found.add(id);
     this._saveFound();
-    this._updateBadge();
     this._showToast(eggTitle || t("egg_found"));
     this.game.audio?.playDiscovery?.();
     return true;
@@ -86,14 +74,14 @@ export class DiscoveryHud {
 
   _showToast(msg) {
     clearTimeout(this._toastTimer);
-    this.toast.textContent = "✦  " + msg;
+    this.toast.textContent = `> discovered. ${msg}`;
     requestAnimationFrame(() => {
       this.toast.style.opacity = "1";
       this.toast.style.transform = "translateX(-50%) translateY(0)";
     });
     this._toastTimer = setTimeout(() => {
       this.toast.style.opacity = "0";
-      this.toast.style.transform = "translateX(-50%) translateY(-150%)";
+      this.toast.style.transform = "translateX(-50%) translateY(-200%)";
     }, 2800);
   }
 
@@ -103,7 +91,6 @@ export class DiscoveryHud {
 
   destroy() {
     clearTimeout(this._toastTimer);
-    this.badge?.remove?.();
     this.toast?.remove?.();
   }
 }

@@ -239,8 +239,8 @@ export class ContactPanel {
     // ── Verfügbarkeits-Hinweis (Recruiter brauchen das) ──
     const availability = document.createElement("div");
     availability.textContent = this._lang() === "en"
-      ? "Open to Werkstudent / internship — backend, cloud, DevOps or security. Available from 03/2026."
-      : "Offen für Werkstudent / Praktikum — Backend, Cloud, DevOps oder Security. Ab 03/2026.";
+      ? "Open to Werkstudent / internship. Backend, cloud, DevOps or security. Available from 03/2026."
+      : "Offen für Werkstudent / Praktikum. Backend, Cloud, DevOps oder Security. Ab 03/2026.";
     Object.assign(availability.style, {
       marginTop: "22px",
       padding: "12px 14px",

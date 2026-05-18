@@ -1,17 +1,17 @@
 /**
  * App — React-Root für UI-Overlays.
  *
- * Aktuell nur ein FPS-Counter unten rechts. Die anderen UI-Komponenten
- * (Hud, MiniMap, Settings, Drawer, ContactPanel, ...) werden imperative
- * via Ui.js eingehängt — nicht React-rendered.
+ * Aktuell nur ein FPS-Counter unten rechts (brutalist mono).
+ * Andere UI-Komponenten werden imperativ via Ui.js eingehängt.
  */
 
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 
-export function App({ game }) {
+const SIGNAL_FPS_THRESHOLD = 55;
+
+export function App() {
   const [fps, setFps] = useState(0);
 
-  // Mini-FPS-Counter — polled das Game-Time-Delta einmal pro Sekunde
   useEffect(() => {
     let last = performance.now();
     let frames = 0;
@@ -30,11 +30,25 @@ export function App({ game }) {
     return () => cancelAnimationFrame(rafId);
   }, []);
 
+  const isLow = fps > 0 && fps < SIGNAL_FPS_THRESHOLD;
+
   return (
-    <div className="fixed bottom-4 right-4 rounded-md border border-white/10
-                    bg-black/40 px-3 py-1.5 text-xs text-zinc-300
-                    backdrop-blur-md tabular-nums">
-      {fps} FPS
+    <div
+      style={{
+        position: "fixed",
+        bottom: "16px",
+        right: "16px",
+        padding: "4px 8px",
+        fontFamily: "var(--font-mono)",
+        fontSize: "11px",
+        color: isLow ? "var(--signal)" : "var(--paper-muted)",
+        fontVariantNumeric: "tabular-nums",
+        letterSpacing: "0.02em",
+        pointerEvents: "none",
+      }}
+      aria-label={`${fps} frames per second`}
+    >
+      {String(fps).padStart(3, " ")} fps
     </div>
   );
 }
