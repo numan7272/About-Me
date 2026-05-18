@@ -172,29 +172,39 @@ export class Island {
         let touched = 0, recolored = 0;
         obj.traverse((sub) => {
           if (!sub.isMesh) return;
+          const subName = sub.name || "";
+          // Lamps (Wal-Beleuchtung / Egg-Glow) sollen glühen — kein strip,
+          // kein recolor. Spheres sind beim Whale die Augen/Sclera —
+          // Recolor übersprungen damit das Gesicht sichtbar bleibt.
+          const isLamp = /lamp/i.test(subName);
+          const isSphere = /sphere/i.test(subName);
+
           const mats = Array.isArray(sub.material) ? sub.material : [sub.material];
           for (const m of mats) {
             if (!m) continue;
-            // Emissive raus (PBR / Phong / Lambert)
-            m.emissive?.setRGB?.(0, 0, 0);
-            if ("emissiveIntensity" in m) m.emissiveIntensity = 0;
-            if (m.emissiveMap) m.emissiveMap = null;
-            // PBR-Caps
-            if ("metalness" in m && typeof m.metalness === "number" && m.metalness > 0.85) {
-              m.metalness = 0.85;
+
+            if (!isLamp) {
+              // Emissive raus (PBR / Phong / Lambert)
+              m.emissive?.setRGB?.(0, 0, 0);
+              if ("emissiveIntensity" in m) m.emissiveIntensity = 0;
+              if (m.emissiveMap) m.emissiveMap = null;
+              // PBR-Caps
+              if ("metalness" in m && typeof m.metalness === "number" && m.metalness > 0.85) {
+                m.metalness = 0.85;
+              }
+              if ("roughness" in m && typeof m.roughness === "number" && m.roughness < 0.3) {
+                m.roughness = 0.3;
+              }
             }
-            if ("roughness" in m && typeof m.roughness === "number" && m.roughness < 0.3) {
-              m.roughness = 0.3;
-            }
-            // Whale-Fix: MeshBasicMaterial (Sketchfab unlit) ignoriert Lights;
-            // wenn color near-white UND keine baseColorTexture → force dark.
-            // Sub-Mesh-Heuristik: alles unter Egg_Container_Whale_* bekommt
-            // einen Wal-Blau-Grau Tint; andere Whites werden mit muted-gray
-            // ersetzt um Blow-out zu verhindern.
-            if (m.color && !m.map) {
+
+            // Whale-Fix: MeshBasicMaterial (Sketchfab unlit) ignoriert
+            // Lights; wenn color near-white UND keine baseColorTexture →
+            // force dark. Spheres + Lamps skippen, sonst verschwindet das
+            // Gesicht und die Glow-Akzente.
+            if (!isSphere && !isLamp && m.color && !m.map) {
               const c = m.color;
               if (c.r > 0.85 && c.g > 0.85 && c.b > 0.85) {
-                if (sub.name.toLowerCase().includes("whale") ||
+                if (subName.toLowerCase().includes("whale") ||
                     name.toLowerCase().includes("whale")) {
                   c.setHex(0x4f6470);   // muted whale blue-gray
                 } else {
