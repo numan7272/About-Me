@@ -83,40 +83,69 @@ Practice > theory. Always.
 — n
 `;
 
-// Public-Repos auf github.com/numan7272. Privat-Repos (GlyphFall, omni-view,
-// AI-Apps) absichtlich nicht gelistet. Click auf eine Card → öffnet GitHub
-// in neuem Tab. SQLi-Lab läuft über die TODO-Datei auf dem Desktop (nicht
-// mehr doppelt über einen Fake-Projekt-Eintrag).
+// Alle öffentlichen Repos von github.com/numan7272 (Stand 05/2026).
+// Click auf eine Card → öffnet das GitHub-Repo in neuem Tab.
+// SQLi-Lab läuft separat über die TODO-Datei auf dem Desktop.
 const PROJECTS = [
   {
-    name: "funke",
-    sub: "JavaScript · MIT · Self-hosted Discord alternative",
-    body: "Real-time Messaging, WebRTC Voice-Chat und Screen-Sharing. Self-hosted weil Discord/Slack overkill waren und ich Kontrolle über den Signaling-Server wollte.",
-    url: "https://github.com/numan7272/funke",
+    name: "About-Me",
+    sub: "JavaScript · 3D Portfolio (aktiv)",
+    body: "Diese Seite. Vite + Three.js (WebGL + WebGPU) + Rapier3D Physik. Bike-Steuerung, custom Shader-Pipeline, versteckte Mini-Game-Labs. Source für alles was du gerade siehst.",
+    url: "https://github.com/numan7272/About-Me",
   },
   {
     name: "synapser-backend",
     sub: "Python · FastAPI + Google OR-Tools",
-    body: "Core-Backend für Synapser — AI-driven Scheduling. Löst Constraint-Satisfaction-Probleme in Echtzeit, plus Geo/Auth/Stripe-Integrationen.",
+    body: "Core-Backend für Synapser — AI-driven Scheduling-Plattform. Löst Constraint-Satisfaction-Probleme in Echtzeit, plus Real-time-Rescheduling und externe API-Integrationen (Geo, Weather, Smart-Home).",
     url: "https://github.com/numan7272/synapser-backend",
   },
   {
+    name: "synapser-frontend",
+    sub: "C++ · Native UI Companion",
+    body: "Native UI-Frontend für Synapser. Companion zum FastAPI-Backend.",
+    url: "https://github.com/numan7272/synapser-frontend",
+  },
+  {
     name: "OmniView",
-    sub: "TypeScript · Multi-Source Viewer",
-    body: "Unified Dashboard für mehrere Live-Datenquellen — Kameras, Logs, Sensor-Feeds in einer UI.",
+    sub: "TypeScript · Multi-Source Dashboard",
+    body: "Unified Dashboard für mehrere Live-Datenquellen — Kameras, Logs, Sensor-Feeds zusammen in einer UI.",
     url: "https://github.com/numan7272/OmniView",
   },
   {
-    name: "Python-Projekt",
-    sub: "Python · Lern-Repo",
-    body: "Sammelsurium aus Python-Übungen während ich die Sprache aufgebaut habe. Algorithmen, kleine Tools, Snippets.",
-    url: "https://github.com/numan7272/Python-Projekt",
+    name: "funke",
+    sub: "JavaScript · Self-hosted Voice/Chat",
+    body: "Self-hosted Discord-Alternative mit Real-time Messaging, WebRTC Voice-Chat und Screen-Sharing. Self-hosted weil Discord/Slack overkill waren und ich Kontrolle über den Signaling-Server wollte.",
+    url: "https://github.com/numan7272/funke",
   },
   {
-    name: "About-Me",
-    sub: "JavaScript · Mein altes Portfolio (legacy)",
-    body: "Vorgänger dieser Seite. Next.js + Three.js. Die Bike-Steuerung hier ist 1:1 von dort portiert. Wird abgeschaltet sobald die neue Version live ist.",
-    url: "https://github.com/numan7272/About-Me",
+    name: "GlyphFall",
+    sub: "JavaScript · Sandbox-Experiment",
+    body: "Browser-Side-Projekt. WIP, im Aufbau.",
+    url: "https://github.com/numan7272/GlyphFall",
+  },
+  {
+    name: "youtube-converter",
+    sub: "Python · Media-Utility",
+    body: "Kommandozeilen-Tool zum Konvertieren von YouTube-Videos in Audio/Video-Formate. yt-dlp basiert.",
+    url: "https://github.com/numan7272/youtube-converter",
+  },
+  {
+    name: "CaptureStream",
+    sub: "Python · Stream-Capture",
+    body: "Headless-Tool zum Aufzeichnen von Live-Streams. Python-basiert, lokales Storage.",
+    url: "https://github.com/numan7272/CaptureStream",
+  },
+  {
+    name: "omni-view",
+    sub: "TypeScript · OmniView-Prototyp",
+    body: "Früher Prototyp / Vorgänger von OmniView. Eingefroren — der aktive Code liegt im großgeschriebenen Repo.",
+    url: "https://github.com/numan7272/omni-view",
+  },
+  {
+    name: "Python-Projekt",
+    sub: "Python · Lern-Log",
+    body: "Sammelsurium aus Python-Übungen während ich die Sprache aufgebaut habe. Algorithmen, kleine Tools, Snippets. Tägliche Commits als Disziplin-Marker.",
+    url: "https://github.com/numan7272/Python-Projekt",
   },
 ];
 
