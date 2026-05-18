@@ -170,14 +170,15 @@ export class Island {
       // bearbeitet, auch wenn das Sub-Mesh selbst keinen Egg_*-Namen hat.
       if (name.startsWith("Egg_")) {
         let touched = 0, recolored = 0;
+        const isWhaleContext =
+          name.toLowerCase().includes("whale") ||
+          name.toLowerCase().includes("container");
         obj.traverse((sub) => {
           if (!sub.isMesh) return;
           const subName = sub.name || "";
           // Lamps (Wal-Beleuchtung / Egg-Glow) sollen glühen — kein strip,
-          // kein recolor. Spheres sind beim Whale die Augen/Sclera —
-          // Recolor übersprungen damit das Gesicht sichtbar bleibt.
+          // kein recolor.
           const isLamp = /lamp/i.test(subName);
-          const isSphere = /sphere/i.test(subName);
 
           const mats = Array.isArray(sub.material) ? sub.material : [sub.material];
           for (const m of mats) {
@@ -197,18 +198,26 @@ export class Island {
               }
             }
 
-            // Whale-Fix: MeshBasicMaterial (Sketchfab unlit) ignoriert
-            // Lights; wenn color near-white UND keine baseColorTexture →
-            // force dark. Spheres + Lamps skippen, sonst verschwindet das
-            // Gesicht und die Glow-Akzente.
-            if (!isSphere && !isLamp && m.color && !m.map) {
+            // Sketchfab-Unlit-Fix: MeshBasicMaterial ignoriert Lights.
+            // Wenn color near-white UND keine baseColorTexture → force.
+            // - Im Whale/Container-Kontext: Docker-Brand-Blau für die
+            //   Body-Meshes (Spheres + Cubes). Damit ist Moby Dock auch
+            //   sichtbar als Docker-Wal lesbar.
+            // - Außerhalb: muted slate.
+            // - Lamp-Materials werden in beiden Fällen ausgespart.
+            const subLower = subName.toLowerCase();
+            // Eye-Heuristik: stark-kleine Spheres mit "eye"/"pupil" im Namen
+            // explizit ausnehmen, damit die natürliche Farbe steht.
+            const isEye = /\beye|pupil/i.test(subName);
+            if (!isLamp && !isEye && m.color && !m.map) {
               const c = m.color;
               if (c.r > 0.85 && c.g > 0.85 && c.b > 0.85) {
-                if (subName.toLowerCase().includes("whale") ||
-                    name.toLowerCase().includes("whale")) {
-                  c.setHex(0x4f6470);   // muted whale blue-gray
+                if (isWhaleContext || subLower.includes("whale")) {
+                  // Docker-Brand-Blau (#0db7ed), leicht abgesoftet damit's
+                  // unter ACES Tone-Mapping nicht ins Cyan-Neon kippt.
+                  c.setHex(0x4aa5c8);
                 } else {
-                  c.setHex(0x6a7280);   // generic slate
+                  c.setHex(0x6a7280);   // generic slate für andere Eggs
                 }
                 recolored++;
               }
