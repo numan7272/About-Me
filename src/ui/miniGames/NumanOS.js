@@ -85,7 +85,8 @@ Practice > theory. Always.
 
 // Public-Repos auf github.com/numan7272. Privat-Repos (GlyphFall, omni-view,
 // AI-Apps) absichtlich nicht gelistet. Click auf eine Card → öffnet GitHub
-// in neuem Tab. Die isVuln-Card ist der versteckte SQLi-Trigger.
+// in neuem Tab. SQLi-Lab läuft über die TODO-Datei auf dem Desktop (nicht
+// mehr doppelt über einen Fake-Projekt-Eintrag).
 const PROJECTS = [
   {
     name: "funke",
@@ -117,12 +118,6 @@ const PROJECTS = [
     body: "Vorgänger dieser Seite. Next.js + Three.js. Die Bike-Steuerung hier ist 1:1 von dort portiert. Wird abgeschaltet sobald die neue Version live ist.",
     url: "https://github.com/numan7272/About-Me",
   },
-  {
-    name: "restaurant-reservations",
-    sub: "PHP + MySQL · Family business app (legacy, 2018)",
-    body: "Mein erstes Real-World-Codebase, geschrieben mit 16 für den Familien-Betrieb. PHP, String-Concatenated SQL Queries. Heute wüsste ich es besser. Der /admin-Login lebt noch — try it.",
-    isVuln: true,
-  },
 ];
 
 const TERMINAL_BANNER = [
@@ -152,11 +147,11 @@ const TERMINAL_COMMANDS = {
     "Pictures/  Music/       .bash_history",
   ],
   history: () => [
-    "  1  ssh prod@reservation.local",
-    "  2  mysql -u admin -p",
-    "  3  curl -X POST http://localhost:8080/admin/login -d 'user=admin&pass=admin'",
-    "  4  vim Projects/restaurant-reservations/admin.php",
-    "  5  git commit -m 'WIP: still need to fix SQL injection in admin login'",
+    "  1  cd Projects/sqli-sandbox",
+    "  2  python3 -m http.server 8080",
+    "  3  curl -X POST http://localhost:8080/login -d \"user=admin' OR 1=1 --&pass=x\"",
+    "  4  vim notes/payloads.md",
+    "  5  git commit -m 'practice: tautology bypass works'",
     "  6  git push origin main",
     "  7  history",
   ],
@@ -1027,11 +1022,6 @@ export class NumanOS {
           That's the joke. Real one has bike physics, grass shaders, and a few
           hidden labs like this one.
         </p>
-        <p style="font-size:13px;line-height:1.6;opacity:0.85;margin-top:10px;">
-          The other browser tab would have a customer-login form from the
-          family-restaurant app. It's still vulnerable — opening Projects/ →
-          restaurant-reservations and trying /admin will show you why.
-        </p>
         <div style="margin-top:20px;padding:12px 14px;background:rgba(80,140,255,0.10);border:1px solid rgba(80,140,255,0.25);border-radius:8px;font-size:12px;line-height:1.5;">
           <strong style="color:#82b9ff;">Tip:</strong> there's a TODO file on the
           desktop. Open it.
@@ -1046,9 +1036,8 @@ export class NumanOS {
     wrap.className = "nos-projects";
     for (const p of PROJECTS) {
       const card = document.createElement("div");
-      card.className = "nos-project" + (p.isVuln ? " vuln-hint" : "");
-      // GitHub-Icon-Hint nur wenn URL vorhanden + nicht vuln
-      const externalHint = (p.url && !p.isVuln)
+      card.className = "nos-project";
+      const externalHint = p.url
         ? `<div class="nos-project-link">↗ github.com/numan7272/${p.name}</div>`
         : "";
       card.innerHTML = `
@@ -1057,9 +1046,7 @@ export class NumanOS {
         <div class="nos-project-body">${p.body}</div>
         ${externalHint}
       `;
-      if (p.isVuln) {
-        card.addEventListener("click", () => this._openSqliFromProjects());
-      } else if (p.url) {
+      if (p.url) {
         card.addEventListener("click", () => {
           window.open(p.url, "_blank", "noopener,noreferrer");
         });
@@ -1236,10 +1223,11 @@ export class NumanOS {
     const wrap = document.createElement("div");
     wrap.className = "nos-textfile-body";
     wrap.innerHTML = `
-// TODO: Fix SQL injection in admin login form
-// Path: ~/Projects/restaurant-reservations/admin.php
-// Severity: HIGH — old code from 2018, still concatenates strings.
-// Action: rewrite to prepared statements.
+// TODO: SQL injection — security practice sandbox
+// Path: ~/Projects/sqli-sandbox/login.php
+// Source: PortSwigger SQLi-Track + meine eigenen Notizen.
+// Goal: 4 Payload-Familien durchspielen — Tautology / Comment /
+//       UNION-Exfil / Blind-Time-Based. Alles client-side, keine echten Queries.
 
 // Steps to reproduce:
 //   1. Open the login form below
@@ -1257,7 +1245,7 @@ export class NumanOS {
   font-size: 13px;
   cursor: pointer;
   font-weight: 600;
-">→ Open the vulnerable form</button>
+">→ Open the sandbox login form</button>
     `;
     this._openWindow("todo", wrap);
     setTimeout(() => {
@@ -1266,11 +1254,6 @@ export class NumanOS {
         btn.addEventListener("click", () => this._launchSqliLab());
       }
     }, 50);
-  }
-
-  _openSqliFromProjects() {
-    // Click auf Projects/restaurant-reservations → direkt zum Lab
-    this._launchSqliLab();
   }
 
   async _launchSqliLab() {
