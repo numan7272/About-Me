@@ -10,6 +10,7 @@
  */
 
 import { t } from "../data/content.js";
+import { haptic } from "./_a11y.js";
 
 const STORAGE_KEY = "numan-portfolio-discoveries-v1";
 
@@ -69,6 +70,8 @@ export class DiscoveryHud {
     this._saveFound();
     this._showToast(eggTitle || t("egg_found"));
     this.game.audio?.playDiscovery?.();
+    // Doppel-tick Haptic für "geschafft"-Feeling (respektiert reduced-motion)
+    haptic(40);
     return true;
   }
 

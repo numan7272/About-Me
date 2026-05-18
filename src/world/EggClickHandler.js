@@ -139,6 +139,11 @@ export class EggClickHandler {
     // One-Time-Hint dismissen — der User hat's geschnallt.
     this.game.ui?.buildingsHint?.acknowledge?.();
 
+    // Haptic-Feedback (Android, später iOS) — kurzes Tick beim Tap.
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      try { navigator.vibrate(10); } catch {}
+    }
+
     const miniGames = this.game.ui?.miniGames;
     if (miniGames?.open) {
       miniGames.open(eggId);

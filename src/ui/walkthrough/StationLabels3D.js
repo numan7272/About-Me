@@ -19,6 +19,7 @@
 
 import * as THREE from "three";
 import { getStationsForLang } from "../../data/stations.js";
+import { prefersReducedMotion } from "../_a11y.js";
 
 const LABEL_HEIGHT_OFFSET = 11.5;    // default-Höhe übers Dach
 const LABEL_FRONT_OFFSET = 6.0;      // default-Abstand entlang frontWorld
@@ -257,15 +258,22 @@ export class StationLabels3D {
         opacity = 0;
       }
 
-      // Aktive Station: leichter Puls + nie ganz transparent
+      // Aktive Station: leichter Puls + nie ganz transparent. Bei
+      // prefers-reduced-motion stattdessen statisch volle Sichtbarkeit
+      // (das Label SOLL erkennbar bleiben, nur nicht pulsen).
       if (l.id === this.activeStationId) {
-        const pulse = 0.85 + Math.sin(time * 3.5) * 0.15;
-        opacity = Math.max(opacity, 0.7) * pulse;
-        l.sprite.scale.set(
-          l.baseScale * (1.0 + Math.sin(time * 3.5) * 0.04),
-          l.baseScale * (TEX_H / TEX_W) * (1.0 + Math.sin(time * 3.5) * 0.04),
-          1,
-        );
+        if (prefersReducedMotion()) {
+          opacity = Math.max(opacity, 1.0);
+          l.sprite.scale.set(l.baseScale, l.baseScale * (TEX_H / TEX_W), 1);
+        } else {
+          const pulse = 0.85 + Math.sin(time * 3.5) * 0.15;
+          opacity = Math.max(opacity, 0.7) * pulse;
+          l.sprite.scale.set(
+            l.baseScale * (1.0 + Math.sin(time * 3.5) * 0.04),
+            l.baseScale * (TEX_H / TEX_W) * (1.0 + Math.sin(time * 3.5) * 0.04),
+            1,
+          );
+        }
       } else {
         l.sprite.scale.set(l.baseScale, l.baseScale * (TEX_H / TEX_W), 1);
       }

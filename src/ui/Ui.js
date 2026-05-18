@@ -18,6 +18,7 @@ import { MiniGames } from "./miniGames/MiniGames.js";
 import { BuildingsHint } from "./BuildingsHint.js";
 import { ControlModePicker } from "./ControlModePicker.js";
 import { getControlMode, subscribeControlMode } from "./controlMode.js";
+import { haptic } from "./_a11y.js";
 
 // InfoCard ist aktuell deaktiviert — Walkthrough nutzt BottomDrawer.
 // import { InfoCard } from "./InfoCard.js";
@@ -59,6 +60,43 @@ export class Ui {
     this._applyControlMode(getControlMode());
     this._unsubControl = subscribeControlMode((m) => this._applyControlMode(m));
     // this.infoCard = new InfoCard(game);   // deaktiviert
+
+    // A11y: Tasten 1-5 öffnen die Stationen direkt — ohne Bike fahren
+    // zu müssen. Tour-Story-Reihenfolge: 1=Yek 2=THG 3=HAW 4=Designa 5=HQ.
+    // Ermöglicht Recruitern mit a11y-Bedarf den ganzen Content per Tastatur.
+    this._setupShortcuts();
+  }
+
+  _setupShortcuts() {
+    const STATION_KEYS = {
+      Digit1: "yek",
+      Digit2: "thg",
+      Digit3: "haw",
+      Digit4: "designa",
+      Digit5: "hq",
+      Numpad1: "yek",
+      Numpad2: "thg",
+      Numpad3: "haw",
+      Numpad4: "designa",
+      Numpad5: "hq",
+    };
+    this._onShortcut = (e) => {
+      // Skip wenn User in Input/Textarea tippt oder Modifier gedrückt sind
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const tag = e.target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.target?.isContentEditable) return;
+      // Nicht während aktivem Mini-Game (würde das offene Game stören)
+      if (this.miniGames?.active) return;
+      const stationId = STATION_KEYS[e.code];
+      if (!stationId) return;
+      e.preventDefault();
+      // Mini-Game-Open für die Station öffnen
+      this.miniGames?.open?.(stationId);
+      // Haptic-Feedback wenn verfügbar
+      haptic(8);
+    };
+    window.addEventListener("keydown", this._onShortcut);
   }
 
   /** Joystick / TapToMove je nach Modus an- oder ausschalten. */
@@ -91,6 +129,7 @@ export class Ui {
   }
 
   destroy() {
+    if (this._onShortcut) window.removeEventListener("keydown", this._onShortcut);
     this.hud?.destroy?.();
     this.miniMap?.destroy?.();
     this.settings?.destroy?.();

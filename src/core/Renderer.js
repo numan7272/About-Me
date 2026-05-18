@@ -103,7 +103,7 @@ export class Renderer {
         ? THREE.PCFShadowMap
         : THREE.PCFSoftShadowMap;
     }
-    r.setClearColor(0x04060e);
+    r.setClearColor(0x101218);   // matches --ink token + theme-color in index.html
 
     // Bruno-Pattern: manuelle renderOrder-Sortierung statt teurer Default-Sort.
     // Bei vielen statischen Objekten 0.2-1ms CPU/Frame gespart.
@@ -139,6 +139,7 @@ export class Renderer {
 
       this.postProcessing.outputNode = scenePass.add(bloomPass);
       this._wgpuScenePass = scenePass;
+      this._wgpuBloom = bloomPass;
       console.log("[Renderer] WebGPU render pipeline ready (optimized)");
     } catch (e) {
       console.warn("[Renderer] WebGPU pipeline init failed:", e?.message || e);
@@ -232,8 +233,30 @@ export class Renderer {
     // — kein expliziter setSize-Call nötig.
   }
 
+  /**
+   * Bloom intensity day-night aware. Bei Tag dimmen wir bloom auf 0.20
+   * (sonst blenden Bike-Chrome + Laternen aus), bei Nacht hoch auf den
+   * Default damit Laternen + Headlight bloomen. Per nightFactor lerp.
+   */
+  _updateBloomForDayCycle() {
+    const nf = this.game?.world?.dayCycle?.live?.nightFactor;
+    if (typeof nf !== "number") return;
+    if (this.mode === "webgl" && this.bloomPass) {
+      // WebGL UnrealBloom: 0.18 Tag → 0.55 Nacht
+      this.bloomPass.strength = 0.18 + nf * 0.37;
+    } else if (this.mode === "webgpu" && this._wgpuBloom) {
+      // WebGPU TSL bloom: 0.18 Tag → 0.45 Nacht (etwas niedriger weil
+      // TSL bloom auf Linear-Space wirkt und stärker durchschlägt)
+      if (this._wgpuBloom.strength?.value !== undefined) {
+        this._wgpuBloom.strength.value = 0.18 + nf * 0.27;
+      }
+    }
+  }
+
   render(scene, camera) {
     if (!this.instance) return;
+
+    this._updateBloomForDayCycle();
 
     // WebGL + EffectComposer-Pfad
     if (this.composer && this.mode === "webgl") {

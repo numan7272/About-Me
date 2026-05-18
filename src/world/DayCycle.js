@@ -149,18 +149,24 @@ export class DayCycle {
 
     // Tasten zum Cycle-Override (Debug/Demo):
     //  T = Toggle Pause
-    //  N = Night-Snap
-    //  D = Day-Snap
+    //  N = Smooth-Transition zu Night (3s)
+    //  M = Smooth-Transition zu Day  (3s)
+    //  B = Resume automatic cycle
+    // Smooth statt snap, damit der Übergang sich filmisch anfühlt.
     this._onKey = (e) => {
+      // Nicht auf Inputs/Textareas reagieren (User tippt vielleicht im
+      // SQLi-Lab oder einem anderen Mini-Game).
+      const tag = e.target?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
+      if (e.target?.isContentEditable) return;
+
       if (e.code === "KeyT") {
         this._paused = !this._paused;
         console.log(`[DayCycle] ${this._paused ? "paused" : "resumed"}`);
       } else if (e.code === "KeyN") {
-        this._overrideProgress = 0.5;
-        console.log("[DayCycle] snapped to night");
+        this.transitionTo?.(0.5, 3, false);
       } else if (e.code === "KeyM") {
-        this._overrideProgress = 0;
-        console.log("[DayCycle] snapped to day");
+        this.transitionTo?.(0, 3, true);
       } else if (e.code === "KeyB") {
         this._overrideProgress = null;
         console.log("[DayCycle] resumed automatic cycle");

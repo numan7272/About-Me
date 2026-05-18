@@ -171,10 +171,9 @@ async function buildOceanMaterialTSL() {
   const webgpuMod = await import("three/webgpu");
   const tslMod = await import("three/tsl");
   const {
-    Fn, uniform, varying, vec2, vec3, vec4, float,
+    Fn, uniform, vec2, vec3, vec4, float,
     sin, dot, floor, fract, mix, smoothstep, clamp, max, abs, length,
-    positionLocal, modelWorldMatrix, cameraProjectionMatrix, cameraViewMatrix,
-    time,
+    positionLocal, modelWorldMatrix,
   } = tslMod;
   const { MeshBasicNodeMaterial } = webgpuMod;
 

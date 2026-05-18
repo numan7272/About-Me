@@ -36,6 +36,14 @@ export class ProximityTrigger {
     this._highlightedEggId = null;
   }
 
+  _prefersReducedMotion() {
+    if (this._reducedCache !== undefined) return this._reducedCache;
+    try {
+      this._reducedCache = !!window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    } catch { this._reducedCache = false; }
+    return this._reducedCache;
+  }
+
   /** Setzt ein Egg in Highlight-Mode (stärkerer Puls + größer + heller).
    *  Case-insensitive Match — egg-Keys aus dem GLB sind groß ("Router"),
    *  aber `eggHint` in stations.js ist klein ("router"). Wir normalisieren. */
@@ -133,12 +141,14 @@ export class ProximityTrigger {
 
     // Egg-Animationen — kein Floating/Spinning mehr für GLB-Meshes (Router
     // soll dort sitzen wo er platziert wurde). Stattdessen subtiles Emissive-
-    // Pulsing bei Hover oder Highlight (Walkthrough-Killer-Moment).
+    // Pulsing bei Hover oder Highlight (Walkthrough-Killer-Moment). Bei
+    // prefers-reduced-motion: statt Puls einfach steady-glow.
+    const reduced = this._prefersReducedMotion();
     for (const [id, mesh] of this.eggMeshes) {
       if (!mesh.visible) continue;
       const isHighlighted = id === this._highlightedEggId;
       const isHovered = !!mesh.userData?.hovered;
-      const pulse = (Math.sin(this._t * 4.0) + 1) * 0.5;   // 0..1
+      const pulse = reduced ? 0.5 : (Math.sin(this._t * 4.0) + 1) * 0.5;
       let emissiveIntensity = 0;
       if (isHighlighted) emissiveIntensity = 0.7 + pulse * 0.5;
       else if (isHovered) emissiveIntensity = 0.4 + pulse * 0.3;

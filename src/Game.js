@@ -152,7 +152,39 @@ export class Game {
         window.__deferTourOverlay = false;
       }
       this.ui?.walkthrough?.showStartOverlayAfterSplash?.();
+      // Sobald die Welt sichtbar ist, preloaden wir die Mini-Game-Chunks
+      // im Hintergrund. So fühlt sich der erste Building-Click instant an,
+      // statt erst den 30-100KB-Chunk laden zu müssen. Network ist eh idle
+      // weil der User entweder Tour-Overlay liest oder fährt.
+      this._preloadMiniGames();
     };
+  }
+
+  _preloadMiniGames() {
+    if (this._miniGamesPreloaded) return;
+    this._miniGamesPreloaded = true;
+    // requestIdleCallback (oder setTimeout-Fallback) damit der eigentliche
+    // First-Paint nicht durch den Preload blockiert wird.
+    const schedule = window.requestIdleCallback
+      || ((cb) => setTimeout(cb, 800));
+    schedule(() => {
+      const loaders = [
+        () => import("./ui/miniGames/NumanOS.js"),
+        () => import("./ui/miniGames/DesignaOS.js"),
+        () => import("./ui/miniGames/HAWMoodle.js"),
+        () => import("./ui/miniGames/THGQuiz.js"),
+        () => import("./ui/miniGames/YekKasse.js"),
+        () => import("./ui/miniGames/RouterPentest.js"),
+      ];
+      // Sequenziell mit kleinem Stagger statt parallel — wir wollen die
+      // Browser-Verbindungen nicht für 6 Chunks gleichzeitig blocken.
+      let i = 0;
+      const next = () => {
+        if (i >= loaders.length) return;
+        loaders[i++]().catch(() => {}).then(() => setTimeout(next, 60));
+      };
+      next();
+    });
   }
 
   _setupGlobalDebug() {
