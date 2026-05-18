@@ -109,21 +109,22 @@ export class World {
     // Sky-Background — wird vom DayCycle pro Frame aktualisiert
     this.scene.background = new THREE.Color(0xa8d8ff);
 
-    // PMREM-Environment für PBR-Reflections. Ohne envMap rendern metallische
-    // Materials (Chrome, Reflektoren) als reine Direkt-Beleuchtung und wirken
-    // flach/falsch. RoomEnvironment ist ein synthetischer Scene-Light-Probe,
-    // ~zero-cost (einmal pre-filtert), und wird automatisch von allen
-    // PBR-Materials in der Szene als envMap genutzt sobald scene.environment
-    // gesetzt ist. Renderer-init ist async, wir hängen daran.
+    // PMREM-Environment für Bike-PBR-Reflections. Wir setzen das Env-Texture
+    // NICHT auf scene.environment (würde global auf jedes PBR-Material gelegt
+    // und mit der UnrealBloomPass-Threshold von 0.85 unter WebGL alles
+    // ausblenden lassen). Stattdessen exposen wir die Textur an Player, das
+    // sie nur den Bike-Materials zuweist. Buildings, Ocean, Grass bleiben
+    // unverändert in ihrer Original-Beleuchtung.
+    this.envTexture = null;
     const initEnv = () => {
       const renderer = this.game?.renderer?.instance;
       if (!renderer) return;
       try {
         const pmrem = new THREE.PMREMGenerator(renderer);
         const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
-        this.scene.environment = envTex;
-        this.scene.environmentIntensity = 0.6;
+        this.envTexture = envTex;
         pmrem.dispose();
+        this.player?._applyEnvMap?.();
       } catch (e) {
         console.warn("[World] PMREM environment init failed:", e?.message);
       }

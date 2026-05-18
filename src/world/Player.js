@@ -207,6 +207,9 @@ export class Player {
     });
     console.log(`[Player] bike materials neutralized: ${neutralized}`);
     this.scene.add(this.visualRoot);
+    // Env-Map nachträglich aufziehen falls schon ready, sonst hängt World
+    // sich an renderer.ready und ruft _applyEnvMap() später nach.
+    this._applyEnvMap();
 
     // Forward-Local des Bike-Modells nach -π/2-Rotation = +Z im visualRoot-Space
     // (per URL-Test ?bikefwd=+z verifiziert). _tmpForward = _forwardLocal.applyQuat
@@ -215,6 +218,30 @@ export class Player {
 
     // Bike-Headlight am visualRoot — folgt automatisch Position+Rotation
     this.headlight = new BikeHeadlight(this.game, this.visualRoot);
+  }
+
+  /**
+   * Zieht das PMREM-Env-Texture auf die Bike-Materials. Wird sowohl direkt
+   * nach _setupVisual aufgerufen (env evtl. noch nicht ready), als auch
+   * nochmal von World._setupLights's initEnv() sobald renderer fertig ist.
+   * Idempotent — überspringt Materials die schon eine envMap haben.
+   */
+  _applyEnvMap() {
+    if (!this.bikeModel) return;
+    const envMap = this.game?.world?.envTexture;
+    if (!envMap) return;
+    let applied = 0;
+    this.bikeModel.traverse((obj) => {
+      if (!obj.isMesh) return;
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      for (const m of mats) {
+        if (!m || m.envMap || !("envMap" in m)) continue;
+        m.envMap = envMap;
+        m.needsUpdate = true;
+        applied++;
+      }
+    });
+    if (applied > 0) console.log(`[Player] bike envMap applied to ${applied} mats`);
   }
 
   update() {

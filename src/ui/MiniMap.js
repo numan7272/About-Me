@@ -96,21 +96,26 @@ export class MiniMap {
     this.toggleBtn = document.createElement("button");
     this.toggleBtn.type = "button";
     this.toggleBtn.setAttribute("aria-label", "collapse map");
-    this.toggleBtn.textContent = "[−]";
+    this.toggleBtn.textContent = "−";
     Object.assign(this.toggleBtn.style, {
       position: "fixed",
-      top: `${this._mapTop - 4}px`,
-      right: `${this._mapRight - 4}px`,
-      padding: "4px 6px",
+      top: `${this._mapTop + 2}px`,
+      right: `${this._mapRight + 2}px`,
+      width: "20px",
+      height: "20px",
+      padding: "0",
       border: "0",
-      background: "transparent",
+      background: "var(--ink-solid)",
       color: "var(--paper-muted)",
       fontFamily: "var(--font-mono)",
-      fontSize: "11px",
+      fontSize: "13px",
       lineHeight: "1",
       cursor: "pointer",
-      zIndex: "12",
+      zIndex: "13",
       transition: "color 180ms var(--ease)",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
     });
     this.toggleBtn.addEventListener("mouseenter", () => {
       this.toggleBtn.style.color = "var(--signal)";
@@ -132,23 +137,46 @@ export class MiniMap {
   setCollapsed(collapsed) {
     this._collapsed = collapsed;
     if (collapsed) {
+      // Im collapsed-Modus IST die Pille selbst der Aufklapp-Button.
+      // Separater Toggle wird ausgeblendet, die ganze 44x44-Fläche ist
+      // klickbar. Inhalt = "+" mittig, ink-solid mit corner-brackets.
       this.root.style.width = "44px";
       this.root.style.height = "44px";
       this.root.style.pointerEvents = "auto";
       this.canvas.style.opacity = "0.0";
-      this.toggleBtn.textContent = "[ + ]";
-      this.toggleBtn.setAttribute("aria-label", "expand map");
-      this.toggleBtn.style.top = `${this._mapTop + 14}px`;
-      this.toggleBtn.style.right = `${this._mapRight + 12}px`;
+      this.toggleBtn.style.display = "none";
+      // Plus-Char direkt im root rendern. Wir nutzen den existing _expandHint
+      // wenn vorhanden, sonst inject einmalig.
+      if (!this._expandHint) {
+        this._expandHint = document.createElement("div");
+        this._expandHint.textContent = "+";
+        Object.assign(this._expandHint.style, {
+          position: "absolute",
+          inset: "0",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "var(--font-mono)",
+          fontSize: "18px",
+          color: "var(--paper)",
+          pointerEvents: "none",
+        });
+        this.root.appendChild(this._expandHint);
+      }
+      this._expandHint.style.display = "flex";
       this.root.style.cursor = "pointer";
+      this.root.setAttribute("aria-label", "expand map");
     } else {
       this.root.style.width = `${this._mapSize}px`;
       this.root.style.height = `${this._mapSize}px`;
       this.canvas.style.opacity = "1.0";
-      this.toggleBtn.textContent = "[−]";
+      this.toggleBtn.style.display = "flex";
+      this.toggleBtn.textContent = "−";
       this.toggleBtn.setAttribute("aria-label", "collapse map");
-      this.toggleBtn.style.top = `${this._mapTop - 4}px`;
-      this.toggleBtn.style.right = `${this._mapRight - 4}px`;
+      this.toggleBtn.style.top = `${this._mapTop + 2}px`;
+      this.toggleBtn.style.right = `${this._mapRight + 2}px`;
+      if (this._expandHint) this._expandHint.style.display = "none";
+      this.root.removeAttribute("aria-label");
     }
   }
 

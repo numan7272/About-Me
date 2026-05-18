@@ -190,14 +190,24 @@ export class StationLabels3D {
 
     // Title — italic mono display. Italic-Mono ist selten genug um nicht
     // sofort als "Editorial-Magazin"-Reflex zu lesen.
-    const titleStr = station.title || "";
-    let size = 52;
+    let titleStr = station.title || "";
     const maxW = TEX_W - (PAD + 20) - PAD;
-    do {
+    let size = 56;
+    const minSize = 22;
+    while (size > minSize) {
       ctx.font = `italic 500 ${size}px "JetBrains Mono", ui-monospace, monospace`;
       if (ctx.measureText(titleStr).width <= maxW) break;
       size -= 2;
-    } while (size > 26);
+    }
+    // Wenn auch bei minSize nicht passt, mit Ellipsis abschneiden statt
+    // über die Card-Kante zu drucken.
+    if (ctx.measureText(titleStr).width > maxW) {
+      let cut = titleStr;
+      while (cut.length > 4 && ctx.measureText(cut + "…").width > maxW) {
+        cut = cut.slice(0, -1);
+      }
+      titleStr = cut + "…";
+    }
 
     ctx.fillStyle = "rgba(20, 16, 12, 0.94)";
     ctx.textAlign = "left";
