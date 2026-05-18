@@ -235,7 +235,10 @@ export class FakeOS {
         di.className = "fos-dock-icon";
         di.dataset.appId = app.id;
         di.title = app.label;
-        di.textContent = app.icon;
+        di.setAttribute("aria-label", app.label);
+        // innerHTML statt textContent damit auch Inline-SVG-Icons rendern,
+        // nicht nur Emoji-Strings.
+        di.innerHTML = app.icon || "";
         this.dom.dock.appendChild(di);
       }
     }
@@ -536,11 +539,15 @@ export class FakeOS {
       }
       .fos-dock-icon {
         font-size: 30px;
+        color: #fff;
         cursor: pointer;
         transition: transform 180ms ease;
         line-height: 1;
+        display: flex; align-items: center; justify-content: center;
       }
+      .fos-dock-icon svg { width: 30px; height: 30px; display: block; }
       .fos-dock-icon:hover { transform: translateY(-6px) scale(1.15); }
+      .fos-icon-glyph svg { width: 40px; height: 40px; display: block; color: #fff; }
 
       .fos-window {
         position: absolute;

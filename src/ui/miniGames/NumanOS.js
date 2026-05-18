@@ -22,35 +22,46 @@ const NOW_HHMM = () => {
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
 };
 
+// Inline-SVG-Icons (Lucide-style 1.6px stroke, currentColor). Ersetzt
+// Browser-/OS-Emojis die plattform-abhängig pixelig oder farbverdreht
+// gerendert wurden. Hier sind die Icons monochrom + theme-kompatibel.
+const NOS_ICONS = {
+  globe: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>`,
+  folder: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>`,
+  terminal: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>`,
+  fileText: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>`,
+  fileEdit: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M10.4 16.6L17 10l-3-3-6.6 6.6V17h2.4z"/></svg>`,
+};
+
 const DESKTOP_FILES = [
   {
     id: "browser",
     label: "Browser",
-    icon: "🌐",
+    icon: NOS_ICONS.globe,
     type: "app",
   },
   {
     id: "projects",
     label: "Projects",
-    icon: "📁",
+    icon: NOS_ICONS.folder,
     type: "folder",
   },
   {
     id: "terminal",
     label: "Terminal",
-    icon: "⌨️",
+    icon: NOS_ICONS.terminal,
     type: "app",
   },
   {
     id: "readme",
     label: "README.txt",
-    icon: "📄",
+    icon: NOS_ICONS.fileText,
     type: "textfile",
   },
   {
     id: "todo_sqli",
     label: "TODO_fix_sql_injection.txt",
-    icon: "📝",
+    icon: NOS_ICONS.fileEdit,
     type: "trigger_sqli",
   },
 ];
@@ -278,6 +289,7 @@ export class NumanOS {
       .nos-icon-glyph {
         font-size: 38px;
         line-height: 1;
+        color: #fff;
         filter: drop-shadow(0 2px 4px rgba(0,0,0,0.4));
       }
       .nos-icon-label {
@@ -290,6 +302,16 @@ export class NumanOS {
       .nos-icon[data-type="trigger_sqli"] .nos-icon-label {
         color: #ffd97a;
       }
+      .nos-icon[data-type="trigger_sqli"] .nos-icon-glyph { color: #ffd97a; }
+      .nos-icon-glyph svg {
+        width: 42px; height: 42px;
+        display: block;
+      }
+      .nos-dock-icon svg {
+        width: 32px; height: 32px;
+        display: block;
+      }
+      .nos-dock-icon { color: #fff; }
 
       /* ── Dock ── */
       .nos-dock {
@@ -645,10 +667,10 @@ export class NumanOS {
     const dock = document.createElement("div");
     dock.className = "nos-dock";
     dock.innerHTML = `
-      <div class="nos-dock-icon" data-file-id="browser" title="Browser">🌐</div>
-      <div class="nos-dock-icon" data-file-id="terminal" title="Terminal">⌨️</div>
-      <div class="nos-dock-icon" data-file-id="projects" title="Projects">📁</div>
-      <div class="nos-dock-icon" data-file-id="readme" title="README">📄</div>
+      <div class="nos-dock-icon" data-file-id="browser" title="Browser" aria-label="Browser">${NOS_ICONS.globe}</div>
+      <div class="nos-dock-icon" data-file-id="terminal" title="Terminal" aria-label="Terminal">${NOS_ICONS.terminal}</div>
+      <div class="nos-dock-icon" data-file-id="projects" title="Projects" aria-label="Projects">${NOS_ICONS.folder}</div>
+      <div class="nos-dock-icon" data-file-id="readme" title="README" aria-label="README">${NOS_ICONS.fileText}</div>
     `;
     area.appendChild(dock);
 
