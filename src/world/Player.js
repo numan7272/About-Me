@@ -135,9 +135,27 @@ export class Player {
     this.bikeModel.rotation.set(0, -Math.PI / 2, 0);
     this.visualRoot.add(this.bikeModel);
     this.bikeModel.traverse((obj) => {
-      if (obj.isMesh) {
-        obj.castShadow = true;
-        obj.receiveShadow = true;
+      if (!obj.isMesh) return;
+      obj.castShadow = true;
+      obj.receiveShadow = true;
+
+      // GLB-Fix: Der USDZ→glTF Bake hat das Chrome_material mit
+      // emissiveFactor=[1,1,1] + emissive-Texture exportiert. Das macht
+      // chrome-Teile reinweiß glühend. Wir strippen Emissive überall ausser
+      // beim Rücklicht (das SOLL leuchten). Schadet nichts wenn die Mat
+      // gar kein Emissive hat.
+      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+      for (const mat of mats) {
+        if (!mat) continue;
+        const isLight = /light_rear/i.test(mat.name || "");
+        if (isLight) continue;
+        mat.emissive?.setRGB?.(0, 0, 0);
+        if ("emissiveIntensity" in mat) mat.emissiveIntensity = 0;
+        if (mat.emissiveMap) {
+          mat.emissiveMap.dispose?.();
+          mat.emissiveMap = null;
+        }
+        mat.needsUpdate = true;
       }
     });
     this.scene.add(this.visualRoot);

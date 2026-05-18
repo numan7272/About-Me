@@ -61,30 +61,32 @@ export class BottomDrawer {
       zIndex: String(Z_INDEX),
       padding: "0 16px 16px 16px",
       pointerEvents: "none",       // Container ist click-through, nur Panel fängt
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      color: "rgba(240, 245, 250, 0.92)",
-      transition: "transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1), opacity 0.25s",
+      fontFamily: "var(--font-mono)",
+      color: "var(--paper)",
+      transition: "transform 280ms var(--ease), opacity 200ms var(--ease)",
       transform: "translateY(110%)",
       opacity: "0",
     });
 
     this.panel = document.createElement("div");
+    this.panel.className = "hud-bracket";
     Object.assign(this.panel.style, {
       maxWidth: "1080px",
       margin: "0 auto",
       pointerEvents: "auto",
-      background: "rgba(8, 14, 26, 0.78)",
-      backdropFilter: "blur(14px)",
-      WebkitBackdropFilter: "blur(14px)",
-      border: "1px solid rgba(255, 255, 255, 0.12)",
-      borderRadius: "16px",
-      boxShadow: "0 16px 40px rgba(0, 0, 0, 0.5)",
+      background: "var(--ink-solid)",
+      color: "var(--paper)",
       display: "grid",
       gridTemplateColumns: "minmax(160px, 220px) 1fr minmax(140px, 200px)",
       gap: "20px",
-      padding: "18px 22px",
+      padding: "16px 20px",
       alignItems: "center",
     });
+    const cornerTr = document.createElement("span");
+    cornerTr.className = "hud-bracket-tr";
+    const cornerBl = document.createElement("span");
+    cornerBl.className = "hud-bracket-bl";
+    this.panel.append(cornerTr, cornerBl);
 
     // ── Left: Station-Identifier ──
     this.leftCol = document.createElement("div");
@@ -105,25 +107,24 @@ export class BottomDrawer {
     this.stationLabel = document.createElement("div");
     Object.assign(this.stationLabel.style, {
       fontSize: "11px",
-      letterSpacing: "0.16em",
-      textTransform: "uppercase",
-      color: "rgba(170, 190, 210, 0.7)",
+      color: "var(--paper-muted)",
     });
     this.leftCol.appendChild(this.stationLabel);
 
     this.stationTitle = document.createElement("div");
     Object.assign(this.stationTitle.style, {
-      fontSize: "15px",
-      fontWeight: "700",
+      fontSize: "16px",
+      fontWeight: "400",
       lineHeight: "1.25",
-      color: "rgba(240, 245, 250, 0.96)",
+      letterSpacing: "-0.01em",
+      color: "var(--paper)",
     });
     this.leftCol.appendChild(this.stationTitle);
 
     this.stationTimeframe = document.createElement("div");
     Object.assign(this.stationTimeframe.style, {
-      fontSize: "12px",
-      color: "rgba(160, 180, 200, 0.7)",
+      fontSize: "11px",
+      color: "var(--paper-dim)",
     });
     this.leftCol.appendChild(this.stationTimeframe);
 
@@ -181,46 +182,52 @@ export class BottomDrawer {
 
   _makePrimaryBtn() {
     const b = document.createElement("button");
+    b.type = "button";
     Object.assign(b.style, {
-      padding: "13px 20px",
-      minHeight: "44px",          // WCAG Touch-Target
-      borderRadius: "10px",
-      border: "1px solid rgba(126, 200, 255, 0.45)",
-      background: "linear-gradient(135deg, rgba(126,200,255,0.22), rgba(126,200,255,0.10))",
-      color: "rgba(240, 245, 250, 0.98)",
-      fontSize: "14px",
-      fontWeight: "600",
+      padding: "12px 16px",
+      minHeight: "44px",
+      border: "1px solid var(--signal)",
+      background: "transparent",
+      color: "var(--signal)",
+      fontFamily: "var(--font-mono)",
+      fontSize: "13px",
+      letterSpacing: "0.04em",
       cursor: "pointer",
-      transition: "background 0.15s, transform 0.1s",
+      transition: "background 180ms var(--ease)",
+      textTransform: "lowercase",
     });
     b.addEventListener("mouseenter", () => {
-      b.style.background = "linear-gradient(135deg, rgba(126,200,255,0.35), rgba(126,200,255,0.18))";
+      b.style.background = "var(--signal-dim)";
     });
     b.addEventListener("mouseleave", () => {
-      b.style.background = "linear-gradient(135deg, rgba(126,200,255,0.22), rgba(126,200,255,0.10))";
+      b.style.background = "transparent";
     });
     return b;
   }
 
   _makeSecondaryBtn() {
     const b = document.createElement("button");
+    b.type = "button";
     Object.assign(b.style, {
       flex: "1",
-      padding: "11px 14px",
-      minHeight: "44px",          // WCAG Touch-Target
-      borderRadius: "8px",
-      border: "1px solid rgba(255, 255, 255, 0.14)",
-      background: "rgba(255, 255, 255, 0.04)",
-      color: "rgba(220, 230, 240, 0.82)",
+      padding: "10px 12px",
+      minHeight: "44px",
+      border: "1px solid var(--rule-strong)",
+      background: "transparent",
+      color: "var(--paper-muted)",
+      fontFamily: "var(--font-mono)",
       fontSize: "12px",
       cursor: "pointer",
-      transition: "background 0.15s",
+      transition: "color 180ms var(--ease), border-color 180ms var(--ease)",
+      textTransform: "lowercase",
     });
     b.addEventListener("mouseenter", () => {
-      b.style.background = "rgba(255, 255, 255, 0.12)";
+      b.style.color = "var(--paper)";
+      b.style.borderColor = "var(--paper-muted)";
     });
     b.addEventListener("mouseleave", () => {
-      b.style.background = "rgba(255, 255, 255, 0.04)";
+      b.style.color = "var(--paper-muted)";
+      b.style.borderColor = "var(--rule-strong)";
     });
     return b;
   }
@@ -362,22 +369,20 @@ export class BottomDrawer {
     navRow.appendChild(this.btnSkip);
     this.rightCol.appendChild(navRow);
 
-    // Step-Dots
+    // Step-Indikator: [01/03] statt dots
     this.stepDots.innerHTML = "";
-    for (let i = 0; i < 3; i++) {
-      const dot = document.createElement("span");
-      Object.assign(dot.style, {
-        width: "8px",
-        height: "8px",
-        borderRadius: "50%",
-        background: i === this.step ? accent : "rgba(255,255,255,0.18)",
-        transition: "background 0.18s",
-      });
-      this.stepDots.appendChild(dot);
-    }
+    Object.assign(this.stepDots.style, {
+      fontSize: "11px",
+      color: "var(--paper-muted)",
+      fontVariantNumeric: "tabular-nums",
+      marginBottom: "2px",
+    });
+    const stepNum = document.createElement("span");
+    stepNum.textContent = `${String(this.step + 1).padStart(2, "0")} / 03`;
+    this.stepDots.appendChild(stepNum);
 
-    this.stationLabel.textContent = s.subtitle || "";
-    this.stationLabel.style.color = accent;
+    this.stationLabel.textContent = `> ${(s.subtitle || "").toLowerCase()}`;
+    this.stationLabel.style.color = "var(--paper-muted)";
     this.stationTitle.textContent = s.title || "";
     this.stationTimeframe.textContent = s.timeframe || "";
 
@@ -393,38 +398,39 @@ export class BottomDrawer {
 
     // Button-Labels
     const isLastStep = this.step === 2;
-    this.btnNext.textContent = isLastStep ? strings.next + " →" : strings.next;
-    this.btnPrev.textContent = "← " + strings.prev;
-    this.btnSkip.textContent = strings.skip;
+    this.btnNext.textContent = isLastStep
+      ? `${strings.next.toLowerCase()}  →`
+      : strings.next.toLowerCase();
+    this.btnPrev.textContent = `←  ${strings.prev.toLowerCase()}`;
+    this.btnSkip.textContent = strings.skip.toLowerCase();
   }
 
-  _stepHeader(text, color) {
+  _stepHeader(text) {
     const h = document.createElement("div");
-    h.textContent = text;
+    h.textContent = `> ${(text || "").toLowerCase()}`;
     Object.assign(h.style, {
-      fontSize: "10px",
-      letterSpacing: "0.2em",
-      textTransform: "uppercase",
-      color: color || "rgba(170, 190, 210, 0.7)",
+      fontSize: "11px",
+      color: "var(--paper-muted)",
     });
     return h;
   }
 
   _renderWhat(s, strings) {
-    this.center.appendChild(this._stepHeader(strings.step_what, s.color));
+    this.center.appendChild(this._stepHeader(strings.step_what));
     const headline = document.createElement("div");
     headline.textContent = s.headline || "";
     Object.assign(headline.style, {
-      fontSize: "17px",
-      fontWeight: "600",
+      fontSize: "16px",
+      fontWeight: "400",
       lineHeight: "1.4",
-      color: "rgba(245, 250, 255, 0.96)",
+      letterSpacing: "-0.01em",
+      color: "var(--paper)",
     });
     this.center.appendChild(headline);
   }
 
   _renderHow(s, strings) {
-    this.center.appendChild(this._stepHeader(strings.step_how, s.color));
+    this.center.appendChild(this._stepHeader(strings.step_how));
     const list = document.createElement("ul");
     Object.assign(list.style, {
       margin: "0",
@@ -432,54 +438,43 @@ export class BottomDrawer {
       listStyle: "none",
       display: "flex",
       flexDirection: "column",
-      gap: "5px",
+      gap: "4px",
     });
     for (const bullet of (s.bullets || []).slice(0, 4)) {
       const li = document.createElement("li");
       Object.assign(li.style, {
-        fontSize: "13.5px",
-        lineHeight: "1.45",
-        paddingLeft: "16px",
-        position: "relative",
-        color: "rgba(225, 235, 245, 0.9)",
+        fontSize: "13px",
+        lineHeight: "1.5",
+        color: "var(--paper)",
+        fontFamily: "var(--font-mono)",
       });
-      const dot = document.createElement("span");
-      Object.assign(dot.style, {
-        position: "absolute",
-        left: "0",
-        top: "9px",
-        width: "6px",
-        height: "6px",
-        borderRadius: "50%",
-        background: s.accent || s.color || "#7ec8ff",
-      });
-      li.appendChild(dot);
-      li.appendChild(document.createTextNode(bullet));
+      li.textContent = `> ${bullet}`;
       list.appendChild(li);
     }
     this.center.appendChild(list);
   }
 
   _renderStack(s, strings) {
-    this.center.appendChild(this._stepHeader(strings.step_stack, s.color));
-    const wrap = document.createElement("div");
+    this.center.appendChild(this._stepHeader(strings.step_stack));
+    const wrap = document.createElement("ul");
     Object.assign(wrap.style, {
-      display: "flex",
-      flexWrap: "wrap",
-      gap: "6px",
+      margin: "0",
+      padding: "0",
+      listStyle: "none",
+      display: "grid",
+      gridTemplateColumns: "repeat(auto-fill, minmax(120px, 1fr))",
+      gap: "2px 16px",
     });
     for (const skill of (s.skills || [])) {
-      const chip = document.createElement("span");
-      chip.textContent = skill;
-      Object.assign(chip.style, {
-        fontSize: "12.5px",
-        padding: "5px 10px",
-        borderRadius: "999px",
-        border: `1px solid ${s.accent || s.color}55`,
-        background: `${s.color || "#7ec8ff"}1a`,
-        color: "rgba(240, 250, 255, 0.92)",
+      const item = document.createElement("li");
+      item.textContent = `> ${skill}`;
+      Object.assign(item.style, {
+        fontSize: "12px",
+        color: "var(--paper-muted)",
+        fontFamily: "var(--font-mono)",
+        lineHeight: "1.6",
       });
-      wrap.appendChild(chip);
+      wrap.appendChild(item);
     }
     this.center.appendChild(wrap);
   }
@@ -501,37 +496,36 @@ export class BottomDrawer {
 
     // Eyebrow
     const eyebrow = document.createElement("div");
-    eyebrow.textContent = isEn ? "End of tour" : "Ende der Tour";
+    eyebrow.textContent = isEn ? "> end of tour" : "> ende der tour";
     Object.assign(eyebrow.style, {
       fontSize: "11px",
-      letterSpacing: "0.22em",
-      textTransform: "uppercase",
-      color: "rgba(126, 200, 255, 0.85)",
+      color: "var(--paper-muted)",
     });
     this.leftCol.appendChild(eyebrow);
 
     // Headline
     const title = document.createElement("div");
     title.textContent = isEn
-      ? "Let's talk."
-      : "Lass uns sprechen.";
+      ? "let's talk."
+      : "lass uns sprechen.";
     Object.assign(title.style, {
       fontSize: "22px",
-      fontWeight: "700",
+      fontWeight: "400",
       lineHeight: "1.2",
-      color: "rgba(245, 250, 255, 0.98)",
+      letterSpacing: "-0.01em",
+      color: "var(--paper)",
     });
     this.leftCol.appendChild(title);
 
-    // Body — generischer Ton, nicht auf einen Job-Typ festgelegt.
+    // Body. Generischer Ton, nicht auf einen Job-Typ festgelegt.
     const body = document.createElement("div");
     body.textContent = isEn
-      ? "Thanks for taking the tour. If you think I'd fit your team — for an internship, working-student role, or project — drop me a line. I usually reply within a day."
-      : "Danke fürs Durchklicken. Wenn du denkst ich passe in dein Team — ob Praktikum, Werkstudentenstelle oder Projekt — schreib mir gerne. Antwort meistens innerhalb eines Tages.";
+      ? "thanks for taking the tour. if you think i'd fit your team, drop me a line. usually within a day."
+      : "danke fürs durchklicken. wenn du denkst ich passe in dein team, schreib mir. meist innerhalb eines tages.";
     Object.assign(body.style, {
-      fontSize: "13.5px",
+      fontSize: "13px",
       lineHeight: "1.55",
-      color: "rgba(220, 230, 240, 0.85)",
+      color: "var(--paper)",
       maxWidth: "640px",
       margin: "0 auto",
     });
@@ -542,40 +536,24 @@ export class BottomDrawer {
     Object.assign(btnWrap.style, {
       display: "flex",
       justifyContent: "center",
-      gap: "10px",
+      gap: "8px",
       flexWrap: "wrap",
     });
 
-    const btnContact = document.createElement("button");
-    btnContact.textContent = (isEn ? "Open contact" : "Kontakt öffnen") + " →";
-    Object.assign(btnContact.style, {
-      padding: "11px 22px",
-      borderRadius: "10px",
-      border: "1px solid rgba(126, 200, 255, 0.55)",
-      background: "linear-gradient(135deg, rgba(126,200,255,0.30), rgba(126,200,255,0.14))",
-      color: "rgba(245, 250, 255, 0.98)",
-      fontSize: "14px",
-      fontWeight: "600",
-      cursor: "pointer",
-      transition: "background 0.15s",
-    });
-    btnContact.addEventListener("mouseenter", () => {
-      btnContact.style.background = "linear-gradient(135deg, rgba(126,200,255,0.45), rgba(126,200,255,0.22))";
-    });
-    btnContact.addEventListener("mouseleave", () => {
-      btnContact.style.background = "linear-gradient(135deg, rgba(126,200,255,0.30), rgba(126,200,255,0.14))";
-    });
+    const btnContact = this._makePrimaryBtn();
+    btnContact.textContent = `${isEn ? "open contact" : "kontakt öffnen"}  →`;
+    btnContact.style.flex = "0 1 auto";
     btnContact.addEventListener("click", () => this._endHandlers?.onContact?.());
     btnWrap.appendChild(btnContact);
 
     const btnRestart = this._makeSecondaryBtn();
-    btnRestart.textContent = isEn ? "Replay tour" : "Tour erneut";
+    btnRestart.textContent = isEn ? "replay tour" : "tour erneut";
     btnRestart.style.flex = "0 1 auto";
     btnRestart.addEventListener("click", () => this._endHandlers?.onRestart?.());
     btnWrap.appendChild(btnRestart);
 
     const btnClose = this._makeSecondaryBtn();
-    btnClose.textContent = isEn ? "Explore freely" : "Frei erkunden";
+    btnClose.textContent = isEn ? "explore freely" : "frei erkunden";
     btnClose.style.flex = "0 1 auto";
     btnClose.addEventListener("click", () => this._endHandlers?.onClose?.());
     btnWrap.appendChild(btnClose);

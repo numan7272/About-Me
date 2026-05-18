@@ -15,6 +15,7 @@
  */
 
 import * as THREE from "three";
+import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
 import { Resources } from "../core/Resources.js";
 import { Island } from "./Island.js";
 import { Player } from "./Player.js";
@@ -107,6 +108,31 @@ export class World {
 
     // Sky-Background — wird vom DayCycle pro Frame aktualisiert
     this.scene.background = new THREE.Color(0xa8d8ff);
+
+    // PMREM-Environment für PBR-Reflections. Ohne envMap rendern metallische
+    // Materials (Chrome, Reflektoren) als reine Direkt-Beleuchtung und wirken
+    // flach/falsch. RoomEnvironment ist ein synthetischer Scene-Light-Probe,
+    // ~zero-cost (einmal pre-filtert), und wird automatisch von allen
+    // PBR-Materials in der Szene als envMap genutzt sobald scene.environment
+    // gesetzt ist. Renderer-init ist async, wir hängen daran.
+    const initEnv = () => {
+      const renderer = this.game?.renderer?.instance;
+      if (!renderer) return;
+      try {
+        const pmrem = new THREE.PMREMGenerator(renderer);
+        const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+        this.scene.environment = envTex;
+        this.scene.environmentIntensity = 0.6;
+        pmrem.dispose();
+      } catch (e) {
+        console.warn("[World] PMREM environment init failed:", e?.message);
+      }
+    };
+    if (this.game?.renderer?.ready?.then) {
+      this.game.renderer.ready.then(initEnv).catch(() => {});
+    } else {
+      initEnv();
+    }
   }
 
   _buildIsland() {

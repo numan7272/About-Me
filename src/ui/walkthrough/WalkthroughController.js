@@ -306,77 +306,81 @@ export class WalkthroughController {
       position: "fixed",
       inset: "0",
       zIndex: "16",
-      background: "rgba(4, 8, 16, 0.55)",
-      backdropFilter: "blur(8px)",
-      WebkitBackdropFilter: "blur(8px)",
+      background: "oklch(13% 0.015 250 / 0.55)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      color: "rgba(240, 245, 250, 0.94)",
+      fontFamily: "var(--font-mono)",
+      color: "var(--paper)",
       opacity: "0",
-      transition: "opacity 0.32s",
+      transition: "opacity 0.32s var(--ease)",
       pointerEvents: "auto",
     });
 
-    const card = document.createElement("div");
+    const card = document.createElement("section");
+    card.className = "hud-bracket";
+    card.setAttribute("role", "dialog");
+    card.setAttribute("aria-modal", "true");
+    card.setAttribute("aria-labelledby", "tour-overlay-title");
     Object.assign(card.style, {
       maxWidth: "460px",
       width: "calc(100% - 40px)",
-      padding: "32px 32px 24px 32px",
-      borderRadius: "18px",
-      border: "1px solid rgba(255, 255, 255, 0.14)",
-      background: "rgba(10, 18, 32, 0.88)",
-      boxShadow: "0 20px 60px rgba(0, 0, 0, 0.6)",
-      textAlign: "center",
+      padding: "28px 28px 22px",
+      background: "var(--ink-solid)",
+      color: "var(--paper)",
+      textAlign: "left",
     });
+    card.append(this._cornerSpan("tr"), this._cornerSpan("bl"));
 
     const eyebrow = document.createElement("div");
-    eyebrow.textContent = lang === "en" ? "Welcome" : "Willkommen";
+    eyebrow.textContent = `> ${lang === "en" ? "welcome" : "willkommen"}`;
     Object.assign(eyebrow.style, {
       fontSize: "11px",
-      letterSpacing: "0.22em",
-      textTransform: "uppercase",
-      color: "rgba(126, 200, 255, 0.85)",
-      marginBottom: "12px",
+      color: "var(--paper-muted)",
+      marginBottom: "10px",
     });
     card.appendChild(eyebrow);
 
-    const title = document.createElement("div");
+    const title = document.createElement("h2");
+    title.id = "tour-overlay-title";
     title.textContent = strings.intro_title;
     Object.assign(title.style, {
-      fontSize: "28px",
-      fontWeight: "700",
-      lineHeight: "1.15",
-      marginBottom: "10px",
+      margin: "0 0 10px",
+      fontSize: "24px",
+      fontWeight: "400",
+      lineHeight: "1.2",
+      letterSpacing: "-0.01em",
+      color: "var(--paper)",
     });
     card.appendChild(title);
 
-    const body = document.createElement("div");
+    const body = document.createElement("p");
     body.textContent = strings.intro_body;
     Object.assign(body.style, {
-      fontSize: "14px",
+      margin: "0 0 16px",
+      fontSize: "13px",
       lineHeight: "1.55",
-      color: "rgba(220, 230, 240, 0.85)",
-      marginBottom: "18px",
+      color: "var(--paper-muted)",
     });
     card.appendChild(body);
 
-    // Hint-Box: Buildings sind anklickbar — kleiner Tipp damit Recruiter es
-    // entdecken. Sichtbar im Welcome-Overlay UND beim Wieder-Sehen der Tour.
+    const rule = document.createElement("hr");
+    rule.className = "hud-rule";
+    rule.style.margin = "0 0 14px";
+    card.appendChild(rule);
+
     const hintBox = document.createElement("div");
-    hintBox.innerHTML = lang === "en"
-      ? "💡 Tip: each building is clickable — try it after the tour."
-      : "💡 Tipp: Jedes Gebäude ist anklickbar — probier's nach der Tour.";
+    hintBox.textContent = lang === "en"
+      ? "> tip. every building is clickable. try one after the tour."
+      : "> tipp. jedes gebäude ist anklickbar. probier's nach der tour.";
     Object.assign(hintBox.style, {
       padding: "10px 12px",
-      background: "rgba(126, 200, 255, 0.08)",
-      border: "1px solid rgba(126, 200, 255, 0.22)",
-      borderRadius: "8px",
+      borderLeft: "2px solid var(--signal)",
+      background: "transparent",
       fontSize: "12px",
       lineHeight: "1.5",
-      color: "rgba(220, 235, 250, 0.85)",
-      marginBottom: "20px",
+      color: "var(--paper)",
+      marginBottom: "18px",
     });
     card.appendChild(hintBox);
 
@@ -384,7 +388,7 @@ export class WalkthroughController {
     Object.assign(btnRow.style, {
       display: "flex",
       flexDirection: "column",
-      gap: "10px",
+      gap: "8px",
     });
 
     const btnStart = this._makePrimaryButton(strings.start_tour);
@@ -406,12 +410,12 @@ export class WalkthroughController {
 
     const hint = document.createElement("div");
     hint.textContent = lang === "en"
-      ? "Tour takes ~2 minutes · You can restart it any time."
-      : "Tour dauert ~2 Minuten · Du kannst sie jederzeit neu starten.";
+      ? "~2 min. restart any time."
+      : "~2 min. jederzeit neu startbar.";
     Object.assign(hint.style, {
-      marginTop: "18px",
+      marginTop: "14px",
       fontSize: "11px",
-      color: "rgba(150, 170, 190, 0.55)",
+      color: "var(--paper-dim)",
     });
     card.appendChild(hint);
 
@@ -423,6 +427,13 @@ export class WalkthroughController {
     requestAnimationFrame(() => {
       overlay.style.opacity = "1";
     });
+    setTimeout(() => btnStart.focus(), 50);
+  }
+
+  _cornerSpan(corner) {
+    const s = document.createElement("span");
+    s.className = `hud-bracket-${corner}`;
+    return s;
   }
 
   _hideStartOverlay() {
@@ -436,45 +447,51 @@ export class WalkthroughController {
 
   _makePrimaryButton(label) {
     const b = document.createElement("button");
-    b.textContent = label + " →";
+    b.type = "button";
+    b.textContent = `${label.toLowerCase()}  →`;
     Object.assign(b.style, {
-      padding: "13px 24px",
-      borderRadius: "11px",
-      border: "1px solid rgba(126, 200, 255, 0.55)",
-      background: "linear-gradient(135deg, rgba(126,200,255,0.30), rgba(126,200,255,0.14))",
-      color: "rgba(245, 250, 255, 0.98)",
-      fontSize: "15px",
-      fontWeight: "600",
+      padding: "14px 18px",
+      border: "1px solid var(--signal)",
+      background: "transparent",
+      color: "var(--signal)",
+      fontFamily: "var(--font-mono)",
+      fontSize: "14px",
+      letterSpacing: "0.04em",
       cursor: "pointer",
-      transition: "background 0.15s, transform 0.1s",
+      transition: "background 180ms var(--ease)",
+      minHeight: "48px",
     });
     b.addEventListener("mouseenter", () => {
-      b.style.background = "linear-gradient(135deg, rgba(126,200,255,0.45), rgba(126,200,255,0.22))";
+      b.style.background = "var(--signal-dim)";
     });
     b.addEventListener("mouseleave", () => {
-      b.style.background = "linear-gradient(135deg, rgba(126,200,255,0.30), rgba(126,200,255,0.14))";
+      b.style.background = "transparent";
     });
     return b;
   }
 
   _makeSecondaryButton(label) {
     const b = document.createElement("button");
-    b.textContent = label;
+    b.type = "button";
+    b.textContent = label.toLowerCase();
     Object.assign(b.style, {
-      padding: "11px 22px",
-      borderRadius: "10px",
-      border: "1px solid rgba(255, 255, 255, 0.14)",
-      background: "rgba(255, 255, 255, 0.04)",
-      color: "rgba(220, 230, 240, 0.85)",
+      padding: "12px 18px",
+      border: "1px solid var(--rule-strong)",
+      background: "transparent",
+      color: "var(--paper-muted)",
+      fontFamily: "var(--font-mono)",
       fontSize: "13px",
       cursor: "pointer",
-      transition: "background 0.15s",
+      transition: "color 180ms var(--ease), border-color 180ms var(--ease)",
+      minHeight: "44px",
     });
     b.addEventListener("mouseenter", () => {
-      b.style.background = "rgba(255, 255, 255, 0.10)";
+      b.style.color = "var(--paper)";
+      b.style.borderColor = "var(--paper-muted)";
     });
     b.addEventListener("mouseleave", () => {
-      b.style.background = "rgba(255, 255, 255, 0.04)";
+      b.style.color = "var(--paper-muted)";
+      b.style.borderColor = "var(--rule-strong)";
     });
     return b;
   }
@@ -482,56 +499,39 @@ export class WalkthroughController {
   // ─── Tour-Restart-Button ───────────────────────────────────────────────
 
   _buildTourButton() {
-    // Kleiner Button neben der MiniMap → "Tour starten" für Wiederholungs-
-    // besucher. MiniMap sitzt top:84 right:20 mit 200x200.
-    // Wir setzen den Button DARÜBER (top:84 right:230, also linksneben MiniMap).
+    // Plain text-button neben der MiniMap. MiniMap sitzt top:84 right:20.
+    // Auf Mobile rückt sie auf top:70 right:12 und ist kleiner (130px).
     const btn = document.createElement("button");
-    btn.title = this._lang() === "en" ? "Start guided tour" : "Geführte Tour starten";
-    // Position: rechts neben der MiniMap. Auf Mobile rückt die MiniMap näher
-    // an den Rand (12px) und ist kleiner (130px) — Tour-Button muss sich
-    // anpassen, sonst landet er off-screen.
+    btn.type = "button";
+    btn.className = "hud-btn";
+    btn.title = this._lang() === "en" ? "start guided tour" : "geführte tour starten";
+
     const isMobileLayout = window.matchMedia?.("(max-width: 600px)")?.matches;
-    const btnTop   = isMobileLayout ? "60px" : "84px";
-    const btnRight = isMobileLayout ? "150px" : "230px";   // 130+12+8 / 200+20+10
+    const btnTop   = isMobileLayout ? "62px" : "84px";
+    const btnRight = isMobileLayout ? "154px" : "238px";
     Object.assign(btn.style, {
       position: "fixed",
       top: btnTop,
       right: btnRight,
       zIndex: "13",
-      padding: "8px 14px",
-      borderRadius: "999px",
-      border: "1px solid rgba(126, 200, 255, 0.35)",
-      background: "rgba(0, 0, 0, 0.5)",
-      backdropFilter: "blur(10px)",
-      WebkitBackdropFilter: "blur(10px)",
-      color: "rgba(240, 245, 250, 0.92)",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      fontSize: "12px",
-      fontWeight: "600",
-      cursor: "pointer",
-      display: "none",        // Initial versteckt — zeigt sich nach Free-Roam-Wahl
+      background: "var(--ink-solid)",
+      display: "none",          // initial hidden, zeigt sich nach Free-Roam-Wahl
       alignItems: "center",
-      gap: "6px",
-      transition: "background 0.15s",
+      gap: "8px",
     });
 
     const icon = document.createElement("span");
-    icon.textContent = "▶";
-    icon.style.fontSize = "10px";
-    icon.style.color = "rgba(126, 200, 255, 0.9)";
+    icon.textContent = "▸";
+    Object.assign(icon.style, {
+      fontSize: "11px",
+      color: "var(--signal)",
+    });
     btn.appendChild(icon);
 
     const label = document.createElement("span");
-    // "Tour" ist in DE und EN das gleiche Wort — bewusst keine Übersetzung.
-    label.textContent = "Tour";
+    label.textContent = "tour";
     btn.appendChild(label);
 
-    btn.addEventListener("mouseenter", () => {
-      btn.style.background = "rgba(126, 200, 255, 0.18)";
-    });
-    btn.addEventListener("mouseleave", () => {
-      btn.style.background = "rgba(0, 0, 0, 0.5)";
-    });
     btn.addEventListener("click", () => {
       if (this.active) {
         this.endTour({ completed: false });
@@ -554,9 +554,9 @@ export class WalkthroughController {
     if (this._tourButtonLabel) {
       const lang = this._lang();
       if (this.active) {
-        this._tourButtonLabel.textContent = lang === "en" ? "End tour" : "Tour beenden";
+        this._tourButtonLabel.textContent = lang === "en" ? "end tour" : "tour beenden";
       } else {
-        this._tourButtonLabel.textContent = "Tour";
+        this._tourButtonLabel.textContent = "tour";
       }
     }
   }

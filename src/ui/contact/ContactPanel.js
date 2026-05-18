@@ -38,64 +38,44 @@ export class ContactPanel {
 
   _buildButton() {
     this.btn = document.createElement("button");
+    this.btn.type = "button";
+    this.btn.className = "hud-btn";
     const isMobile = window.matchMedia?.("(max-width: 600px)")?.matches;
     Object.assign(this.btn.style, {
       position: "fixed",
       top: isMobile ? "12px" : "20px",
       right: isMobile ? "12px" : "20px",
       zIndex: String(Z_INDEX_BTN),
-      padding: isMobile ? "12px 16px 12px 18px" : "10px 18px 10px 20px",
-      borderRadius: "999px",
-      border: "1px solid rgba(126, 200, 255, 0.45)",
-      background: "linear-gradient(135deg, rgba(126,200,255,0.25), rgba(126,200,255,0.10))",
-      backdropFilter: "blur(12px)",
-      WebkitBackdropFilter: "blur(12px)",
-      color: "rgba(245, 250, 255, 0.96)",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      fontSize: "13px",
-      fontWeight: "600",
-      letterSpacing: "0.02em",
-      cursor: "pointer",
-      boxShadow: "0 4px 16px rgba(0, 0, 0, 0.35)",
-      transition: "background 0.15s, transform 0.15s, box-shadow 0.15s",
+      background: "var(--ink-solid)",
       display: "flex",
       alignItems: "center",
       gap: "8px",
+      letterSpacing: "0.04em",
     });
 
-    // Heartbeat-Indicator (kleiner pulsierender Dot)
+    // Caret-Cursor als "available"-Signal. Blinkt langsam, mono-terminal-feel.
     this._heartbeat = document.createElement("span");
+    this._heartbeat.textContent = "▌";
     Object.assign(this._heartbeat.style, {
-      width: "8px",
-      height: "8px",
-      borderRadius: "50%",
-      background: "#7ec8ff",
-      boxShadow: "0 0 8px rgba(126, 200, 255, 0.9)",
-      animation: "contact-pulse 2.2s ease-in-out infinite",
+      color: "var(--signal)",
+      fontSize: "13px",
+      lineHeight: "1",
+      animation: "contact-caret-blink 1.8s steps(2, end) infinite",
     });
     this.btn.appendChild(this._heartbeat);
 
     this._btnLabel = document.createElement("span");
     this.btn.appendChild(this._btnLabel);
 
-    this.btn.addEventListener("mouseenter", () => {
-      this.btn.style.background = "linear-gradient(135deg, rgba(126,200,255,0.38), rgba(126,200,255,0.18))";
-      this.btn.style.transform = "translateY(-1px)";
-    });
-    this.btn.addEventListener("mouseleave", () => {
-      this.btn.style.background = "linear-gradient(135deg, rgba(126,200,255,0.25), rgba(126,200,255,0.10))";
-      this.btn.style.transform = "translateY(0)";
-    });
     this.btn.addEventListener("click", () => this.toggle());
 
     document.body.appendChild(this.btn);
 
-    // Pulse-Keyframe injizieren
     if (!document.getElementById("contact-keyframes")) {
       const style = document.createElement("style");
       style.id = "contact-keyframes";
       style.textContent =
-        "@keyframes contact-pulse { 0%, 100% { opacity: 0.7; transform: scale(1); } 50% { opacity: 1; transform: scale(1.18); } }";
+        "@keyframes contact-caret-blink { 0%, 49% { opacity: 1; } 50%, 100% { opacity: 0.25; } }";
       document.head.appendChild(style);
     }
 
@@ -104,7 +84,7 @@ export class ContactPanel {
 
   _updateButtonLabel() {
     const strings = this._strings();
-    this._btnLabel.textContent = strings.contact;
+    this._btnLabel.textContent = (strings.contact || "contact").toLowerCase();
   }
 
   _buildPanel() {
@@ -114,18 +94,19 @@ export class ContactPanel {
       position: "fixed",
       inset: "0",
       zIndex: String(Z_INDEX_PANEL - 1),
-      background: "rgba(4, 8, 16, 0.45)",
-      backdropFilter: "blur(4px)",
-      WebkitBackdropFilter: "blur(4px)",
+      background: "oklch(13% 0.015 250 / 0.55)",
       opacity: "0",
       pointerEvents: "none",
-      transition: "opacity 0.25s",
+      transition: "opacity 220ms var(--ease)",
     });
     this.backdrop.addEventListener("click", () => this.close());
     document.body.appendChild(this.backdrop);
 
     // ── Panel ──
-    this.panel = document.createElement("div");
+    this.panel = document.createElement("aside");
+    this.panel.setAttribute("role", "dialog");
+    this.panel.setAttribute("aria-modal", "true");
+    this.panel.setAttribute("aria-label", "contact");
     Object.assign(this.panel.style, {
       position: "fixed",
       top: "0",
@@ -133,18 +114,15 @@ export class ContactPanel {
       bottom: "0",
       width: "min(420px, 92vw)",
       zIndex: String(Z_INDEX_PANEL),
-      background: "rgba(8, 14, 26, 0.92)",
-      backdropFilter: "blur(18px)",
-      WebkitBackdropFilter: "blur(18px)",
-      borderLeft: "1px solid rgba(255, 255, 255, 0.12)",
-      boxShadow: "-12px 0 36px rgba(0, 0, 0, 0.55)",
+      background: "var(--ink-solid)",
+      borderLeft: "1px solid var(--rule-strong)",
       transform: "translateX(100%)",
-      transition: "transform 0.32s cubic-bezier(0.2, 0.8, 0.2, 1)",
+      transition: "transform 320ms var(--ease)",
       display: "flex",
       flexDirection: "column",
-      padding: "28px 28px 24px 28px",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      color: "rgba(240, 245, 250, 0.92)",
+      padding: "26px 26px 22px",
+      fontFamily: "var(--font-mono)",
+      color: "var(--paper)",
       overflowY: "auto",
     });
     document.body.appendChild(this.panel);
@@ -154,57 +132,71 @@ export class ContactPanel {
 
   _renderPanelContent() {
     this.panel.innerHTML = "";
+    const isEn = this._lang() === "en";
 
     // ── Close-Button ──
     const closeBtn = document.createElement("button");
-    closeBtn.innerHTML = "&times;";
+    closeBtn.type = "button";
+    closeBtn.textContent = "[ esc ] close";
+    closeBtn.setAttribute("aria-label", "close contact panel");
     Object.assign(closeBtn.style, {
       position: "absolute",
-      top: "16px",
-      right: "16px",
-      width: "32px",
-      height: "32px",
-      borderRadius: "50%",
-      border: "1px solid rgba(255, 255, 255, 0.14)",
-      background: "rgba(255, 255, 255, 0.05)",
-      color: "rgba(220, 230, 240, 0.85)",
-      fontSize: "20px",
+      top: "12px",
+      right: "12px",
+      background: "transparent",
+      border: "0",
+      color: "var(--paper-muted)",
+      fontFamily: "var(--font-mono)",
+      fontSize: "11px",
       cursor: "pointer",
-      lineHeight: "1",
+      padding: "4px 6px",
+      transition: "color 180ms var(--ease)",
+    });
+    closeBtn.addEventListener("mouseenter", () => {
+      closeBtn.style.color = "var(--signal)";
+    });
+    closeBtn.addEventListener("mouseleave", () => {
+      closeBtn.style.color = "var(--paper-muted)";
     });
     closeBtn.addEventListener("click", () => this.close());
     this.panel.appendChild(closeBtn);
 
     // ── Header ──
     const eyebrow = document.createElement("div");
-    eyebrow.textContent = this._lang() === "en" ? "Get in touch" : "Kontakt aufnehmen";
+    eyebrow.textContent = isEn ? "> get in touch" : "> kontakt aufnehmen";
     Object.assign(eyebrow.style, {
       fontSize: "11px",
-      letterSpacing: "0.2em",
-      textTransform: "uppercase",
-      color: "rgba(126, 200, 255, 0.85)",
-      marginBottom: "8px",
+      color: "var(--paper-muted)",
+      marginBottom: "10px",
+      marginTop: "8px",
     });
     this.panel.appendChild(eyebrow);
 
     const name = document.createElement("div");
-    name.textContent = "Numan Yesil";
+    name.textContent = "numan.yesil";
     Object.assign(name.style, {
-      fontSize: "28px",
-      fontWeight: "700",
+      fontSize: "26px",
+      fontWeight: "400",
       lineHeight: "1.1",
+      letterSpacing: "-0.02em",
       marginBottom: "4px",
+      color: "var(--paper)",
     });
     this.panel.appendChild(name);
 
     const loc = document.createElement("div");
-    loc.textContent = CONTACT.location;
+    loc.textContent = (CONTACT.location || "").toLowerCase();
     Object.assign(loc.style, {
-      fontSize: "13px",
-      color: "rgba(170, 190, 210, 0.7)",
-      marginBottom: "24px",
+      fontSize: "12px",
+      color: "var(--paper-muted)",
+      marginBottom: "20px",
     });
     this.panel.appendChild(loc);
+
+    const rule = document.createElement("hr");
+    rule.className = "hud-rule";
+    rule.style.margin = "0 0 18px";
+    this.panel.appendChild(rule);
 
     // ── E-Mail-Block ──
     this.panel.appendChild(this._buildEmailRow());
@@ -214,56 +206,35 @@ export class ContactPanel {
     Object.assign(buttonsWrap.style, {
       display: "flex",
       flexDirection: "column",
-      gap: "10px",
-      marginTop: "20px",
+      gap: "8px",
+      marginTop: "16px",
     });
 
     buttonsWrap.appendChild(this._buildLinkRow({
-      label: "LinkedIn",
+      label: "linkedin",
       sub: "/in/numan-yesil",
       url: CONTACT.linkedin,
       icon: this._svgLinkedIn(),
     }));
     buttonsWrap.appendChild(this._buildLinkRow({
-      label: "GitHub",
+      label: "github",
       sub: "@numan7272",
       url: CONTACT.github,
       icon: this._svgGitHub(),
     }));
     this.panel.appendChild(buttonsWrap);
 
-    // (CV-Download bewusst entfernt — Lebenslauf wird individuell auf
-    // Anfrage geschickt, nicht öffentlich gehostet. DSGVO + saubere
-    // Bewerbungs-Praxis.)
-
-    // ── Verfügbarkeits-Hinweis (Recruiter brauchen das) ──
-    const availability = document.createElement("div");
-    availability.textContent = this._lang() === "en"
-      ? "Open to Werkstudent / internship. Backend, cloud, DevOps or security. Available from 03/2026."
-      : "Offen für Werkstudent / Praktikum. Backend, Cloud, DevOps oder Security. Ab 03/2026.";
-    Object.assign(availability.style, {
-      marginTop: "22px",
-      padding: "12px 14px",
-      borderRadius: "10px",
-      background: "rgba(126, 200, 255, 0.08)",
-      border: "1px solid rgba(126, 200, 255, 0.22)",
-      fontSize: "12px",
-      lineHeight: "1.5",
-      color: "rgba(220, 235, 250, 0.92)",
-    });
-    this.panel.appendChild(availability);
-
     // ── Footer-Hint ──
     const footer = document.createElement("div");
-    footer.textContent = this._lang() === "en"
-      ? "Press ESC to close · I usually reply within a day."
-      : "ESC zum Schließen · Antwort meistens innerhalb eines Tages.";
+    footer.textContent = isEn
+      ? "[ esc ] close · reply usually within a day."
+      : "[ esc ] schließen · antwort meist innerhalb eines tages.";
     Object.assign(footer.style, {
       marginTop: "auto",
       paddingTop: "20px",
       fontSize: "11px",
-      color: "rgba(140, 160, 180, 0.55)",
-      textAlign: "center",
+      color: "var(--paper-dim)",
+      textAlign: "left",
     });
     this.panel.appendChild(footer);
   }
@@ -274,10 +245,9 @@ export class ContactPanel {
       display: "flex",
       gap: "8px",
       alignItems: "stretch",
-      background: "rgba(126, 200, 255, 0.08)",
-      border: "1px solid rgba(126, 200, 255, 0.28)",
-      borderRadius: "12px",
+      borderLeft: "2px solid var(--signal)",
       padding: "12px 14px",
+      background: "transparent",
     });
 
     const mailto = document.createElement("a");
@@ -285,38 +255,51 @@ export class ContactPanel {
     mailto.textContent = CONTACT.email;
     Object.assign(mailto.style, {
       flex: "1",
-      fontSize: "15px",
-      fontWeight: "600",
-      color: "rgba(126, 200, 255, 0.96)",
+      fontSize: "14px",
+      fontWeight: "400",
+      color: "var(--signal)",
       textDecoration: "none",
       lineHeight: "1.4",
       wordBreak: "break-all",
       display: "flex",
       alignItems: "center",
+      fontFamily: "var(--font-mono)",
     });
     wrap.appendChild(mailto);
 
     const copyBtn = document.createElement("button");
-    copyBtn.textContent = this._lang() === "en" ? "Copy" : "Kopieren";
+    copyBtn.type = "button";
+    copyBtn.textContent = this._lang() === "en" ? "copy" : "kopieren";
     Object.assign(copyBtn.style, {
       padding: "6px 12px",
-      borderRadius: "6px",
-      border: "1px solid rgba(255, 255, 255, 0.14)",
-      background: "rgba(255, 255, 255, 0.04)",
-      color: "rgba(220, 230, 240, 0.85)",
-      fontSize: "12px",
+      border: "1px solid var(--rule-strong)",
+      background: "transparent",
+      color: "var(--paper-muted)",
+      fontFamily: "var(--font-mono)",
+      fontSize: "11px",
       cursor: "pointer",
       whiteSpace: "nowrap",
+      transition: "color 180ms var(--ease), border-color 180ms var(--ease)",
+    });
+    copyBtn.addEventListener("mouseenter", () => {
+      copyBtn.style.color = "var(--paper)";
+      copyBtn.style.borderColor = "var(--paper-muted)";
+    });
+    copyBtn.addEventListener("mouseleave", () => {
+      copyBtn.style.color = "var(--paper-muted)";
+      copyBtn.style.borderColor = "var(--rule-strong)";
     });
     copyBtn.addEventListener("click", async () => {
       try {
         await navigator.clipboard.writeText(CONTACT.email);
         const original = copyBtn.textContent;
-        copyBtn.textContent = "✓";
-        copyBtn.style.color = "#34d399";
+        copyBtn.textContent = "[ ok ]";
+        copyBtn.style.color = "var(--signal)";
+        copyBtn.style.borderColor = "var(--signal)";
         setTimeout(() => {
           copyBtn.textContent = original;
-          copyBtn.style.color = "rgba(220, 230, 240, 0.85)";
+          copyBtn.style.color = "var(--paper-muted)";
+          copyBtn.style.borderColor = "var(--rule-strong)";
         }, 1200);
       } catch (e) {
         console.warn("[Contact] clipboard write failed:", e);
@@ -337,32 +320,30 @@ export class ContactPanel {
       alignItems: "center",
       gap: "14px",
       padding: "12px 14px",
-      borderRadius: "10px",
-      border: "1px solid rgba(255, 255, 255, 0.12)",
-      background: "rgba(255, 255, 255, 0.04)",
-      color: "rgba(240, 245, 250, 0.92)",
+      border: "1px solid var(--rule)",
+      background: "transparent",
+      color: "var(--paper)",
       textDecoration: "none",
-      transition: "background 0.15s, border-color 0.15s",
+      transition: "border-color 180ms var(--ease), color 180ms var(--ease)",
+      fontFamily: "var(--font-mono)",
     });
     a.addEventListener("mouseenter", () => {
-      a.style.background = "rgba(255, 255, 255, 0.10)";
-      a.style.borderColor = "rgba(126, 200, 255, 0.35)";
+      a.style.borderColor = "var(--signal)";
     });
     a.addEventListener("mouseleave", () => {
-      a.style.background = "rgba(255, 255, 255, 0.04)";
-      a.style.borderColor = "rgba(255, 255, 255, 0.12)";
+      a.style.borderColor = "var(--rule)";
     });
 
     const iconWrap = document.createElement("span");
     iconWrap.innerHTML = icon;
     Object.assign(iconWrap.style, {
-      width: "22px",
-      height: "22px",
+      width: "20px",
+      height: "20px",
       flexShrink: "0",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      color: "rgba(220, 230, 240, 0.82)",
+      color: "var(--paper-muted)",
     });
     a.appendChild(iconWrap);
 
@@ -370,12 +351,17 @@ export class ContactPanel {
     Object.assign(txt.style, { display: "flex", flexDirection: "column", gap: "1px" });
     const t1 = document.createElement("div");
     t1.textContent = label;
-    t1.style.fontSize = "14px";
-    t1.style.fontWeight = "600";
+    Object.assign(t1.style, {
+      fontSize: "13px",
+      fontWeight: "400",
+      color: "var(--paper)",
+    });
     const t2 = document.createElement("div");
     t2.textContent = sub;
-    t2.style.fontSize = "12px";
-    t2.style.color = "rgba(160, 180, 200, 0.7)";
+    Object.assign(t2.style, {
+      fontSize: "11px",
+      color: "var(--paper-muted)",
+    });
     txt.appendChild(t1);
     txt.appendChild(t2);
     a.appendChild(txt);
@@ -384,8 +370,8 @@ export class ContactPanel {
     arrow.textContent = "→";
     Object.assign(arrow.style, {
       marginLeft: "auto",
-      color: "rgba(170, 190, 210, 0.55)",
-      fontSize: "16px",
+      color: "var(--paper-dim)",
+      fontSize: "14px",
     });
     a.appendChild(arrow);
 

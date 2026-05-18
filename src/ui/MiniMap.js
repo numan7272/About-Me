@@ -14,41 +14,46 @@ import { TELEPORT_POINTS } from "../data/stations.js";
 
 const SIZE = 200;
 const WORLD_RANGE = 60;           // ±60m wird auf Canvas gemappt
-const BIKE_COLOR = "#ffffff";
 
-const BUILDING_COLORS = {
-  HQ:      "#ff7eb6",   // pink
-  HAW:     "#ffa726",   // orange
-  Yek:     "#ffeb3b",   // yellow
-  THG:     "#ef5350",   // red
-  Designa: "#42a5f5",   // blue
-};
+// Brutalist-Mono palette. Map ist Telemetrie — Buildings unterscheiden sich
+// über Position + Label, nicht über Regenbogen. Aktive Tour-Station kann
+// optional in --signal eingefärbt werden.
+const PAPER       = "oklch(94% 0.015 75)";
+const PAPER_MUTED = "oklch(72% 0.02 75)";
+const PAPER_DIM   = "oklch(55% 0.02 70)";
+const INK_SOFT    = "oklch(20% 0.02 250)";
+const SIGNAL      = "oklch(72% 0.22 25)";
 
 export class MiniMap {
   constructor(game) {
     this.game = game;
 
-    // Wrapper — auf Mobile kleiner (130px statt 200px)
+    // Wrapper — auf Mobile kleiner (130px statt 200px). Rechteckig,
+    // hairline-border, kein blur, brutalist register.
     const isMobile = window.matchMedia?.("(max-width: 600px)")?.matches;
     const mapSize = isMobile ? 130 : SIZE;
     this._renderSize = mapSize;
     this.root = document.createElement("div");
+    this.root.className = "hud-bracket";
     Object.assign(this.root.style, {
       position: "fixed",
       top: isMobile ? "70px" : "84px",
       right: isMobile ? "12px" : "20px",
       width: `${mapSize}px`,
       height: `${mapSize}px`,
-      borderRadius: "50%",
       overflow: "hidden",
-      background: "rgba(10, 20, 40, 0.55)",
-      backdropFilter: "blur(10px)",
-      border: "2px solid rgba(255, 255, 255, 0.18)",
-      boxShadow: "0 4px 24px rgba(0, 0, 0, 0.35)",
+      background: "var(--ink-solid)",
+      color: "var(--paper)",
       pointerEvents: "auto",
       cursor: "pointer",
       zIndex: "11",
+      transition: "width 280ms var(--ease), height 280ms var(--ease)",
     });
+    const cornerTr = document.createElement("span");
+    cornerTr.className = "hud-bracket-tr";
+    const cornerBl = document.createElement("span");
+    cornerBl.className = "hud-bracket-bl";
+    this.root.append(cornerTr, cornerBl);
 
     // Canvas
     this.canvas = document.createElement("canvas");
@@ -89,32 +94,29 @@ export class MiniMap {
 
   _buildToggleButton(isMobile) {
     this.toggleBtn = document.createElement("button");
-    this.toggleBtn.title = "Karte zuklappen";
-    this.toggleBtn.innerHTML = "&minus;";
-    // 44px Touch-Target (Apple HIG) — Position passt sich später dynamisch an.
+    this.toggleBtn.type = "button";
+    this.toggleBtn.setAttribute("aria-label", "collapse map");
+    this.toggleBtn.textContent = "[−]";
     Object.assign(this.toggleBtn.style, {
       position: "fixed",
-      top: `${this._mapTop - 10}px`,
-      right: `${this._mapRight - 10}px`,
-      width: "32px",
-      height: "32px",
-      borderRadius: "50%",
-      border: "1px solid rgba(255, 255, 255, 0.2)",
-      background: "rgba(0, 0, 0, 0.55)",
-      backdropFilter: "blur(8px)",
-      WebkitBackdropFilter: "blur(8px)",
-      color: "rgba(240, 245, 250, 0.95)",
-      fontFamily: "system-ui, -apple-system, sans-serif",
-      fontSize: "16px",
-      fontWeight: "700",
+      top: `${this._mapTop - 4}px`,
+      right: `${this._mapRight - 4}px`,
+      padding: "4px 6px",
+      border: "0",
+      background: "transparent",
+      color: "var(--paper-muted)",
+      fontFamily: "var(--font-mono)",
+      fontSize: "11px",
       lineHeight: "1",
       cursor: "pointer",
       zIndex: "12",
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      boxShadow: "0 2px 8px rgba(0, 0, 0, 0.4)",
-      padding: "0",
+      transition: "color 180ms var(--ease)",
+    });
+    this.toggleBtn.addEventListener("mouseenter", () => {
+      this.toggleBtn.style.color = "var(--signal)";
+    });
+    this.toggleBtn.addEventListener("mouseleave", () => {
+      this.toggleBtn.style.color = "var(--paper-muted)";
     });
     this.toggleBtn.addEventListener("click", () => this.toggleCollapsed());
     document.body.appendChild(this.toggleBtn);
@@ -130,28 +132,23 @@ export class MiniMap {
   setCollapsed(collapsed) {
     this._collapsed = collapsed;
     if (collapsed) {
-      // Karte verkleinern auf einen kleinen Pin
-      this.root.style.transition = "all 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)";
       this.root.style.width = "44px";
       this.root.style.height = "44px";
       this.root.style.pointerEvents = "auto";
       this.canvas.style.opacity = "0.0";
-      this.toggleBtn.innerHTML = "+";
-      this.toggleBtn.title = "Karte aufklappen";
-      // Toggle-Button-Position passt sich an die schmalere Karte an
-      this.toggleBtn.style.top = `${this._mapTop + 8}px`;
-      this.toggleBtn.style.right = `${this._mapRight + 8}px`;
-      // Tap auf zugeklappte Karte → aufklappen
+      this.toggleBtn.textContent = "[ + ]";
+      this.toggleBtn.setAttribute("aria-label", "expand map");
+      this.toggleBtn.style.top = `${this._mapTop + 14}px`;
+      this.toggleBtn.style.right = `${this._mapRight + 12}px`;
       this.root.style.cursor = "pointer";
     } else {
-      this.root.style.transition = "all 0.28s cubic-bezier(0.2, 0.8, 0.2, 1)";
       this.root.style.width = `${this._mapSize}px`;
       this.root.style.height = `${this._mapSize}px`;
       this.canvas.style.opacity = "1.0";
-      this.toggleBtn.innerHTML = "&minus;";
-      this.toggleBtn.title = "Karte zuklappen";
-      this.toggleBtn.style.top = `${this._mapTop - 6}px`;
-      this.toggleBtn.style.right = `${this._mapRight - 6}px`;
+      this.toggleBtn.textContent = "[−]";
+      this.toggleBtn.setAttribute("aria-label", "collapse map");
+      this.toggleBtn.style.top = `${this._mapTop - 4}px`;
+      this.toggleBtn.style.right = `${this._mapRight - 4}px`;
     }
   }
 
@@ -264,19 +261,25 @@ export class MiniMap {
 
     ctx.clearRect(0, 0, SIZE, SIZE);
 
-    // 1) Insel-Kreis (Approximation)
-    ctx.fillStyle = "rgba(70, 130, 60, 0.45)";
+    // 1) Insel-Outline (Hairline-Kreis als Approximation)
+    ctx.strokeStyle = INK_SOFT;
+    ctx.fillStyle = INK_SOFT;
     ctx.beginPath();
     ctx.arc(SIZE / 2, SIZE / 2, SIZE * 0.42, 0, Math.PI * 2);
     ctx.fill();
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = PAPER_DIM;
+    ctx.beginPath();
+    ctx.arc(SIZE / 2, SIZE / 2, SIZE * 0.42, 0, Math.PI * 2);
+    ctx.stroke();
 
-    // 2) Road-Curve
+    // 2) Road-Curve als dünner Mono-Pfad
     const curve = road.curve;
     const pts = curve.getSpacedPoints(80);
-    ctx.strokeStyle = "rgba(40, 45, 55, 0.85)";
-    ctx.lineWidth = 3;
-    ctx.lineCap = "round";
-    ctx.lineJoin = "round";
+    ctx.strokeStyle = PAPER_MUTED;
+    ctx.lineWidth = 1.2;
+    ctx.lineCap = "butt";
+    ctx.lineJoin = "miter";
     ctx.beginPath();
     for (let i = 0; i < pts.length; i++) {
       const [cx, cy] = this._w2c(pts[i].x, pts[i].z);
@@ -286,36 +289,27 @@ export class MiniMap {
     ctx.closePath();
     ctx.stroke();
 
-    // Mittellinie
-    ctx.strokeStyle = "rgba(230, 225, 200, 0.65)";
-    ctx.lineWidth = 1;
-    ctx.setLineDash([3, 4]);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // 3) Buildings — farbige Punkte mit Labels
+    // 3) Buildings als 1x4 px crosshair + Mono-Label. Alle gleich, keine Farb-Hierarchie.
+    ctx.font = "9px ui-monospace, 'JetBrains Mono', monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "alphabetic";
     for (const b of island.buildings) {
       const [bx, , bz] = b.position;
       const [cx, cy] = this._w2c(bx, bz);
-      const color = BUILDING_COLORS[b.id] || "#ffffff";
 
-      // Glow
-      ctx.fillStyle = color + "55";
+      // Crosshair statt Punkt
+      ctx.strokeStyle = PAPER;
+      ctx.lineWidth = 1;
       ctx.beginPath();
-      ctx.arc(cx, cy, 9, 0, Math.PI * 2);
-      ctx.fill();
+      ctx.moveTo(cx - 4, cy);
+      ctx.lineTo(cx + 4, cy);
+      ctx.moveTo(cx, cy - 4);
+      ctx.lineTo(cx, cy + 4);
+      ctx.stroke();
 
-      // Core
-      ctx.fillStyle = color;
-      ctx.beginPath();
-      ctx.arc(cx, cy, 4.5, 0, Math.PI * 2);
-      ctx.fill();
-
-      // Label
-      ctx.fillStyle = "rgba(245, 250, 255, 0.95)";
-      ctx.font = "bold 9px system-ui, sans-serif";
-      ctx.textAlign = "center";
-      ctx.fillText(b.id, cx, cy - 11);
+      // Label klein-mono
+      ctx.fillStyle = PAPER_MUTED;
+      ctx.fillText((b.id || "").toLowerCase(), cx, cy - 8);
     }
 
     return true;
@@ -364,24 +358,14 @@ export class MiniMap {
     const baseRX = bx + dirZ * 4 - dirX * 3;
     const baseRY = by - dirX * 4 - dirZ * 3;
 
-    // Pulse-Glow
-    const pulse = (Math.sin(now * 0.005) + 1) * 0.5;   // 0..1
-    ctx.fillStyle = `rgba(255, 255, 255, ${0.18 + pulse * 0.18})`;
-    ctx.beginPath();
-    ctx.arc(bx, by, 9 + pulse * 3, 0, Math.PI * 2);
-    ctx.fill();
-
-    // Pfeil
-    ctx.fillStyle = BIKE_COLOR;
-    ctx.strokeStyle = "rgba(0, 10, 30, 0.65)";
-    ctx.lineWidth = 1.2;
+    // Heading-Pfeil in --signal (coral). Kein Glow, nur scharfer Pfeil.
+    ctx.fillStyle = SIGNAL;
     ctx.beginPath();
     ctx.moveTo(tipX, tipY);
     ctx.lineTo(baseLX, baseLY);
     ctx.lineTo(baseRX, baseRY);
     ctx.closePath();
     ctx.fill();
-    ctx.stroke();
   }
 
   destroy() {
