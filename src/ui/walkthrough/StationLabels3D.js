@@ -45,9 +45,10 @@ const FADE_FAR = 80;                 // über dieser Distanz → fade aus
 const FADE_PEAK_NEAR = 12;           // unter dieser Distanz hat das Label volle Sichtbarkeit
 const FADE_PEAK_FAR = 45;
 
-// Canvas-Texture-Dimension — höher = schärfer, aber mehr GPU-Speicher
-const TEX_W = 512;
-const TEX_H = 192;
+// Canvas-Texture-Dimension. Höhere W:H Ratio jetzt (Landscape), damit mehr
+// Platz für den italic-mono Title bei kleinerer Vertikal-Höhe in der 3D-Welt.
+const TEX_W = 768;
+const TEX_H = 240;
 
 export class StationLabels3D {
   constructor(game, buildings) {
@@ -131,72 +132,87 @@ export class StationLabels3D {
     console.log(`[StationLabels3D] ${this.labels.length} labels created`);
   }
 
+  /**
+   * Editorial-paper Label. Bewusst NICHT brutalist-HUD wie der Rest der UI —
+   * diese Labels sind in der 3D-Welt verankert (Architektur-Wayfinding) und
+   * sollen sich wie Papier auf Schwarz anfühlen, nicht wie HUD-Glas.
+   *
+   *   ┌─────────────────────────────────────────┐
+   *   │  // hq        ────────────  laufend     │   small mono caps
+   *   │                                          │
+   *   │  Was ich gerade baue.                   │   italic mono display
+   *   │                                          │
+   *   └─────────────────────────────────────────┘
+   *    ^ 4px station-accent left edge (subtle identity)
+   */
   _createLabelTexture(station) {
     const c = document.createElement("canvas");
     c.width = TEX_W;
     c.height = TEX_H;
     const ctx = c.getContext("2d");
+    const dpr = 1;   // canvas ist schon high-res, Sprite scaliert es runter
 
-    // ── Hintergrund Pill ──
-    const padding = 18;
-    const radius = (TEX_H - padding * 2) * 0.45;
-    ctx.fillStyle = "rgba(10, 18, 32, 0.85)";
-    ctx.strokeStyle = station.accent || station.color || "rgba(255,255,255,0.5)";
-    ctx.lineWidth = 4;
-    this._roundedRect(
-      ctx, padding, padding, TEX_W - padding * 2, TEX_H - padding * 2, radius,
-    );
-    ctx.fill();
+    const PAD = 28;
+    const ACCENT_W = 5;
+
+    // Warm cream paper. Bewusst leicht transparent damit die 3D-Szene
+    // dahinter durchschimmert und das Label als "Schwebe-Schild" wirkt,
+    // nicht als opaker Aufkleber.
+    ctx.fillStyle = "rgba(244, 238, 224, 0.93)";
+    ctx.fillRect(0, 0, TEX_W, TEX_H);
+
+    // Station-Accent als 4-5px Streifen links (Identity ohne dass das ganze
+    // Label die Farbe trägt — viel ruhiger als der alte Cyan-Border-Pill).
+    ctx.fillStyle = station.accent || station.color || "#1a1816";
+    ctx.fillRect(0, 0, ACCENT_W, TEX_H);
+
+    // Hairline-Doppelregel unter dem Header (subtle Editorial-Geste).
+    ctx.strokeStyle = "rgba(26, 22, 18, 0.30)";
+    ctx.lineWidth = 1 * dpr;
+    ctx.beginPath();
+    ctx.moveTo(PAD + 20, PAD + 38);
+    ctx.lineTo(TEX_W - PAD, PAD + 38);
     ctx.stroke();
 
-    // ── Subtitle (Linie 1, klein, oben) ──
-    ctx.font = "600 22px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = station.color || "#7ec8ff";
-    ctx.textAlign = "center";
-    ctx.textBaseline = "middle";
-    ctx.fillText(
-      (station.subtitle || "").toUpperCase(),
-      TEX_W / 2,
-      padding + 44,
-    );
+    // Header-Zeile: links "// id", rechts "timeframe", beides klein-mono.
+    ctx.font = '500 22px "JetBrains Mono", ui-monospace, monospace';
+    ctx.fillStyle = "rgba(40, 32, 24, 0.62)";
+    ctx.textBaseline = "alphabetic";
 
-    // ── Title (Linie 2, groß) ──
-    ctx.font = "700 38px system-ui, -apple-system, sans-serif";
-    ctx.fillStyle = "rgba(245, 250, 255, 0.96)";
-    const titleY = TEX_H / 2 + 16;
-    this._fitText(ctx, station.title || "", TEX_W - padding * 2 - 20, 38, titleY);
+    ctx.textAlign = "left";
+    ctx.fillText(`// ${(station.id || "").toLowerCase()}`, PAD + 20, PAD + 28);
+
+    const tf = (station.timeframe || "").replace(/\s+/g, " ").trim();
+    if (tf) {
+      ctx.textAlign = "right";
+      ctx.fillText(tf, TEX_W - PAD, PAD + 28);
+    }
+
+    // Title — italic mono display. Italic-Mono ist selten genug um nicht
+    // sofort als "Editorial-Magazin"-Reflex zu lesen.
+    const titleStr = station.title || "";
+    let size = 52;
+    const maxW = TEX_W - (PAD + 20) - PAD;
+    do {
+      ctx.font = `italic 500 ${size}px "JetBrains Mono", ui-monospace, monospace`;
+      if (ctx.measureText(titleStr).width <= maxW) break;
+      size -= 2;
+    } while (size > 26);
+
+    ctx.fillStyle = "rgba(20, 16, 12, 0.94)";
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+    // Vertikal grob mittig im verbleibenden Raum unter der Rule
+    const titleY = PAD + 38 + (TEX_H - PAD - (PAD + 38)) * 0.62;
+    ctx.fillText(titleStr, PAD + 20, titleY);
 
     const tex = new THREE.CanvasTexture(c);
     tex.colorSpace = THREE.SRGBColorSpace;
     tex.magFilter = THREE.LinearFilter;
     tex.minFilter = THREE.LinearMipmapLinearFilter;
-    tex.anisotropy = 4;
+    tex.anisotropy = 8;
     tex.needsUpdate = true;
     return tex;
-  }
-
-  _roundedRect(ctx, x, y, w, h, r) {
-    ctx.beginPath();
-    ctx.moveTo(x + r, y);
-    ctx.lineTo(x + w - r, y);
-    ctx.quadraticCurveTo(x + w, y, x + w, y + r);
-    ctx.lineTo(x + w, y + h - r);
-    ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
-    ctx.lineTo(x + r, y + h);
-    ctx.quadraticCurveTo(x, y + h, x, y + h - r);
-    ctx.lineTo(x, y + r);
-    ctx.quadraticCurveTo(x, y, x + r, y);
-    ctx.closePath();
-  }
-
-  _fitText(ctx, text, maxWidth, defaultSize, y) {
-    let size = defaultSize;
-    ctx.font = `700 ${size}px system-ui, -apple-system, sans-serif`;
-    while (ctx.measureText(text).width > maxWidth && size > 18) {
-      size -= 2;
-      ctx.font = `700 ${size}px system-ui, -apple-system, sans-serif`;
-    }
-    ctx.fillText(text, TEX_W / 2, y);
   }
 
   /** Markiert eine Station als "aktiv" (durch Walkthrough) — pulsiert dann */

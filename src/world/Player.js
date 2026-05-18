@@ -134,30 +134,78 @@ export class Player {
     this.visualRoot = new THREE.Group();
     this.bikeModel.rotation.set(0, -Math.PI / 2, 0);
     this.visualRoot.add(this.bikeModel);
+
+    // GLB-Defensive: VanMoof-USDZ→glTF Bake hat Probleme:
+    //   1. Chrome_material.emissiveFactor=[1,1,1] + emissive-Texture
+    //      → leuchtet reinweiß
+    //   2. metallic=1 + roughness=0.2 ohne HDR-Sky-Env clipped weiß
+    //   3. Materials sind shared zwischen den 14 Meshes des Bikes
+    // Wir klonen die Materials, damit unsere Anpassungen die Original-Cache-
+    // Materials des Resources-Loaders nicht touchen, und ziehen sie auf
+    // sinnvolle PBR-Defaults.
+    let neutralized = 0;
+    const wrap = (mat) => {
+      if (!mat) return mat;
+      const m = mat.clone();
+      const name = m.name || "unnamed";
+      const isLight = /light_rear/i.test(name);
+
+      if (isLight) {
+        // Rear-Light soll leuchten, aber zurückgehalten — sonst bloomt es
+        // bei Nacht den halben Bildschirm aus.
+        if ("emissiveIntensity" in m) m.emissiveIntensity = 0.55;
+      } else {
+        m.emissive?.setRGB?.(0, 0, 0);
+        if ("emissiveIntensity" in m) m.emissiveIntensity = 0;
+        if (m.emissiveMap) m.emissiveMap = null;
+      }
+
+      // Cap mirror-metalness — RoomEnvironment-Probe ist kein HDR-Sky.
+      if ("metalness" in m && typeof m.metalness === "number" && m.metalness > 0.85) {
+        m.metalness = 0.85;
+      }
+      // Floor roughness — pure mirror (rough < 0.25) ohne richtige HDR-Env
+      // sieht nach Sample-Color statt nach Reflexion aus.
+      if ("roughness" in m && typeof m.roughness === "number" && m.roughness < 0.25) {
+        m.roughness = 0.25;
+      }
+      if ("envMapIntensity" in m) m.envMapIntensity = 0.8;
+
+      // Fallback-BaseColor falls baseColorTexture fehlt oder failed loaded
+      // (z.B. unter aggressiver CSP). VanMoof S3 ist matt-anthrazit.
+      if (!m.map && m.color) {
+        const FALLBACKS = {
+          Frame_material: 0x18181b,
+          Chrome_material: 0x9a9a9d,
+          Extras_material: 0x232326,
+          Tire_Front_material: 0x121214,
+          Tire_Rear_material: 0x121214,
+          Reflectors_material: 0xcfd2d6,
+          Extras_Metallic_Silver_material: 0x8d8e90,
+          Extras_Metallic_Black_material: 0x1a1a1c,
+          Brakes_material: 0x303035,
+          Valves_material: 0x4a4a4d,
+          Valve_Heads_material: 0x303033,
+          Kick_Lock_Yellow_material: 0x8a8a16,
+        };
+        const hex = FALLBACKS[name];
+        if (hex !== undefined) m.color.setHex(hex);
+      }
+
+      m.needsUpdate = true;
+      neutralized++;
+      return m;
+    };
+
     this.bikeModel.traverse((obj) => {
       if (!obj.isMesh) return;
       obj.castShadow = true;
       obj.receiveShadow = true;
-
-      // GLB-Fix: Der USDZ→glTF Bake hat das Chrome_material mit
-      // emissiveFactor=[1,1,1] + emissive-Texture exportiert. Das macht
-      // chrome-Teile reinweiß glühend. Wir strippen Emissive überall ausser
-      // beim Rücklicht (das SOLL leuchten). Schadet nichts wenn die Mat
-      // gar kein Emissive hat.
-      const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
-      for (const mat of mats) {
-        if (!mat) continue;
-        const isLight = /light_rear/i.test(mat.name || "");
-        if (isLight) continue;
-        mat.emissive?.setRGB?.(0, 0, 0);
-        if ("emissiveIntensity" in mat) mat.emissiveIntensity = 0;
-        if (mat.emissiveMap) {
-          mat.emissiveMap.dispose?.();
-          mat.emissiveMap = null;
-        }
-        mat.needsUpdate = true;
-      }
+      obj.material = Array.isArray(obj.material)
+        ? obj.material.map(wrap)
+        : wrap(obj.material);
     });
+    console.log(`[Player] bike materials neutralized: ${neutralized}`);
     this.scene.add(this.visualRoot);
 
     // Forward-Local des Bike-Modells nach -π/2-Rotation = +Z im visualRoot-Space

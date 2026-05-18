@@ -81,6 +81,10 @@ export class BottomDrawer {
       gap: "20px",
       padding: "16px 20px",
       alignItems: "center",
+      // Station-Color-Identity-Stripe links — wird in _render() pro Station
+      // gesetzt. Bringt Farbe zurück in den Tour-Drawer, ohne Gradient-Bombast.
+      borderLeft: "3px solid transparent",
+      transition: "border-color 220ms var(--ease)",
     });
     const cornerTr = document.createElement("span");
     cornerTr.className = "hud-bracket-tr";
@@ -234,25 +238,43 @@ export class BottomDrawer {
 
   _applyResponsive() {
     if (this._mq.matches) {
-      // Mobile: 1-Spalten-Layout + 120px Bottom-Abstand für Brake-Button/Joystick
-      this.root.style.padding = "0 12px 130px 12px";
+      // Mobile compact: Drawer darf NICHT mehr als ~36vh blockieren — sonst
+      // sieht der Recruiter das gerade-geframte Gebäude nicht. Innere Scroll
+      // statt unendliches Wachstum. Joystick-Abstand auf 76px reduziert
+      // (Joystick liegt unten-mittig, Drawer rückt knapp darüber).
+      this.root.style.padding = "0 10px 76px 10px";
       this.panel.style.gridTemplateColumns = "1fr";
-      this.panel.style.gap = "12px";
-      this.panel.style.padding = "14px 16px";
+      this.panel.style.gap = "10px";
+      this.panel.style.padding = "12px 14px 10px";
+      this.panel.style.maxHeight = "min(38vh, 320px)";
+      this.panel.style.overflowY = "auto";
+      this.panel.style.WebkitOverflowScrolling = "touch";
       this.leftCol.style.flexDirection = "row";
       this.leftCol.style.flexWrap = "wrap";
       this.leftCol.style.alignItems = "baseline";
       this.leftCol.style.gap = "8px";
       this.center.style.minHeight = "auto";
+      // Buttons in EINE Zeile auf Mobile statt vertikal stacked
+      if (this.rightCol) {
+        this.rightCol.style.flexDirection = "row-reverse";
+        this.rightCol.style.gap = "8px";
+        this.rightCol.style.alignItems = "stretch";
+      }
     } else {
       this.root.style.padding = "0 16px 16px 16px";
       this.panel.style.gridTemplateColumns = "minmax(160px, 220px) 1fr minmax(140px, 200px)";
       this.panel.style.gap = "20px";
       this.panel.style.padding = "18px 22px";
+      this.panel.style.maxHeight = "";
+      this.panel.style.overflowY = "";
       this.leftCol.style.flexDirection = "column";
       this.leftCol.style.flexWrap = "nowrap";
       this.leftCol.style.gap = "6px";
       this.center.style.minHeight = "70px";
+      if (this.rightCol) {
+        this.rightCol.style.flexDirection = "column";
+        this.rightCol.style.gap = "8px";
+      }
     }
   }
 
@@ -351,6 +373,10 @@ export class BottomDrawer {
     this._applyResponsive();
     this.panel.style.textAlign = "";
 
+    // Station-Color als linker Identity-Stripe + im Step-Counter wieder
+    // erkennbar (statt komplettem Mono-Einheitsbrei).
+    this.panel.style.borderLeftColor = accent;
+
     // Linke/Center/Right-Col leeren — wir bauen sie unten neu auf.
     // Wichtig: nicht aus der DOM lösen, nur Inhalte clearen.
     this.leftCol.innerHTML = "";
@@ -369,17 +395,23 @@ export class BottomDrawer {
     navRow.appendChild(this.btnSkip);
     this.rightCol.appendChild(navRow);
 
-    // Step-Indikator: [01/03] statt dots
+    // Step-Indikator: bunte Zahl + muted Total. Aktuelle Schritt-Zahl in
+    // Station-Akzent, damit die Identity-Stripe nicht alleine steht.
     this.stepDots.innerHTML = "";
     Object.assign(this.stepDots.style, {
       fontSize: "11px",
       color: "var(--paper-muted)",
       fontVariantNumeric: "tabular-nums",
       marginBottom: "2px",
+      display: "flex",
+      gap: "2px",
     });
-    const stepNum = document.createElement("span");
-    stepNum.textContent = `${String(this.step + 1).padStart(2, "0")} / 03`;
-    this.stepDots.appendChild(stepNum);
+    const curNum = document.createElement("span");
+    curNum.textContent = String(this.step + 1).padStart(2, "0");
+    curNum.style.color = accent;
+    const totalNum = document.createElement("span");
+    totalNum.textContent = " / 03";
+    this.stepDots.append(curNum, totalNum);
 
     this.stationLabel.textContent = `> ${(s.subtitle || "").toLowerCase()}`;
     this.stationLabel.style.color = "var(--paper-muted)";
@@ -483,11 +515,13 @@ export class BottomDrawer {
     const lang = this._lang();
     const isEn = lang === "en";
 
-    // Layout temporär auf Single-Column umstellen damit die Card mittig wirkt
+    // Layout temporär auf Single-Column umstellen damit die Card mittig wirkt.
+    // Identity-Stripe in End-Card-Mode auf Signal-Coral (Call-to-Action).
     this.panel.style.gridTemplateColumns = "1fr";
     this.panel.style.gap = "16px";
     this.panel.style.padding = "22px 28px";
     this.panel.style.textAlign = "center";
+    this.panel.style.borderLeftColor = "var(--signal)";
 
     // Spalten leeren
     this.leftCol.innerHTML = "";
