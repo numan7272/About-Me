@@ -61,6 +61,7 @@ export class Renderer {
         this.instance = r;
         this.mode = "webgpu";
         await this._initWebGPUBloom();
+        this._installDeviceLossHandler(r);
         console.log("[Renderer] WebGPU initialized with native bloom");
         return;
       } catch (e) {
@@ -121,11 +122,13 @@ export class Renderer {
       const tsl = await import("three/tsl");
       // bloom() ist NICHT in three/tsl exportiert — kommt aus den Addons
       const bloomMod = await import("three/addons/tsl/display/BloomNode.js");
-      const { PostProcessing } = webgpu;
+      // RenderPipeline ersetzt PostProcessing seit r183. Wir bevorzugen die
+      // neue API, mit Fallback auf den alten Namen für ältere three-Builds.
+      const Pipeline = webgpu.RenderPipeline || webgpu.PostProcessing;
       const { pass } = tsl;
       const { bloom } = bloomMod;
 
-      this.postProcessing = new PostProcessing(this.instance);
+      this.postProcessing = new Pipeline(this.instance);
 
       // ScenePass + Bloom — Threshold hoch (1.0 = nur HDR-Werte), Strength
       // niedriger. Das reduziert die Bloom-Mip-Chain-Last drastisch:
@@ -136,11 +139,55 @@ export class Renderer {
 
       this.postProcessing.outputNode = scenePass.add(bloomPass);
       this._wgpuScenePass = scenePass;
-      console.log("[Renderer] WebGPU bloom pipeline ready (optimized)");
+      console.log("[Renderer] WebGPU render pipeline ready (optimized)");
     } catch (e) {
-      console.warn("[Renderer] WebGPU bloom init failed:", e?.message || e);
+      console.warn("[Renderer] WebGPU pipeline init failed:", e?.message || e);
       this.postProcessing = null;
     }
+  }
+
+  /**
+   * Attach a device-loss watcher. On unexpected loss we surface a brutalist
+   * recovery overlay and reload; on intentional destroy we stay silent.
+   * Recovery via full re-init would require rebuilding scene + physics +
+   * shaders, which for a portfolio site is more risk than reload.
+   */
+  _installDeviceLossHandler(r) {
+    const device = r?.backend?.device;
+    if (!device?.lost?.then) return;
+    device.lost.then((info) => {
+      if (this._deviceLossHandled) return;
+      this._deviceLossHandled = true;
+      const reason = info?.reason || "unknown";
+      console.warn("[Renderer] WebGPU device lost:", reason, info?.message || "");
+      if (reason !== "unknown") return;
+      this._showDeviceLossOverlay();
+    }).catch(() => {});
+  }
+
+  _showDeviceLossOverlay() {
+    const lang = (typeof window !== "undefined" && window.__lang === "en") ? "en" : "de";
+    const msg = lang === "en"
+      ? "> gpu device lost. reloading"
+      : "> gpu verloren. neu laden";
+    const overlay = document.createElement("div");
+    overlay.setAttribute("role", "alert");
+    overlay.textContent = msg;
+    Object.assign(overlay.style, {
+      position: "fixed",
+      inset: "0",
+      display: "flex",
+      alignItems: "center",
+      justifyContent: "center",
+      background: "var(--ink-solid, rgba(16, 18, 24, 0.92))",
+      color: "var(--signal, #ff5a3c)",
+      fontFamily: "var(--font-mono, ui-monospace, monospace)",
+      fontSize: "14px",
+      letterSpacing: "0.04em",
+      zIndex: "999",
+    });
+    document.body.appendChild(overlay);
+    setTimeout(() => location.reload(), 1200);
   }
 
   async _initWebGLBloom() {
@@ -212,6 +259,27 @@ export class Renderer {
   }
 
   destroy() {
+    // WebGL EffectComposer holds passes + render targets — dispose them
+    // explicitly before the renderer goes away.
+    try {
+      this.composer?.passes?.forEach?.((p) => p?.dispose?.());
+      this.composer?.renderTarget1?.dispose?.();
+      this.composer?.renderTarget2?.dispose?.();
+    } catch (e) {
+      console.warn("[Renderer] composer dispose failed:", e?.message);
+    }
+    this.composer = null;
+    this.renderPass = null;
+    this.bloomPass = null;
+
+    // WebGPU RenderPipeline. dispose() exists on newer builds.
+    try { this.postProcessing?.dispose?.(); } catch (e) {
+      console.warn("[Renderer] postProcessing dispose failed:", e?.message);
+    }
+    this.postProcessing = null;
+    this._wgpuScenePass = null;
+
     this.instance?.dispose?.();
+    this.instance = null;
   }
 }
