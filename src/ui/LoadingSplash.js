@@ -113,7 +113,7 @@ export class LoadingSplash {
     });
 
     this.card = document.createElement("section");
-    this.card.className = "hud-bracket";
+    this.card.className = "hud-bracket splash-card";
     this.card.setAttribute("role", "dialog");
     this.card.setAttribute("aria-modal", "true");
     this.card.setAttribute("aria-labelledby", "splash-title");
@@ -121,6 +121,9 @@ export class LoadingSplash {
       width: "min(520px, 100%)",
       maxHeight: "calc(100vh - 48px)",
       overflowY: "auto",
+      overflowX: "hidden",
+      scrollbarWidth: "none",
+      msOverflowStyle: "none",
       WebkitOverflowScrolling: "touch",
       padding: window.innerWidth < 500
         ? "26px 22px 22px 22px"

@@ -80,6 +80,7 @@ html, body {
   color: var(--paper);
   font-family: var(--font-mono);
 }
+.splash-card::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .hud-bracket.paper {
   background: var(--paper-bg);
   color: var(--ink-text);
