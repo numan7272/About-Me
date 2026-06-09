@@ -28,7 +28,7 @@ OKLCH. Neutrals tinted toward Indigo/Amber. One signal color, ≤8% surface.
 
 ## Type system
 
-**Primary:** Departure Mono (self-hosted, OFL). Bitmap-style monospace. Place file at `public/fonts/DepartureMono-Regular.woff2`. Until then JetBrains Mono renders.
+**Primary:** Departure Mono (self-hosted, OFL). Bitmap-style monospace. Lives at `public/fonts/DepartureMono-Regular.woff2` (license alongside). JetBrains Mono is the fallback.
 
 **Stack:** `'Departure Mono', 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace`
 
