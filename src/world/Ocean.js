@@ -122,7 +122,10 @@ const FRAGMENT_SHADER = /* glsl */ `
     vec2 windDir = vec2(0.85, 0.53);
     vec2 caustUv = wxz * 0.09 + windDir * uTime * 0.18;
     float caustic = fbm(caustUv);
-    caustic = smoothstep(0.62, 0.85, caustic) * deepMix * 0.08;
+    // Caustics auch im Flachwasser sichtbar (dort am stärksten in echt),
+    // im Tiefwasser etwas zurückgenommen.
+    float caustZone = max(0.45, deepMix) * (1.0 - smoothstep(-8.0, 0.0, -distToShore));
+    caustic = smoothstep(0.62, 0.85, caustic) * caustZone * 0.10;
 
     float nightDim = 1.0 - uNightFactor * 0.72;
     col *= nightDim;
@@ -284,11 +287,14 @@ async function buildOceanMaterialTSL() {
     const beachEdge = edgeBand.mul(pulse);
     const shoreFoam = max(shoreFoamSoft, beachEdge);
 
-    // Offshore-Caustics (mit cheaper fbm2 für weniger ALU-Last)
+    // Offshore-Caustics (mit cheaper fbm2 für weniger ALU-Last).
+    // Auch im Flachwasser sichtbar — identische Zone wie GLSL-Pfad.
     const windDir = vec2(0.85, 0.53);
     const caustUv = wxz.mul(0.09).add(windDir.mul(uTime).mul(0.18));
     const causticBase = fbm2(caustUv);
-    const caustic = smoothstep(0.62, 0.85, causticBase).mul(deepMix).mul(0.08);
+    const caustZone = max(float(0.45), deepMix)
+      .mul(float(1).sub(smoothstep(-8.0, 0.0, distToShore.negate())));
+    const caustic = smoothstep(0.62, 0.85, causticBase).mul(caustZone).mul(0.10);
 
     // Tag/Nacht
     const nightDim   = float(1).sub(uNightFactor.mul(0.72));
@@ -372,9 +378,15 @@ export class Ocean {
     const t = this.game.time?.elapsed || 0;
     this.material.userData.setTime?.(t);
 
+    // nightFactor nur bei relevanter Änderung schreiben — spart das
+    // Uniform-Update (gleiches Muster wie DayCycle → StreetLamps).
     const dc = this.game.world?.dayCycle?.live;
     if (dc) {
-      this.material.userData.setNightFactor?.(dc.nightFactor ?? 0);
+      const nf = dc.nightFactor ?? 0;
+      if (this._lastNightFactor === undefined || Math.abs(nf - this._lastNightFactor) > 0.002) {
+        this.material.userData.setNightFactor?.(nf);
+        this._lastNightFactor = nf;
+      }
     }
   }
 

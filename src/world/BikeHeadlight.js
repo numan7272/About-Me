@@ -45,7 +45,14 @@ export class BikeHeadlight {
       LIGHT_DECAY,
     );
     this.light.position.set(...LAMP_LOCAL_POS);
-    this.light.castShadow = false;
+    // Schattenwurf mit kleinem Budget-Shadow-Map — bei Tag kostet das
+    // nichts (intensity 0 → Light wird nicht gerendert), bei Nacht gibt
+    // der Kegel auf der Straße echte Kontaktschatten statt Glow-Fleck.
+    this.light.castShadow = true;
+    this.light.shadow.mapSize.set(512, 512);
+    this.light.shadow.camera.near = 0.5;
+    this.light.shadow.camera.far = LIGHT_DISTANCE + 3;
+    this.light.shadow.bias = -0.002;
 
     // Target-Object — das SpotLight schaut auf dessen World-Position.
     // Target muss in der Scene leben, NICHT im visualRoot — sonst würde
@@ -123,6 +130,10 @@ export class BikeHeadlight {
     } else {
       this.light.intensity = maxI;
     }
+
+    // Bei intensity ~0 das Light komplett deaktivieren — sonst rendert
+    // Three die 512er-Shadow-Map auch tagsüber weiter.
+    this.light.visible = this.light.intensity > 0.02;
   }
 
   destroy() {

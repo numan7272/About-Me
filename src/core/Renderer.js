@@ -97,11 +97,10 @@ export class Renderer {
     r.toneMappingExposure = 1.05;
     if (r.shadowMap) {
       r.shadowMap.enabled = true;
-      // PCFSoft kostet unter WebGPU mehrere Sample-Reads pro Pixel.
-      // Standard-PCF ist 4-tap, sieht unter unserer Insel-Iso fast identisch aus.
-      r.shadowMap.type = this.preference === "webgpu"
-        ? THREE.PCFShadowMap
-        : THREE.PCFSoftShadowMap;
+      // PCFSoftShadowMap ist seit r184 deprecated (fiel intern eh auf PCF
+      // zurück). Standard-PCF ist 4-tap, sieht unter unserer Insel-Iso
+      // praktisch identisch aus und ist unter WebGPU deutlich billiger.
+      r.shadowMap.type = THREE.PCFShadowMap;
     }
     r.setClearColor(0x101218);   // matches --ink token + theme-color in index.html
 
@@ -241,6 +240,10 @@ export class Renderer {
   _updateBloomForDayCycle() {
     const nf = this.game?.world?.dayCycle?.live?.nightFactor;
     if (typeof nf !== "number") return;
+    // Nur bei relevanter Änderung schreiben — vermeidet per-Frame
+    // Uniform-Updates (unter WebGPU potenziell Pipeline-Refresh).
+    if (this._lastBloomNf !== undefined && Math.abs(nf - this._lastBloomNf) < 0.003) return;
+    this._lastBloomNf = nf;
     if (this.mode === "webgl" && this.bloomPass) {
       // WebGL UnrealBloom: 0.18 Tag → 0.55 Nacht
       this.bloomPass.strength = 0.18 + nf * 0.37;
