@@ -406,7 +406,7 @@ export class DesignaOS extends FakeOS {
         icon: ICON.jira,
         inDock: true,
         windowSize: { width: 720, height: 480 },
-        onOpen: (host) => this._buildJira(),
+        onOpen: () => this._buildJira(),
       },
       {
         id: "teams",
@@ -414,7 +414,7 @@ export class DesignaOS extends FakeOS {
         icon: ICON.teams,
         inDock: true,
         windowSize: { width: 760, height: 500 },
-        onOpen: (host) => this._buildTeams(),
+        onOpen: () => this._buildTeams(),
       },
       {
         id: "logs",
@@ -422,7 +422,7 @@ export class DesignaOS extends FakeOS {
         icon: ICON.logs,
         inDock: true,
         windowSize: { width: 720, height: 480 },
-        onOpen: (host) => this._buildLogs(),
+        onOpen: () => this._buildLogs(),
       },
       {
         id: "notepad",
@@ -430,7 +430,7 @@ export class DesignaOS extends FakeOS {
         icon: ICON.notepad,
         inDock: true,
         windowSize: { width: 580, height: 500 },
-        onOpen: (host) => this._buildNotepad(),
+        onOpen: () => this._buildNotepad(),
       },
     ];
   }

@@ -24,10 +24,12 @@ import { StreetLamps } from "./StreetLamps.js";
 import { DayCycle } from "./DayCycle.js";
 import { ProximityTrigger } from "./ProximityTrigger.js";
 import { Ocean } from "./Ocean.js";
+import { SkyDome } from "./SkyDome.js";
 import { Grass } from "./Grass.js";
 import { Wind } from "./Wind.js";
 import { ColliderDebug } from "./ColliderDebug.js";
 import { StationLabels3D } from "../ui/walkthrough/StationLabels3D.js";
+import { getControlMode } from "../ui/controlMode.js";
 
 export class World {
   constructor(game) {
@@ -43,6 +45,11 @@ export class World {
 
     // Animiertes Ocean — sofort, kein GLB-Wartezeit
     this.ocean = new Ocean(game);
+
+    // Gradient-Sky-Dome (Horizont→Zenit + Sonne + Sterne). Ersetzt den
+    // flachen scene.background — der bleibt als Fallback bis das Material
+    // async fertig ist.
+    this.sky = new SkyDome(game);
 
     // DayCycle — animiert Sun/Ambient/Hemi/Fog + steuert StreetLamps.
     // Tasten: T=Pause, N=Night-Snap, M=Day-Snap, B=Auto-Cycle resumen.
@@ -247,12 +254,10 @@ export class World {
       .catch((err) => console.error("[World] EggClickHandler import failed:", err));
 
     // Tap-to-Move (LoL-Style). Initial disabled — UI.js setzt enabled basierend
-    // auf controlMode-Setting.
-    Promise.all([
-      import("./TapToMoveController.js"),
-      import("../ui/controlMode.js"),
-    ])
-      .then(([{ TapToMoveController }, { getControlMode }]) => {
+    // auf controlMode-Setting. controlMode statisch importieren — es hängt
+    // eh schon im Haupt-Chunk (Ui.js/SettingsPanel importieren es statisch).
+    import("./TapToMoveController.js")
+      .then(({ TapToMoveController }) => {
         this.tapToMove = new TapToMoveController(this.game);
         // Re-apply Mode jetzt wo TapToMove existiert (UI-Init lief vorher).
         this.game.ui?._applyControlMode?.(getControlMode());
@@ -265,6 +270,7 @@ export class World {
     // Headlight lesen im selben Frame nightFactor/wind, sonst sind sie 1
     // Frame stale.
     if (this.dayCycle?.update) this.dayCycle.update();
+    if (this.sky?.update) this.sky.update();
     if (this.wind?.update) this.wind.update();
     if (this.island?.update) this.island.update();
     if (this.road?.update) this.road.update();
@@ -284,6 +290,7 @@ export class World {
     this.streetLamps?.destroy?.();
     this.grass?.destroy?.();
     this.ocean?.destroy?.();
+    this.sky?.destroy?.();
     this.player?.destroy?.();
     this.island?.destroy?.();
     this.proximity?.destroy?.();

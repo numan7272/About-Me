@@ -8,7 +8,6 @@
  * Step-Loop wird vom Game.update() pro Frame getrigert.
  */
 
-import RAPIER from "@dimforge/rapier3d-compat";
 import { EventEmitter } from "./EventEmitter.js";
 
 export class Physics extends EventEmitter {
@@ -18,13 +17,20 @@ export class Physics extends EventEmitter {
     this.world = null;
     this.ready = false;
     this.gravity = { x: 0, y: -18, z: 0 };
-    this.RAPIER = RAPIER;   // für Sub-Module die Ray etc. brauchen
+    // Wird in _init() gesetzt — Sub-Module (Player, Island) greifen erst
+    // nach dem "ready"-Event darauf zu.
+    this.RAPIER = null;
 
     this._init();
   }
 
   async _init() {
+    // Dynamic import: rapier3d-compat bringt ~2MB inline-WASM mit. Als
+    // eigener Chunk lädt es parallel zum Rest statt den Haupt-Chunk
+    // aufzublähen (First-Paint deutlich früher).
+    const { default: RAPIER } = await import("@dimforge/rapier3d-compat");
     await RAPIER.init();
+    this.RAPIER = RAPIER;
     this.world = new RAPIER.World(this.gravity);
     this.world.integrationParameters.dt = 1 / 60;
     this.ready = true;

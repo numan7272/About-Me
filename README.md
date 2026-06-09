@@ -55,6 +55,7 @@ src/
 │   ├── Road.js            # Procedural curve through stations
 │   ├── Grass.js           # Instanced grass — GLSL + TSL variants
 │   ├── Ocean.js           # 2-octave fBm caustics
+│   ├── SkyDome.js         # Gradient sky + sun disc + night stars (GLSL + TSL)
 │   ├── StreetLamps.js     # Light-pool along the road
 │   ├── DayCycle.js        # Time-of-day → ambient + sky
 │   ├── ProximityTrigger.js

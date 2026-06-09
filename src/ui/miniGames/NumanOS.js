@@ -708,7 +708,7 @@ export class NumanOS {
   }
 
   _wireEvents() {
-    const { root, icons, dock, menubar } = this.dom;
+    const { icons, dock, menubar } = this.dom;
 
     // Close NumanOS
     menubar.querySelector("[data-action='close-os']")
@@ -1007,7 +1007,6 @@ export class NumanOS {
       if (e.target.closest("[data-action='close']")) return;
       dragging = true;
       const rect = win.getBoundingClientRect();
-      const parentRect = this.dom.area.getBoundingClientRect();
       offX = e.clientX - rect.left;
       offY = e.clientY - rect.top;
       handle.style.cursor = "grabbing";
