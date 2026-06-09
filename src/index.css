@@ -168,8 +168,8 @@ html, body {
 .hud-btn[data-active="true"] { color: var(--signal); }
 .hud-btn[data-active="true"]::after { transform: scaleX(1); }
 
-/* Universal focus ring */
-:where(button, [role="button"], [tabindex]):focus-visible {
+/* Universal focus ring — auch Formularfelder (SQLi-Lab, Kontakt) und Links */
+:where(button, a, input, select, textarea, [role="button"], [tabindex]):focus-visible {
   outline: 2px solid var(--signal);
   outline-offset: 2px;
 }

@@ -338,7 +338,7 @@ export class TouchJoystick {
    * = brake"-Override würde mit dem Heading-Vector-Konzept kollidieren:
    * im Heading-Style ist "unten am Screen" eine Fahrt-Richtung, kein Stop.
    */
-  _applyToInputs(nx, nz) {
+  _applyToInputs(_nx, _nz) {
     const inputs = this.game?.inputs;
     if (!inputs?.keys) return;
     inputs.keys.brake = false;

@@ -16,7 +16,6 @@
 
 import * as THREE from "three";
 
-const FRONT_OFFSET = -3.0;     // negativ = näher zum Insel-Zentrum
 const TARGET_RADIUS = 28.0;    // alle Wegpunkte ~28m vom Zentrum
 const Y_OFFSET = 0.03;         // Straße 3cm über Terrain — sichtbar aber flach
 const SAMPLES = 600;

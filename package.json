@@ -11,13 +11,10 @@
   },
   "dependencies": {
     "@dimforge/rapier3d-compat": "^0.19.3",
-    "framer-motion": "^12.38.0",
-    "lucide-react": "^1.14.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "three": "^0.184.0",
-    "tweakpane": "^4.0.5",
-    "zustand": "^5.0.13"
+    "tweakpane": "^4.0.5"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",

@@ -9,12 +9,10 @@
  *   - KEINE automatische InfoCard mehr — Walkthrough kommt separat
  */
 
-import * as THREE from "three";
-import { LANDMARKS, EGGS, getLang } from "../data/content.js";
+import { EGGS, getLang } from "../data/content.js";
 
 const BUILDING_RADIUS = 6;
 const EGG_RADIUS = 2.5;
-const EGG_GLOW_RADIUS = 0.5;
 
 export class ProximityTrigger {
   constructor(game) {

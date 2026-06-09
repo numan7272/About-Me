@@ -387,13 +387,13 @@ function buildGrassMaterialGLSL(buildings, roadCurve) {
 // WebGPU/TSL-Material-Factory
 // ═══════════════════════════════════════════════════════════════════════════
 
-async function buildGrassMaterialTSL(buildings, roadCurve) {
+async function buildGrassMaterialTSL() {
   const webgpu = await import("three/webgpu");
   const tsl = await import("three/tsl");
   const {
     Fn, If, Loop, uniform, uniformArray, attribute, varying,
-    vec2, vec3, vec4, float, int,
-    sin, cos, dot, mix, smoothstep, clamp, max, min, abs, length, fract, normalize, step,
+    vec2, vec3, vec4, float,
+    sin, dot, mix, smoothstep, clamp, max, min, abs, length, fract, normalize, step,
     positionLocal, cameraPosition,
     Discard,
   } = tsl;
@@ -656,7 +656,7 @@ export class Grass {
 
     try {
       if (mode === "webgpu") {
-        this.material = await buildGrassMaterialTSL(this.buildings, this.roadCurve);
+        this.material = await buildGrassMaterialTSL();
       } else {
         this.material = buildGrassMaterialGLSL(this.buildings, this.roadCurve);
       }

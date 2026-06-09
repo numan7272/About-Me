@@ -266,7 +266,6 @@ export class SqlInjectionLab {
   _trySubmit() {
     const user = this.dom.userInput.value;
     const pass = this.dom.passInput.value;
-    const combined = `${user} ${pass}`;
 
     // ─── Level 4: Blind / Time-Based ───
     // (vor Level 3 weil UNION-Pattern matchen würde auf "SELECT")
