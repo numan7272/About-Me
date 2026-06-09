@@ -17,7 +17,6 @@
  */
 
 import * as THREE from "three";
-import RAPIER from "@dimforge/rapier3d-compat";
 import { BikeHeadlight } from "./BikeHeadlight.js";
 
 // Konstanten 1:1 aus dem alten About-Me Repo (Player.js).
@@ -27,12 +26,9 @@ const MAX_SPEED  = 7.5;       // m/s Top-Speed (alt: 4.5 war zu langsam)
 const ACCEL      = 6;         // velocity-lerp-faktor (1/s) → lerpT = min(1, ACCEL*dt)
 const BRAKE_LERP_RATE = 10;   // brakeT = min(1, 10*dt) — schärfer als ACCEL
 const TURN_SPEED = 2.6;       // rad/s — Drehrate
-const JOY_DEADZONE = 0.05;    // Magnitude-Schwelle zum Movement-Start
 const SPEED_FACTOR_FLOOR = 0.55;  // Keyboard: Mindest-Drehrate auch im Stand
 const ANG_CAP_JOY_MULT = 1.6;     // Joystick: ANG_CAP = TURN_SPEED * 1.6
 const JOY_P_GAIN = 5;             // P-Controller für Yaw-Fehler
-
-const BIKE_HALF_SIZE = [0.32, 0.45, 0.85];
 
 const SUSPENSION_TAU = 0.10;
 const VISUAL_Y_OFFSET = 0.22;
@@ -64,6 +60,7 @@ export class Player {
     this._tmpQuat = new THREE.Quaternion();
     this._tmpEuler = new THREE.Euler(0, 0, 0, "YXZ");
     this._tmpForward = new THREE.Vector3();
+    this._tmpCamDir = new THREE.Vector3();
 
     // Forward-Local: wird in _setupVisual aus bikeModel.getWorldDirection
     // kalibriert. Fallback: +Z (Standard-Three.js-Convention).
@@ -102,6 +99,10 @@ export class Player {
 
   _setupBody() {
     const world = this.physics.world;
+    // RAPIER aus dem Physics-Modul (dynamic import) — läuft erst nach
+    // physics.ready, da ist das Modul garantiert geladen.
+    const RAPIER = this.physics.RAPIER;
+    if (!world || !RAPIER) return;
     const [x, y, z] = this.spawnPos;
     const bodyDesc = RAPIER.RigidBodyDesc.dynamic()
       .setTranslation(x, y, z)
@@ -302,7 +303,7 @@ export class Player {
         const cam = this.game.cameraRig?.camera;
         let camFwdX = 0, camFwdZ = 1;
         if (cam) {
-          const v = new THREE.Vector3();
+          const v = this._tmpCamDir;
           cam.getWorldDirection(v);
           v.y = 0;
           const len = Math.hypot(v.x, v.z) || 1;
@@ -389,7 +390,7 @@ export class Player {
       const cam = this.game.cameraRig?.camera;
       let camForwardX = 0, camForwardZ = 1;
       if (cam) {
-        const v = new THREE.Vector3();
+        const v = this._tmpCamDir;
         cam.getWorldDirection(v);
         v.y = 0;
         const len = Math.hypot(v.x, v.z) || 1;

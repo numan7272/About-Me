@@ -15,7 +15,6 @@
  */
 
 import * as THREE from "three";
-import RAPIER from "@dimforge/rapier3d-compat";
 
 export class Island {
   constructor(game, gltfScene) {
@@ -68,7 +67,11 @@ export class Island {
 
   _buildColliders() {
     const world = this.physics.world;
-    if (!world) return;
+    // RAPIER kommt aus dem Physics-Modul (dynamic import) — hält das
+    // 2MB-WASM-Bundle aus dem Haupt-Chunk raus. _buildColliders läuft
+    // erst nach physics.ready, da ist RAPIER garantiert gesetzt.
+    const RAPIER = this.physics.RAPIER;
+    if (!world || !RAPIER) return;
 
     let totalColliders = 0;
 
@@ -370,5 +373,33 @@ export class Island {
 
   update() {
     // Phase 2: keine Animation
+  }
+
+  destroy() {
+    // Geclonte GLB-Hierarchie aufräumen — World.destroy() ruft das auf,
+    // bisher gab es die Methode nicht (Geometrien blieben im VRAM).
+    if (this.root) {
+      this.root.traverse((obj) => {
+        if (obj.isMesh) {
+          obj.geometry?.dispose?.();
+          const mats = Array.isArray(obj.material) ? obj.material : [obj.material];
+          for (const m of mats) {
+            if (!m) continue;
+            // Texturen mit disposen (map, normalMap, emissiveMap, ...)
+            for (const key of Object.keys(m)) {
+              if (m[key]?.isTexture) m[key].dispose?.();
+            }
+            m.dispose?.();
+          }
+        }
+      });
+      this.root.parent?.remove?.(this.root);
+      this.root = null;
+    }
+    this.buildings = [];
+    this.eggs = [];
+    this.landmarks = [];
+    this.colliderMeshes = [];
+    this.terrainMesh = null;
   }
 }
