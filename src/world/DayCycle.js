@@ -339,8 +339,9 @@ export class DayCycle {
       this.hemi.intensity = this.live.hemiIntensity;
     }
 
-    // Sky-Background — verläuft von skyColorB (oben) nach skyColorA (Horizont)
-    // Für jetzt einfach skyColorA als flacher Background
+    // Flacher Background als Fallback bis das SkyDome-Material async ready
+    // ist — der Gradient (skyColorA Horizont → skyColorB Zenit) läuft im
+    // SkyDome-Shader, der die Kuppel über den Background zeichnet.
     if (this.scene.background instanceof THREE.Color) {
       this.scene.background.copy(this.live.skyColorA);
     }
