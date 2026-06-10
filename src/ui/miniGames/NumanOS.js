@@ -247,7 +247,8 @@ export class NumanOS {
         background:
           radial-gradient(1200px 800px at 20% 30%, rgba(85,150,255,0.18), transparent 60%),
           radial-gradient(900px 700px at 80% 70%, rgba(220,90,180,0.13), transparent 60%),
-          linear-gradient(135deg, #1d1d1f 0%, #0b0b0d 100%);
+          radial-gradient(700px 500px at 60% 15%, rgba(255,160,120,0.10), transparent 65%),
+          linear-gradient(135deg, #211a26 0%, #0b0b0d 100%);
         opacity: 0; transition: opacity 320ms ease;
         display: flex; flex-direction: column;
       }
@@ -713,6 +714,14 @@ export class NumanOS {
     // Close NumanOS
     menubar.querySelector("[data-action='close-os']")
       .addEventListener("click", () => this.close());
+
+    // Menubar-Uhr lebt — tickt jede halbe Minute
+    const clockEl = menubar.querySelector(".nos-clock");
+    if (clockEl) {
+      this._clockTimer = setInterval(() => {
+        clockEl.textContent = NOW_HHMM();
+      }, 30000);
+    }
 
     // Single-click select / double-click open
     let lastClickTime = 0;
@@ -1311,6 +1320,7 @@ export class NumanOS {
 
   close() {
     if (!this.dom) return;
+    clearInterval(this._clockTimer);
     document.removeEventListener("keydown", this._onKey);
     this._sqliLab?.close?.();
     this.dom.root.style.opacity = "0";
