@@ -1,7 +1,7 @@
 /**
  * Renderer — WebGL- oder WebGPU-Setup mit Three.js.
  *
- * Wie Bruno Simon's folio-2025: User wählt zwischen WebGL und WebGPU.
+ * User wählt zwischen WebGL und WebGPU.
  *
  * WebGL-Pfad:
  *   - THREE.WebGLRenderer
@@ -102,9 +102,9 @@ export class Renderer {
       // praktisch identisch aus und ist unter WebGPU deutlich billiger.
       r.shadowMap.type = THREE.PCFShadowMap;
     }
-    r.setClearColor(0x101218);   // matches --ink token + theme-color in index.html
+    r.setClearColor(0x1d1721);   // matches --ink token + theme-color in index.html
 
-    // Bruno-Pattern: manuelle renderOrder-Sortierung statt teurer Default-Sort.
+    // Manuelle renderOrder-Sortierung statt teurer Default-Sort.
     // Bei vielen statischen Objekten 0.2-1ms CPU/Frame gespart.
     r.sortObjects = false;
     if (r.setOpaqueSort) {

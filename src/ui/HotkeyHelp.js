@@ -61,7 +61,7 @@ export class HotkeyHelp {
     Object.assign(this.overlay.style, {
       position: "fixed",
       inset: "0",
-      background: "oklch(13% 0.015 250 / 0.55)",
+      background: "rgba(20, 15, 25, 0.55)",
       zIndex: "15",
       display: "none",
       alignItems: "center",
@@ -88,12 +88,9 @@ export class HotkeyHelp {
     panel.append(this._cornerSpan("tr"), this._cornerSpan("bl"));
 
     const title = document.createElement("div");
+    title.className = "hud-kicker";
     title.textContent = "> shortcuts";
-    Object.assign(title.style, {
-      fontSize: "11px",
-      color: "var(--paper-muted)",
-      marginBottom: "14px",
-    });
+    title.style.marginBottom = "14px";
     panel.appendChild(title);
 
     const list = document.createElement("div");
@@ -112,6 +109,7 @@ export class HotkeyHelp {
         Object.assign(kbd.style, {
           padding: "2px 7px",
           border: "1px solid var(--rule-strong)",
+          borderRadius: "4px",
           background: "transparent",
           fontFamily: "var(--font-mono)",
           fontSize: "11px",
@@ -124,6 +122,8 @@ export class HotkeyHelp {
       const labelCell = document.createElement("div");
       labelCell.textContent = row.label;
       labelCell.style.color = "var(--paper)";
+      labelCell.style.fontFamily = "var(--font-ui)";
+      labelCell.style.fontSize = "14px";
       list.appendChild(keysCell);
       list.appendChild(labelCell);
     }

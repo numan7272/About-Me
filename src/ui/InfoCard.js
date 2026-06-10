@@ -1,11 +1,10 @@
 /**
  * InfoCard — Slide-in-Panel rechts mit Werdegang- / Easter-Egg-Inhalten.
  *
- * Brutalist-Game-HUD register:
- *   - Solides Ink-Surface, kein backdrop-blur, keine rounded card
- *   - Corner-brackets statt border-radius
- *   - Hairline statt accent-gradient
- *   - Skills als terminal-style `> tag` items, keine Pill-Chips
+ * Hybrid-Register:
+ *   - Warme runde Karte, Hairlines, Station-Akzent links
+ *   - Titel im Display-Font, Body warm/rund
+ *   - Skills bleiben terminal-style `> tag` items (Mono-Erbe), keine Pills
  *
  * Public API:
  *   ui.infoCard.show({ title, subtitle, timeframe, text, skills }, id)
@@ -40,8 +39,8 @@ export class InfoCard {
       maxHeight: "82vh",
       overflow: "auto",
       padding: "22px 24px 20px",
-      fontFamily: "var(--font-mono)",
-      fontSize: "13px",
+      fontFamily: "var(--font-ui)",
+      fontSize: "14px",
       color: "var(--ink-text)",
       zIndex: "13",
       pointerEvents: "auto",
@@ -78,9 +77,8 @@ export class InfoCard {
     this.root.appendChild(this.closeBtn);
 
     this.timeframeEl = document.createElement("div");
+    this.timeframeEl.className = "hud-kicker";
     Object.assign(this.timeframeEl.style, {
-      fontSize: "11px",
-      color: "var(--ink-text-muted)",
       marginBottom: "10px",
       marginTop: "8px",
     });
@@ -89,21 +87,21 @@ export class InfoCard {
     this.titleEl = document.createElement("div");
     this.titleEl.id = "info-card-title";
     Object.assign(this.titleEl.style, {
-      fontSize: "22px",
-      fontWeight: "400",
-      lineHeight: "1.25",
+      fontFamily: "var(--font-display)",
+      fontSize: "34px",
+      fontWeight: "700",
+      lineHeight: "1.05",
       marginBottom: "4px",
-      letterSpacing: "-0.01em",
+      letterSpacing: "0.02em",
       color: "var(--ink-text)",
     });
     this.root.appendChild(this.titleEl);
 
     this.subtitleEl = document.createElement("div");
     Object.assign(this.subtitleEl.style, {
-      fontSize: "13px",
+      fontSize: "14px",
       color: "var(--ink-text-muted)",
       marginBottom: "14px",
-      fontStyle: "italic",
     });
     this.root.appendChild(this.subtitleEl);
 
@@ -118,7 +116,7 @@ export class InfoCard {
 
     this.textEl = document.createElement("div");
     Object.assign(this.textEl.style, {
-      fontSize: "13px",
+      fontSize: "14px",
       lineHeight: "1.6",
       marginBottom: "18px",
       color: "var(--ink-text)",

@@ -306,11 +306,11 @@ export class WalkthroughController {
       position: "fixed",
       inset: "0",
       zIndex: "16",
-      background: "oklch(13% 0.015 250 / 0.55)",
+      background: "rgba(20, 15, 25, 0.55)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
-      fontFamily: "var(--font-mono)",
+      fontFamily: "var(--font-ui)",
       color: "var(--paper)",
       opacity: "0",
       transition: "opacity 0.32s var(--ease)",
@@ -336,12 +336,9 @@ export class WalkthroughController {
     card.append(this._cornerSpan("tr"), this._cornerSpan("bl"));
 
     const eyebrow = document.createElement("div");
+    eyebrow.className = "hud-kicker";
     eyebrow.textContent = `> ${lang === "en" ? "welcome" : "willkommen"}`;
-    Object.assign(eyebrow.style, {
-      fontSize: "11px",
-      color: "var(--ink-text-muted)",
-      marginBottom: "10px",
-    });
+    eyebrow.style.marginBottom = "10px";
     card.appendChild(eyebrow);
 
     const title = document.createElement("h2");
@@ -349,10 +346,11 @@ export class WalkthroughController {
     title.textContent = strings.intro_title;
     Object.assign(title.style, {
       margin: "0 0 10px",
-      fontSize: "26px",
-      fontWeight: "400",
-      lineHeight: "1.2",
-      letterSpacing: "-0.01em",
+      fontFamily: "var(--font-display)",
+      fontSize: "40px",
+      fontWeight: "700",
+      lineHeight: "1.05",
+      letterSpacing: "0.02em",
       color: "var(--ink-text)",
     });
     card.appendChild(title);
@@ -456,15 +454,16 @@ export class WalkthroughController {
   _makePrimaryButton(label) {
     const b = document.createElement("button");
     b.type = "button";
-    b.textContent = `${label.toLowerCase()}  →`;
+    b.textContent = `${label} →`;
     Object.assign(b.style, {
       padding: "14px 18px",
       border: "1px solid var(--signal)",
+      borderRadius: "var(--radius)",
       background: "transparent",
       color: "var(--signal)",
-      fontFamily: "var(--font-mono)",
-      fontSize: "14px",
-      letterSpacing: "0.04em",
+      fontFamily: "var(--font-ui)",
+      fontSize: "16px",
+      fontWeight: "700",
       cursor: "pointer",
       transition: "background 180ms var(--ease)",
       minHeight: "48px",
@@ -484,14 +483,16 @@ export class WalkthroughController {
     // Variant-Flag eingeführt. Bis dahin: dark.
     const b = document.createElement("button");
     b.type = "button";
-    b.textContent = label.toLowerCase();
+    b.textContent = label;
     Object.assign(b.style, {
       padding: "12px 18px",
       border: "1px solid var(--ink-rule-strong)",
+      borderRadius: "var(--radius)",
       background: "transparent",
       color: "var(--ink-text-muted)",
-      fontFamily: "var(--font-mono)",
-      fontSize: "13px",
+      fontFamily: "var(--font-ui)",
+      fontSize: "14px",
+      fontWeight: "700",
       cursor: "pointer",
       transition: "color 180ms var(--ease), border-color 180ms var(--ease)",
       minHeight: "44px",
@@ -525,7 +526,6 @@ export class WalkthroughController {
       top: btnTop,
       right: btnRight,
       zIndex: "13",
-      background: "var(--ink-solid)",
       display: "none",          // initial hidden, zeigt sich nach Free-Roam-Wahl
       alignItems: "center",
       gap: "8px",
@@ -540,7 +540,7 @@ export class WalkthroughController {
     btn.appendChild(icon);
 
     const label = document.createElement("span");
-    label.textContent = "tour";
+    label.textContent = "Tour";
     btn.appendChild(label);
 
     btn.addEventListener("click", () => {
@@ -565,9 +565,9 @@ export class WalkthroughController {
     if (this._tourButtonLabel) {
       const lang = this._lang();
       if (this.active) {
-        this._tourButtonLabel.textContent = lang === "en" ? "end tour" : "tour beenden";
+        this._tourButtonLabel.textContent = lang === "en" ? "End tour" : "Tour beenden";
       } else {
-        this._tourButtonLabel.textContent = "tour";
+        this._tourButtonLabel.textContent = "Tour";
       }
     }
   }

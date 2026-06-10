@@ -15,11 +15,12 @@ import * as THREE from "three";
 const CLICK_DRAG_THRESHOLD = 6;
 const MARKER_LIFETIME_MS = 1500;
 
-// Signal-Coral aus dem UI-Token-System (oklch(72% .22 25) ≈ #ff5a3c).
+// Warmes Signal-Rot aus der UI-Akzentfamilie (#ff6a7c). Bewusst satter als
+// das Peach der Buttons — in der Welt braucht der Marker Kontrast auf Gras.
 // toneMapped:false sorgt dafür dass es trotz ACES nicht ins Orange-Braun
 // fadet — die Linie/das Crosshair sollen über Tag UND Nacht-Cycle gleich
 // kräftig leuchten.
-const SIGNAL_HEX = 0xff5a3c;
+const SIGNAL_HEX = 0xff6a7c;
 const MARKER_SIZE = 1.0;       // halbe Kantenlänge des Bracket-Quadrats in Welt-Metern
 const BRACKET_ARM = 0.32;      // Länge der L-Bracket-Arme
 

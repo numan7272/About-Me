@@ -1,13 +1,13 @@
 /**
- * LoadingSplash — Boot-Log + Start-CTA, Brutalist-Game-HUD register.
+ * LoadingSplash — Lade-Screen + Start-CTA im warmen Spiel-Register.
  *
  * Phase 1 LOADING:
- *   Terminal-style boot log streamt rein. Right-aligned status (ok/err).
+ *   Runder Progress-Bar + Label der gerade ladenden Resource.
  *   3D-Szene läuft im Hintergrund leicht abgedunkelt, kein heavy blur.
  *
  * Phase 2 READY:
  *   Settings (Lang / Volume / Graphics / Renderer) erscheinen.
- *   Großer Start-Button mit Signal-Underline.
+ *   Großer Start-Button, outlined im Signal-Peach.
  *
  * State über window.__masterVolume / window.__lang / localStorage gespiegelt.
  */
@@ -23,30 +23,30 @@ const DEFAULTS = {
 
 const STRINGS = {
   de: {
-    loading: "loading world",
-    ready: "ready",
-    sectionLang: "language",
-    sectionVolume: "volume",
-    sectionGraphics: "graphics",
-    sectionRenderer: "renderer",
-    graphicsLow: "low",
-    graphicsHigh: "high",
-    start: "start ride",
-    welcome: "welcome",
-    intro: "set the world the way you like it.",
+    loading: "Lädt …",
+    ready: "Bereit!",
+    sectionLang: "Sprache",
+    sectionVolume: "Lautstärke",
+    sectionGraphics: "Grafik",
+    sectionRenderer: "Renderer",
+    graphicsLow: "Niedrig",
+    graphicsHigh: "Hoch",
+    start: "Los geht's",
+    welcome: "Hi, willkommen!",
+    intro: "Stell dir die Welt ein, wie du magst.",
   },
   en: {
-    loading: "loading world",
-    ready: "ready",
-    sectionLang: "language",
-    sectionVolume: "volume",
-    sectionGraphics: "graphics",
-    sectionRenderer: "renderer",
-    graphicsLow: "low",
-    graphicsHigh: "high",
-    start: "start ride",
-    welcome: "welcome",
-    intro: "set the world the way you like it.",
+    loading: "Loading …",
+    ready: "Ready!",
+    sectionLang: "Language",
+    sectionVolume: "Volume",
+    sectionGraphics: "Graphics",
+    sectionRenderer: "Renderer",
+    graphicsLow: "Low",
+    graphicsHigh: "High",
+    start: "Start ride",
+    welcome: "Hi, welcome!",
+    intro: "Set the world the way you like it.",
   },
 };
 
@@ -58,7 +58,7 @@ export class LoadingSplash {
     this.destroyed = false;
 
     this.settings = this._loadSettings();
-    this._bootLog = [];
+    this._currentLabel = null;
 
     if (typeof window !== "undefined") {
       window.__masterVolume = this.settings.volume;
@@ -101,12 +101,12 @@ export class LoadingSplash {
       position: "fixed",
       inset: "0",
       zIndex: "30",
-      background: "oklch(13% 0.015 250 / 0.55)",
+      background: "rgba(20, 15, 25, 0.55)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
       padding: "24px",
-      fontFamily: "var(--font-mono)",
+      fontFamily: "var(--font-ui)",
       color: "var(--paper)",
       transition: "opacity 0.55s var(--ease)",
       opacity: "0",
@@ -166,43 +166,41 @@ export class LoadingSplash {
     const left = document.createElement("div");
 
     const meta = document.createElement("div");
-    meta.textContent = `> ${s.welcome}`;
-    Object.assign(meta.style, {
-      fontSize: "11px",
-      color: "var(--paper-muted)",
-      marginBottom: "6px",
-    });
+    meta.className = "hud-kicker";
+    meta.textContent = s.welcome;
+    meta.style.marginBottom = "6px";
     left.appendChild(meta);
 
     const name = document.createElement("h1");
     name.id = "splash-title";
-    name.textContent = "numan.yesil";
+    name.textContent = "Numan Yesil";
     Object.assign(name.style, {
       margin: "0",
-      fontSize: "28px",
-      fontWeight: "400",
-      lineHeight: "1.1",
-      letterSpacing: "-0.02em",
+      fontFamily: "var(--font-display)",
+      fontSize: "52px",
+      fontWeight: "700",
+      lineHeight: "1.0",
+      letterSpacing: "0.02em",
       color: "var(--paper)",
     });
     left.appendChild(name);
 
     const sub = document.createElement("div");
     sub.textContent = this.settings.lang === "en"
-      ? "business informatics · kiel"
-      : "wirtschaftsinformatik · kiel";
+      ? "Business Informatics · Kiel"
+      : "Wirtschaftsinformatik · Kiel";
     Object.assign(sub.style, {
-      fontSize: "12px",
+      fontSize: "14px",
       color: "var(--paper-muted)",
-      marginTop: "4px",
+      marginTop: "6px",
     });
     left.appendChild(sub);
 
     const right = document.createElement("div");
-    right.textContent = this.ready ? `[ ${s.ready} ]` : `[ ${s.loading} ]`;
+    right.className = "hud-kicker";
+    right.textContent = this.ready ? s.ready : s.loading;
     Object.assign(right.style, {
-      fontSize: "11px",
-      color: this.ready ? "var(--signal)" : "var(--paper-muted)",
+      color: this.ready ? "var(--success)" : "var(--paper-muted)",
       whiteSpace: "nowrap",
     });
     this._statusEl = right;
@@ -228,57 +226,51 @@ export class LoadingSplash {
     const intro = document.createElement("p");
     intro.textContent = s.intro;
     Object.assign(intro.style, {
-      margin: "0 0 18px",
-      fontSize: "13px",
+      margin: "0 0 20px",
+      fontSize: "15px",
       lineHeight: "1.5",
       color: "var(--paper-muted)",
     });
     this.card.appendChild(intro);
 
-    this.logEl = document.createElement("pre");
-    Object.assign(this.logEl.style, {
-      margin: "0",
-      padding: "12px 14px",
-      background: "oklch(94% 0.015 75 / 0.04)",
-      borderLeft: "1px solid var(--rule-strong)",
-      fontFamily: "var(--font-mono)",
-      fontSize: "12px",
-      lineHeight: "1.55",
-      color: "var(--paper)",
-      whiteSpace: "pre",
+    // Runder Progress-Bar statt Terminal-Boot-Log
+    const barOuter = document.createElement("div");
+    Object.assign(barOuter.style, {
+      height: "10px",
+      borderRadius: "5px",
+      border: "1px solid var(--rule)",
       overflow: "hidden",
-      minHeight: "120px",
     });
-    this.logEl.textContent = this._formatLog();
-    this.card.appendChild(this.logEl);
+    this._barInner = document.createElement("div");
+    Object.assign(this._barInner.style, {
+      height: "100%",
+      width: `${Math.round((this._lastRatio || 0) * 100)}%`,
+      background: "var(--signal)",
+      borderRadius: "5px",
+      transition: "width 280ms var(--ease)",
+    });
+    barOuter.appendChild(this._barInner);
+    this.card.appendChild(barOuter);
 
-    this.progressRatio = document.createElement("div");
-    Object.assign(this.progressRatio.style, {
+    const row = document.createElement("div");
+    Object.assign(row.style, {
+      display: "flex",
+      justifyContent: "space-between",
       marginTop: "10px",
-      fontSize: "11px",
+      fontSize: "13px",
       color: "var(--paper-muted)",
-      fontVariantNumeric: "tabular-nums",
     });
+    this._loadLabel = document.createElement("span");
+    this._loadLabel.textContent = this._currentLabel || s.loading;
+    this.progressRatio = document.createElement("span");
+    this.progressRatio.style.fontVariantNumeric = "tabular-nums";
     this.progressRatio.textContent = this._formatProgress();
-    this.card.appendChild(this.progressRatio);
-  }
-
-  _formatLog() {
-    if (this._bootLog.length === 0) {
-      return "> init renderer";
-    }
-    return this._bootLog
-      .map((line) => {
-        const name = line.label.padEnd(28, ".");
-        const status = line.ok ? "ok" : "..";
-        return `> ${name} ${status}`;
-      })
-      .join("\n");
+    row.append(this._loadLabel, this.progressRatio);
+    this.card.appendChild(row);
   }
 
   _formatProgress() {
-    const pct = Math.round((this._lastRatio || 0) * 100);
-    return `${String(pct).padStart(3, " ")}% / 100%`;
+    return `${Math.round((this._lastRatio || 0) * 100)}%`;
   }
 
   _renderReady() {
@@ -304,17 +296,17 @@ export class LoadingSplash {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = "hud-btn";
-    btn.textContent = `${s.start}  →`;
+    btn.textContent = `${s.start} →`;
     Object.assign(btn.style, {
       width: "100%",
       padding: "16px",
-      fontSize: "14px",
+      fontSize: "17px",
+      fontWeight: "700",
       color: "var(--signal)",
       background: "transparent",
       border: "1px solid var(--signal)",
-      letterSpacing: "0.04em",
       cursor: "pointer",
-      minHeight: "48px",
+      minHeight: "52px",
     });
     btn.addEventListener("mouseenter", () => {
       btn.style.background = "var(--signal-dim)";
@@ -337,12 +329,9 @@ export class LoadingSplash {
 
   _sectionLabel(text) {
     const lbl = document.createElement("div");
-    lbl.textContent = `> ${text}`;
-    Object.assign(lbl.style, {
-      fontSize: "11px",
-      color: "var(--paper-muted)",
-      marginBottom: "8px",
-    });
+    lbl.className = "hud-kicker";
+    lbl.textContent = text;
+    lbl.style.marginBottom = "8px";
     return lbl;
   }
 
@@ -388,8 +377,8 @@ export class LoadingSplash {
     wrap.appendChild(this._sectionLabel(this._strings().sectionLang));
     wrap.appendChild(this._textToggleGroup(
       [
-        { label: "de", value: "de" },
-        { label: "en", value: "en" },
+        { label: "DE", value: "de" },
+        { label: "EN", value: "en" },
       ],
       this.settings.lang,
       (val) => {
@@ -426,7 +415,7 @@ export class LoadingSplash {
     slider.setAttribute("aria-label", "volume");
     Object.assign(slider.style, {
       flex: "1",
-      accentColor: "oklch(72% 0.22 25)",
+      accentColor: "var(--signal)",
     });
 
     const val = document.createElement("span");
@@ -486,8 +475,8 @@ export class LoadingSplash {
     wrap.appendChild(this._sectionLabel(this._strings().sectionRenderer));
     wrap.appendChild(this._textToggleGroup(
       [
-        { label: "webgl", value: "webgl" },
-        { label: "webgpu", value: "webgpu" },
+        { label: "WebGL", value: "webgl" },
+        { label: "WebGPU", value: "webgpu" },
       ],
       this.settings.renderer,
       (val) => {
@@ -496,11 +485,11 @@ export class LoadingSplash {
         this._saveSettings();
         const hint = document.createElement("div");
         hint.textContent = this.settings.lang === "en"
-          ? "reloading. applying renderer change"
-          : "neu laden. renderer wechselt";
+          ? "Reloading to apply the new renderer …"
+          : "Lade neu, Renderer wechselt …";
         Object.assign(hint.style, {
           marginTop: "10px",
-          fontSize: "11px",
+          fontSize: "13px",
           color: "var(--signal)",
           textAlign: "center",
         });
@@ -514,19 +503,13 @@ export class LoadingSplash {
   /** External call from Game.js on resources progress. */
   setProgress(ratio, label) {
     this._lastRatio = ratio;
-    if (label && !this._bootLog.find((l) => l.label === label)) {
-      this._bootLog.push({ label, ok: false });
+    if (label) this._currentLabel = label;
+    if (this._barInner) {
+      this._barInner.style.width = `${Math.round(ratio * 100)}%`;
     }
-    if (this._bootLog.length > 0) {
-      const last = this._bootLog[this._bootLog.length - 1];
-      if (last) last.ok = ratio < 1
-        ? (this._bootLog.length > 1)
-        : true;
-      this._bootLog.forEach((line, i, arr) => {
-        line.ok = i < arr.length - 1 || ratio >= 1;
-      });
+    if (this._loadLabel && this._currentLabel) {
+      this._loadLabel.textContent = this._currentLabel;
     }
-    if (this.logEl) this.logEl.textContent = this._formatLog();
     if (this.progressRatio) {
       this.progressRatio.textContent = this._formatProgress();
     }
@@ -536,7 +519,6 @@ export class LoadingSplash {
   markReady() {
     if (this.ready) return;
     this.ready = true;
-    this._bootLog.forEach((l) => (l.ok = true));
     setTimeout(() => this._render(), 350);
   }
 

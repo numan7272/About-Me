@@ -2,8 +2,54 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Departure Mono. Place file at public/fonts/DepartureMono-Regular.woff2.
-   OFL licensed: https://departuremono.com. JetBrains Mono renders until added. */
+/* ── Type ────────────────────────────────────────────────────────────────
+   Hybrid-Register — warme Spielwelt trifft HUD:
+   - Nunito (400/700/900) als UI-/Body-Font — rund, freundlich
+   - Amatic SC (700) als Display-Font für Titel
+   - Mono bleibt für diegetische Kontexte (Kali-Terminal, SQLi-Lab, FPS) */
+
+:root {
+  /* Flächen — warmes Aubergine-Dunkel */
+  --ink: #1d1721;
+  --ink-solid: rgba(29, 23, 33, 0.95);
+  --surface: radial-gradient(ellipse at top left, #251f2b, #1d1721);
+
+  /* Text — Weiß mit Opazitäts-Hierarchie statt getönter Neutrals */
+  --paper: rgba(255, 255, 255, 0.92);
+  --paper-muted: rgba(255, 255, 255, 0.65);
+  --paper-dim: rgba(255, 255, 255, 0.42);
+
+  /* Linien — 1px Weiß mit Opazitäts-Stufen, hover voll */
+  --rule: rgba(255, 255, 255, 0.22);
+  --rule-strong: rgba(255, 255, 255, 0.55);
+
+  /* Akzente — soft statt neon */
+  --signal: #ffceca;          /* warmes Peach: aktiv, CTA */
+  --signal-dim: rgba(255, 206, 202, 0.22);
+  --success: #d5ff95;
+  --danger: #ff6a7c;
+
+  /* Lese-Register (InfoCard, Tour) — gleiche dunkle Fläche wie Chrome.
+     Variablennamen bleiben für Kompatibilität mit den Komponenten. */
+  --paper-bg: rgba(33, 27, 39, 0.96);
+  --paper-bg-solid: #251f2b;
+  --ink-text: rgba(255, 255, 255, 0.92);
+  --ink-text-muted: rgba(255, 255, 255, 0.65);
+  --ink-text-dim: rgba(255, 255, 255, 0.42);
+  --ink-rule: rgba(255, 255, 255, 0.22);
+  --ink-rule-strong: rgba(255, 255, 255, 0.55);
+
+  --radius: 8px;
+  --radius-card: 12px;
+
+  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+  --font-ui: "Nunito", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Amatic SC", "Nunito", sans-serif;
+  --font-mono: "Departure Mono", "JetBrains Mono", ui-monospace, "SF Mono",
+               Menlo, monospace;
+}
+
+/* Departure Mono bleibt für Terminal-Kontexte (Kali-Egg, SQLi-Lab). */
 @font-face {
   font-family: "Departure Mono";
   src: url("/fonts/DepartureMono-Regular.woff2") format("woff2");
@@ -12,41 +58,17 @@
   font-display: swap;
 }
 
-:root {
-  --ink: oklch(13% 0.015 250);
-  --ink-solid: oklch(13% 0.015 250 / 0.92);
-  --paper: oklch(94% 0.015 75);
-  --paper-muted: oklch(72% 0.02 75);
-  --paper-dim: oklch(55% 0.02 75);
-  --rule: oklch(94% 0.015 75 / 0.18);
-  --rule-strong: oklch(94% 0.015 75 / 0.40);
-  --signal: oklch(72% 0.22 25);
-  --signal-dim: oklch(72% 0.22 25 / 0.25);
-
-  /* Paper-Register für Lese-Inhalte (InfoCard, Tour-Welcome, 3D-Labels).
-     Dunkle Tinte auf warmem Cream, separate Hierarchie vom ink-HUD. */
-  --paper-bg: oklch(94% 0.018 75 / 0.96);
-  --paper-bg-solid: oklch(94% 0.018 75);
-  --ink-text: oklch(18% 0.012 250);
-  --ink-text-muted: oklch(45% 0.015 70);
-  --ink-text-dim: oklch(60% 0.012 70);
-  --ink-rule: oklch(18% 0.012 250 / 0.18);
-  --ink-rule-strong: oklch(18% 0.012 250 / 0.42);
-
-  --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --font-mono: "Departure Mono", "JetBrains Mono", ui-monospace, "SF Mono",
-               Menlo, monospace;
-}
-
 html, body {
   margin: 0;
   padding: 0;
-  background: var(--ink);
+  background: radial-gradient(farthest-side at 0 0, #251f2b, #1d1721);
   color: var(--paper);
   overflow: hidden;
   user-select: none;
   -webkit-user-select: none;
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
   width: 100%;
   height: 100%;
 }
@@ -71,66 +93,27 @@ html, body {
 
 /* ── Shared chrome primitives ───────────────────────────────────────── */
 
-/* Corner-bracket frame. Drawn as 4 pseudo-element L-shapes around the
-   container. Use sparingly: one bracketed surface per viewport region.
-   `.hud-bracket.paper` switches to dark-on-cream for Lese-Inhalte. */
+/* Karte: weicher Radius, Hairline-Border, radialer
+   Aubergine-Gradient. Der Klassenname .hud-bracket bleibt (alle Panels
+   referenzieren ihn) — die Corner-Brackets selbst sind Geschichte. */
 .hud-bracket {
   position: relative;
-  background: var(--ink-solid);
+  background: var(--surface);
   color: var(--paper);
-  font-family: var(--font-mono);
+  font-family: var(--font-ui);
+  border: 1px solid var(--rule);
+  border-radius: var(--radius-card);
 }
 .splash-card::-webkit-scrollbar { width: 0; height: 0; display: none; }
 .hud-bracket.paper {
-  background: var(--paper-bg);
+  background: var(--surface);
   color: var(--ink-text);
 }
 .hud-bracket::before,
-.hud-bracket::after {
-  content: "";
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  border: 1px solid var(--rule-strong);
-  pointer-events: none;
-}
-.hud-bracket.paper::before,
-.hud-bracket.paper::after,
-.hud-bracket.paper > .hud-bracket-tr,
-.hud-bracket.paper > .hud-bracket-bl {
-  border-color: var(--ink-rule-strong);
-}
-.hud-bracket::before {
-  top: -1px;
-  left: -1px;
-  border-right: 0;
-  border-bottom: 0;
-}
-.hud-bracket::after {
-  bottom: -1px;
-  right: -1px;
-  border-left: 0;
-  border-top: 0;
-}
+.hud-bracket::after,
 .hud-bracket > .hud-bracket-tr,
 .hud-bracket > .hud-bracket-bl {
-  position: absolute;
-  width: 12px;
-  height: 12px;
-  border: 1px solid var(--rule-strong);
-  pointer-events: none;
-}
-.hud-bracket > .hud-bracket-tr {
-  top: -1px;
-  right: -1px;
-  border-left: 0;
-  border-bottom: 0;
-}
-.hud-bracket > .hud-bracket-bl {
-  bottom: -1px;
-  left: -1px;
-  border-right: 0;
-  border-top: 0;
+  display: none;
 }
 
 .hud-rule {
@@ -139,39 +122,51 @@ html, body {
   border: 0;
 }
 
-.hud-btn {
+/* Mono-Kicker — brutalistisches Erbe: kleine Meta-Labels, Status-Zeilen
+   und Einheiten bleiben monospaced. Titel + Body laufen warm/rund. */
+.hud-kicker {
   font-family: var(--font-mono);
-  font-size: 12px;
-  color: var(--paper);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.04em;
+  color: var(--paper-muted);
+}
+
+/* Outlined Button: runde Ecken, Border + Text hellen beim Hover
+   auf. Kein lowercase-Zwang, keine Underline-Animation mehr. */
+.hud-btn {
+  font-family: var(--font-ui);
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--paper-muted);
   background: transparent;
-  border: 0;
-  padding: 10px 14px;
+  border: 1px solid var(--rule-strong);
+  border-radius: var(--radius);
+  padding: 10px 16px;
   cursor: pointer;
   position: relative;
-  text-transform: lowercase;
   min-height: 44px;
+  transition: color 150ms var(--ease), border-color 150ms var(--ease);
 }
-.hud-btn::after {
-  content: "";
-  position: absolute;
-  left: 14px;
-  right: 14px;
-  bottom: 6px;
-  height: 1px;
-  background: var(--signal);
-  transform: scaleX(0);
-  transform-origin: left;
-  transition: transform 180ms var(--ease);
+.hud-btn:hover,
+.hud-btn:focus-visible {
+  color: var(--paper);
+  border-color: rgba(255, 255, 255, 0.95);
 }
-.hud-btn:hover::after,
-.hud-btn:focus-visible::after { transform: scaleX(1); }
-.hud-btn[data-active="true"] { color: var(--signal); }
-.hud-btn[data-active="true"]::after { transform: scaleX(1); }
+.hud-btn[data-active="true"] {
+  color: var(--signal);
+  border-color: var(--signal);
+}
 
 /* Universal focus ring — auch Formularfelder (SQLi-Lab, Kontakt) und Links */
 :where(button, a, input, select, textarea, [role="button"], [tabindex]):focus-visible {
   outline: 2px solid var(--signal);
   outline-offset: 2px;
+}
+
+::selection {
+  color: #251f2b;
+  background-color: #ffffff;
 }
 
 @media (prefers-reduced-motion: reduce) {

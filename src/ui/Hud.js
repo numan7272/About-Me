@@ -27,7 +27,7 @@ export class Hud {
       inset: "0",
       pointerEvents: "none",
       zIndex: "10",
-      fontFamily: "var(--font-mono)",
+      fontFamily: "var(--font-ui)",
       color: "var(--paper)",
       userSelect: "none",
     });
@@ -55,35 +55,22 @@ export class Hud {
     });
     wrap.append(this._cornerSpan("tr"), this._cornerSpan("bl"));
 
-    const caret = document.createElement("span");
-    caret.textContent = "▌";
-    Object.assign(caret.style, {
-      color: "var(--paper-muted)",
-      fontSize: "14px",
-      lineHeight: "1",
-      marginRight: "2px",
-    });
-
     this.speedValue = document.createElement("span");
     this.speedValue.textContent = "0";
     Object.assign(this.speedValue.style, {
-      fontSize: "clamp(40px, 6vw, 64px)",
-      fontWeight: "400",
+      fontFamily: "var(--font-display)",
+      fontSize: "clamp(44px, 6vw, 68px)",
+      fontWeight: "700",
       lineHeight: "1",
       fontVariantNumeric: "tabular-nums",
-      letterSpacing: "-0.02em",
       transition: "color 180ms var(--ease)",
     });
 
     const unit = document.createElement("span");
+    unit.className = "hud-kicker";
     unit.textContent = "km/h";
-    Object.assign(unit.style, {
-      fontSize: "11px",
-      color: "var(--paper-muted)",
-      letterSpacing: "0.06em",
-    });
 
-    wrap.append(caret, this.speedValue, unit);
+    wrap.append(this.speedValue, unit);
     this.root.appendChild(wrap);
     this.speedHud = wrap;
   }
@@ -101,20 +88,21 @@ export class Hud {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.setAttribute("aria-label", "recenter camera");
-    btn.textContent = "↺ recenter";
+    btn.textContent = "↺ Recenter";
     Object.assign(btn.style, {
       position: "absolute",
       bottom: "16px",
       right: "16px",
-      padding: "8px 10px",
+      padding: "8px 14px",
       pointerEvents: "auto",
       display: "none",
       background: "transparent",
-      border: "0",
+      border: "1px solid var(--rule-strong)",
+      borderRadius: "var(--radius)",
       color: "var(--paper-muted)",
-      fontFamily: "var(--font-mono)",
-      fontSize: "12px",
-      letterSpacing: "0.04em",
+      fontFamily: "var(--font-ui)",
+      fontSize: "13px",
+      fontWeight: "700",
       cursor: "pointer",
       opacity: "0",
       transition: "opacity 240ms var(--ease), color 180ms var(--ease)",

@@ -9,7 +9,7 @@
  *   - Pro Building ein THREE.Sprite mit Canvas-Texture
  *   - Canvas zeichnet einen kompakten Pill-Style-Label
  *     (Linie 1: Stationsname klein, Linie 2: Kurzbeschreibung größer)
- *   - Sprite skaliert mit Distanz (Bruno-Style):
+ *   - Sprite skaliert mit Distanz:
  *       nah   → klein und transparent (Mesh ist sowieso sichtbar)
  *       mittel → maximal sichtbar
  *       weit  → noch sichtbar aber dezent
@@ -192,14 +192,14 @@ export class StationLabels3D {
       ctx.fillText(tf, TEX_W - PAD, PAD + 28);
     }
 
-    // Title — italic mono display. Italic-Mono ist selten genug um nicht
-    // sofort als "Editorial-Magazin"-Reflex zu lesen.
+    // Title — handschriftlicher Display-Font. Wirkt wie ein von Hand
+    // beschriftetes Schild in der Welt, nicht wie HUD-Text.
     let titleStr = station.title || "";
     const maxW = TEX_W - (PAD + 20) - PAD;
-    let size = 56;
-    const minSize = 22;
+    let size = 64;
+    const minSize = 26;
     while (size > minSize) {
-      ctx.font = `italic 500 ${size}px "JetBrains Mono", ui-monospace, monospace`;
+      ctx.font = `700 ${size}px "Amatic SC", "Nunito", sans-serif`;
       if (ctx.measureText(titleStr).width <= maxW) break;
       size -= 2;
     }
