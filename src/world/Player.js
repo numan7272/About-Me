@@ -20,7 +20,7 @@ import * as THREE from "three";
 import { BikeHeadlight } from "./BikeHeadlight.js";
 
 // Konstanten 1:1 aus dem alten About-Me Repo (Player.js).
-// Lerp-basierte Beschleunigung statt m/s² — das gibt das "Bruno-Simon-Feel"
+// Lerp-basierte Beschleunigung statt m/s² — das gibt das weiche Fahrgefühl
 // mit sanftem Anfahren und natürlichem Ausrollen.
 const MAX_SPEED  = 7.5;       // m/s Top-Speed (alt: 4.5 war zu langsam)
 const ACCEL      = 6;         // velocity-lerp-faktor (1/s) → lerpT = min(1, ACCEL*dt)
@@ -275,7 +275,7 @@ export class Player {
 
     // ── Joystick-Input (Mobile) ──
     // Wenn der TouchJoystick aktiv ist, nutzen wir Heading-Vector-Logik
-    // (Bruno-Style): Finger zeigt in die Welt-Richtung in die das Bike fahren
+    // Finger zeigt in die Welt-Richtung in die das Bike fahren
     // soll. Bike dreht sich smooth dahin (P-Controller), Throttle = magnitude.
     const joy = this.game?.ui?.touchJoystick?.input;
     const joyActive = !!joy?.active && joy.magnitude > 0.05;

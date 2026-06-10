@@ -1,5 +1,5 @@
 /**
- * Ocean — stilisiertes Cartoon-Wasser im Bruno-Simon-Stil.
+ * Ocean — stilisiertes Cartoon-Wasser.
  *
  * Dual-Renderer-Support:
  *   - WebGL:  klassisches THREE.ShaderMaterial mit GLSL (bewährter Pfad)

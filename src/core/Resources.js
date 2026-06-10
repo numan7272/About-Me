@@ -1,7 +1,7 @@
 /**
  * Resources — Asset-Loader für GLBs, Texturen, Audio.
  *
- * Nutzt GLTFLoader + DRACOLoader (Brunos GLBs sind Draco-komprimiert).
+ * Nutzt GLTFLoader + DRACOLoader (die GLBs sind Draco-komprimiert).
  * Emit "ready" wenn alle gewünschten Assets geladen sind, plus
  * "progress" pro Asset.
  *

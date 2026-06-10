@@ -1,5 +1,5 @@
 /**
- * TouchJoystick — In-World-3D-Joystick im Stil von About-Me (Bruno-Style).
+ * TouchJoystick — In-World-3D-Joystick als Mesh in der Szene.
  *
  * Zwei dünne Ringe + ein Sweep-Arc (Tortenstück) liegen am Bike auf der
  * Ground-Plane. Kein DOM-Overlay, kein Knob — der Arc zeigt in die Richtung

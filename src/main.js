@@ -2,7 +2,7 @@
  * main.js — Entry-Point
  *
  * Startet die Game-Klasse (3D-Welt) + mountet die React-UI in #ui-root.
- * Bruno-Pattern: die Game-Klasse ist ein Singleton, läuft komplett
+ * Die Game-Klasse ist ein Singleton, läuft komplett
  * imperativ. React wird NUR für UI-Overlays genutzt.
  */
 

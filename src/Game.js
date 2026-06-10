@@ -1,7 +1,7 @@
 /**
  * Game.js — Singleton-Hauptklasse für die 3D-Welt.
  *
- * Folgt Brunos folio-2025-Architektur:
+ * Architektur:
  *   - Game.getInstance() ist überall im Code verfügbar
  *   - Konstruktor instanziiert Core-Module (Time, Sizes, Renderer, ...)
  *   - update() läuft jedes Frame via requestAnimationFrame
@@ -48,7 +48,7 @@ export class Game {
     this.canvas = canvas;
 
     // ── Loading-Splash zuerst ──
-    // Bruno-Style: Splash deckt den Canvas zu (Canvas blurrred), Settings
+    // Splash deckt den Canvas zu (Canvas gedimmt), Settings
     // (Lang/Volume/Graphics/Renderer) werden vor Game-Start eingestellt.
     // Tour-Overlay kommt erst NACH Splash-Start. Wenn Splash null bleibt,
     // läuft alles wie bisher.
