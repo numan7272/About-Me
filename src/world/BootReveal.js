@@ -20,8 +20,9 @@
  */
 
 import * as THREE from "three";
+import { BIKE_SPAWN } from "./spawn.js";
 
-const SPAWN = [-4.38, 0.12, 16.63];
+const SPAWN = [BIKE_SPAWN[0], 0.12, BIKE_SPAWN[2]];
 const CIRCLE_R = 2.6;          // ≈ Joystick-Ring (2.4m) + schmaler Rand
 const REVEAL_MAX = 130;        // Radius der die ganze Insel abdeckt
 const RING_COLOR = new THREE.Color(1.28, 1.12, 0.86);   // Sand, dezent

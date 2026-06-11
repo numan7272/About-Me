@@ -7,6 +7,7 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { BIKE_SPAWN } from "../world/spawn.js";
 
 /**
  * CameraRig — entweder OrbitControls (frei) oder Follow-Cam.
@@ -129,18 +130,19 @@ export class CameraRig {
   }
 
   /**
-   * Cinematic Intro-Orbit starten (läuft bis endIntroOrbit/flyTo).
-   * opts: { center: [x,y,z], radius, height, period (s/Runde), targetY }
-   * Default: enge Fahrt um den Bike-Spawn (Spotlight-Moment).
+   * Intro-Pose starten: statische Kamera auf den Spawn-Kreis gerichtet,
+   * mit kaum wahrnehmbarem Schweben (Atmen, KEIN Orbit — Kreisfahrten
+   * beim Laden machen seekrank).
+   * opts: { center: [x,y,z], offset: [x,y,z], targetY }
    */
   startIntroOrbit(opts = {}) {
     this._introOrbit = true;
     this._introT = 0;
-    this._introCenter = opts.center || [-4.4, 0.5, 16.6];
-    this._introRadius = opts.radius ?? 7.5;
-    this._introHeight = opts.height ?? 3.6;
-    this._introSpeed = (Math.PI * 2) / (opts.period ?? 38);
-    this._introTargetY = opts.targetY ?? 1.0;
+    this._introCenter = opts.center || [BIKE_SPAWN[0], 0.5, BIKE_SPAWN[2]];
+    // Gleiche Peilung wie die Follow-Cam — der Ausschwung beim Start
+    // fühlt sich dadurch wie ein Zoom an, nicht wie ein Schwenk.
+    this._introOffset = opts.offset || [7.2, 4.0, 7.2];
+    this._introTargetY = opts.targetY ?? 0.9;
     this.followMode = false;
   }
 
@@ -241,20 +243,16 @@ export class CameraRig {
   }
 
   update() {
-    // ── Intro-Orbit: langsame Kreisfahrt um den Spawn-Punkt ──
+    // ── Intro-Pose: statisch mit minimalem Schweben ──
     if (this._introOrbit) {
       const dt = this.game?.time?.delta || 0.016;
       this._introT += dt;
-      // Sanfter Ein-Schwung in den ersten 2s
-      const ease = Math.min(1, this._introT / 2);
-      const a = this._introT * this._introSpeed;
-      const r = this._introRadius + (1 - ease) * 2;
       const [cx, cy, cz] = this._introCenter;
-      this.camera.position.set(
-        cx + Math.cos(a) * r,
-        cy + this._introHeight,
-        cz + Math.sin(a) * r,
-      );
+      const [ox, oy, oz] = this._introOffset;
+      // Atmen: ±12cm vertikal, ±8cm lateral, sehr langsam
+      const bobY = Math.sin(this._introT * 0.45) * 0.12;
+      const bobX = Math.sin(this._introT * 0.31 + 1.7) * 0.08;
+      this.camera.position.set(cx + ox + bobX, cy + oy + bobY, cz + oz);
       this.controls.target.set(cx, cy + this._introTargetY, cz);
       this.controls.update();
       return;

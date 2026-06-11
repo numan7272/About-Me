@@ -31,6 +31,7 @@ import { Wind } from "./Wind.js";
 import { ColliderDebug } from "./ColliderDebug.js";
 import { StationLabels3D } from "../ui/walkthrough/StationLabels3D.js";
 import { getControlMode } from "../ui/controlMode.js";
+import { BIKE_SPAWN } from "./spawn.js";
 
 export class World {
   constructor(game) {
@@ -218,10 +219,9 @@ export class World {
       return;
     }
 
-    // Spawn vor dem HQ — vom User per Browser-Console festgelegt.
-    // Story-Start "Zu Hause, das letzte Kapitel". Y leicht angehoben für
-    // sauberes Fall-in statt Z-Fighting auf der Auffahrt.
-    const spawn = [-4.38, 1.0, 16.63];
+    // Spawn direkt vor der HQ-Garage (geteilte Konstante, siehe spawn.js).
+    // Y leicht angehoben für sauberes Fall-in.
+    const spawn = [BIKE_SPAWN[0], 1.0, BIKE_SPAWN[2]];
     this.player = new Player(this.game, spawn);
     // Visual-Modell asynchron, sobald RigidBody auch ready ist
     this.player.setBikeModel(bikeGltf.scene.clone(true));

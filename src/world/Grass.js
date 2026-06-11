@@ -116,18 +116,34 @@ const VERTEX_SHADER = /* glsl */ `
     vec2 rel = mod(local - uViewCenter + HALF, ${TILE.toFixed(1)}) - HALF;
     vec2 blade = uViewCenter + rel;
 
-    // ── Cull: Insel-Rand, Buildings, Road ──
+    // ── Cull: Insel-Rand hart, Buildings/Road mit organischem Saum ──
     float hidden = 0.0;
     vec2 mapRel = blade - uMapCenter;
     if (dot(mapRel, mapRel) > uMapRadius * uMapRadius) hidden = 1.0;
+
+    // Statt harter Kreise: Distanz zum nächsten Hindernis messen und den
+    // Saum mit Noise verbeulen + per Halm-Hash ausdünnen — die Wiese
+    // franst natürlich aus statt mit Zirkel-Kante zu enden.
+    float edgeN = vnoise(blade * 0.6);
+
+    float minB = 1e9;
     for (int i = 0; i < 5; i++) {
       vec2 d = uBuildings[i].xy - blade;
-      if (dot(d, d) < uBuildings[i].z) hidden = 1.0;
+      minB = min(minB, dot(d, d) / max(uBuildings[i].z, 0.001));
     }
+    float bRel = sqrt(minB);                       // 1.0 = Kreisrand
+    float buildF = smoothstep(0.55 + edgeN * 0.35, 1.2 + edgeN * 0.35, bRel);
+
+    float minR = 1e9;
     for (int i = 0; i < 64; i++) {
       vec2 d = uRoad[i] - blade;
-      if (dot(d, d) < uRoadRadiusSq) hidden = 1.0;
+      minR = min(minR, dot(d, d));
     }
+    float rRel = sqrt(minR / uRoadRadiusSq);
+    float roadF = smoothstep(0.8 + edgeN * 0.4, 1.6 + edgeN * 0.4, rRel);
+
+    float occupF = min(buildF, roadF);
+    if (occupF < aHash) hidden = 1.0;
 
     // ── Form ──
     float tip = 1.0 - step(0.5, corner);             // Ecke 0 = Spitze
@@ -139,6 +155,9 @@ const VERTEX_SHADER = /* glsl */ `
     // Kachel-Rand: Halme sanft auf 0 schrumpfen statt harter Kante
     float edge = max(abs(rel.x), abs(rel.y)) / HALF;
     h *= 1.0 - smoothstep(0.78, 1.0, edge);
+
+    // Saum-Halme werden zur Kante hin kürzer (zusätzlich zum Ausdünnen)
+    h *= 0.45 + 0.55 * occupF;
 
     // Druckpunkt (Cursor/Finger auf dem Boden): Halme ducken sich
     vec2 away = blade - uPressPos;
@@ -372,7 +391,7 @@ async function buildGrassMaterialTSL(buildings, roadCurve) {
   const {
     Fn, If, Loop, uniform, uniformArray, attribute, varying,
     vec2, vec3, vec4, float,
-    sin, dot, mix, smoothstep, max, length, fract, floor, step, distance,
+    sin, dot, mix, smoothstep, max, min, sqrt, length, fract, floor, step, distance,
     positionLocal, cameraPosition, Break,
   } = tsl;
   const { MeshBasicNodeMaterial } = webgpu;
@@ -438,21 +457,34 @@ async function buildGrassMaterialTSL(buildings, roadCurve) {
     const rel = local.sub(uViewCenter).add(HALF).mod(TILE).sub(HALF);
     const blade = uViewCenter.add(rel);
 
-    // Cull
+    // Cull: Insel-Rand hart, Buildings/Road mit organischem Saum
     const hidden = float(0).toVar();
     const mapRel = blade.sub(uMapCenter);
     If(dot(mapRel, mapRel).greaterThan(uMapRadius.mul(uMapRadius)), () => {
       hidden.assign(1);
     });
+
+    const edgeN = vnoise(blade.mul(0.6));
+
+    const minB = float(1e9).toVar();
     Loop({ start: 0, end: 5, type: "int" }, ({ i }) => {
       const b = buildingArr.element(i);
       const d = b.xy.sub(blade);
-      If(dot(d, d).lessThan(b.z), () => { hidden.assign(1); });
+      minB.assign(min(minB, dot(d, d).div(max(b.z, 0.001))));
     });
+    const bRel = sqrt(minB);
+    const buildF = smoothstep(edgeN.mul(0.35).add(0.55), edgeN.mul(0.35).add(1.2), bRel);
+
+    const minR = float(1e9).toVar();
     Loop({ start: 0, end: 64, type: "int" }, ({ i }) => {
       const d = roadArr.element(i).sub(blade);
-      If(dot(d, d).lessThan(uRoadRadiusSq), () => { hidden.assign(1); });
+      minR.assign(min(minR, dot(d, d)));
     });
+    const rRel = sqrt(minR.div(uRoadRadiusSq));
+    const roadF = smoothstep(edgeN.mul(0.4).add(0.8), edgeN.mul(0.4).add(1.6), rRel);
+
+    const occupF = min(buildF, roadF);
+    If(occupF.lessThan(aHash), () => { hidden.assign(1); });
 
     // Form
     const tip = float(1).sub(step(0.5, corner));
@@ -466,6 +498,7 @@ async function buildGrassMaterialTSL(buildings, roadCurve) {
 
     const edge = max(rel.x.abs(), rel.y.abs()).div(HALF);
     h.mulAssign(float(1).sub(smoothstep(0.78, 1.0, edge)));
+    h.mulAssign(occupF.mul(0.55).add(0.45));
 
     // Druckpunkt: ducken + radial ausweichen (Spiegel des GLSL-Pfads)
     const away = blade.sub(uPressPos);
