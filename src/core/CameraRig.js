@@ -121,6 +121,41 @@ export class CameraRig {
     this._flyToPos = new THREE.Vector3();
     this._flyToTarget = new THREE.Vector3();
     this._flyOnComplete = null;
+
+    // Intro-Orbit: langsame Kamerafahrt um die Insel solange der
+    // Loading-Splash steht. Die Welt selbst ist der Ladescreen.
+    this._introOrbit = false;
+    this._introT = 0;
+  }
+
+  /** Cinematic Insel-Orbit starten (läuft bis endIntroOrbit/flyTo). */
+  startIntroOrbit() {
+    this._introOrbit = true;
+    this._introT = 0;
+    this.followMode = false;
+  }
+
+  /**
+   * Intro beenden: aus dem Orbit hinter das Bike schwingen, danach
+   * Follow-Cam aktivieren. onArrive feuert wenn die Kamera steht.
+   */
+  endIntroOrbit(onArrive) {
+    this._introOrbit = false;
+    const t = this.player?.body?.translation?.();
+    if (!t) {
+      this.followMode = true;
+      onArrive?.();
+      return;
+    }
+    this.flyTo([t.x, t.y, t.z], {
+      duration: 1.8,
+      cameraPos: [t.x + FOLLOW_OFFSET.x, t.y + FOLLOW_OFFSET.y, t.z + FOLLOW_OFFSET.z],
+      lookAt: [t.x, t.y + FOLLOW_LOOK_OFFSET.y, t.z],
+      onComplete: () => {
+        this.followMode = true;
+        onArrive?.();
+      },
+    });
   }
 
   /**
@@ -181,7 +216,9 @@ export class CameraRig {
 
   setPlayer(player) {
     this.player = player;
-    this.followMode = true;
+    // Während des Intro-Orbits bleibt die Kamera auf ihrer Inselfahrt —
+    // Follow übernimmt erst nach endIntroOrbit().
+    if (!this._introOrbit) this.followMode = true;
   }
 
   /** Re-enable follow mode (für "Zentrieren"-Button) */
@@ -195,6 +232,21 @@ export class CameraRig {
   }
 
   update() {
+    // ── Intro-Orbit: langsame Kreisfahrt um die Insel ──
+    if (this._introOrbit) {
+      const dt = this.game?.time?.delta || 0.016;
+      this._introT += dt;
+      // Sanfter Ein-Schwung in den ersten 2s, dann konstante Fahrt
+      const ease = Math.min(1, this._introT / 2);
+      const a = this._introT * 0.085;          // ~74s pro Runde
+      const r = 40 - ease * 6;                 // zieht leicht rein: 40 → 34
+      const h = 17 - ease * 3;
+      this.camera.position.set(Math.cos(a) * r, h, Math.sin(a) * r);
+      this.controls.target.set(0, 1.5, 0);
+      this.controls.update();
+      return;
+    }
+
     // ── Fly-To läuft? Dann tween'en wir Camera + Target. ──
     if (this._flyActive) {
       const dt = this.game?.time?.delta || 0.016;

@@ -68,6 +68,17 @@ export class Game {
     this.sizes = new Sizes();
     this.scene = new THREE.Scene();
     this.cameraRig = new CameraRig(this);
+
+    // Solange der Splash steht, kreist die Kamera cinematisch um die
+    // Insel — Ozean/Himmel/Gras sind prozedural und sofort da, die Welt
+    // ist also ab Sekunde 1 der Ladescreen. Bei reduced-motion bleibt
+    // die Kamera statisch (Standard-Standpunkt).
+    this._reducedMotion = typeof window !== "undefined"
+      && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    if (!this._reducedMotion) {
+      this.cameraRig.startIntroOrbit();
+    }
+
     this.renderer = new Renderer(this);
     this.physics = new Physics(this);
     this.inputs = new Inputs();
@@ -144,14 +155,33 @@ export class Game {
     });
 
     // Splash hat eigene Start-Button-Logik — onStart wird gefeuert wenn User
-    // klickt. Wir öffnen IMMER das Tour-Overlay (auch wenn der User schon
-    // mal Tour gesehen hat — er kommt ja gerade frisch vom Splash und will
-    // entscheiden Tour vs Frei-Fahren).
+    // klickt. Choreografie: Bike fällt aus 5m auf die Insel, die Kamera
+    // schwingt aus dem Orbit dahinter ein, DANN kommt das Tour-Overlay.
+    // Der Start ist der Payoff des Intros, kein Formularwechsel.
     this.splash.onStart = () => {
       if (typeof window !== "undefined") {
         window.__deferTourOverlay = false;
       }
-      this.ui?.walkthrough?.showStartOverlayAfterSplash?.();
+
+      const showOverlay = () => {
+        this.ui?.walkthrough?.showStartOverlayAfterSplash?.();
+      };
+
+      if (this._reducedMotion) {
+        this.cameraRig.followMode = true;
+        showOverlay();
+      } else {
+        // Bike-Drop: kurz anheben, Physik lässt es einfedern während die
+        // Kamera anfliegt. Nur wenn der Body schon existiert.
+        const body = this.world?.player?.body;
+        if (body) {
+          const t = body.translation();
+          body.setTranslation({ x: t.x, y: t.y + 5, z: t.z }, true);
+          body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        }
+        this.cameraRig.endIntroOrbit(showOverlay);
+      }
+
       // Sobald die Welt sichtbar ist, preloaden wir die Mini-Game-Chunks
       // im Hintergrund. So fühlt sich der erste Building-Click instant an,
       // statt erst den 30-100KB-Chunk laden zu müssen. Network ist eh idle

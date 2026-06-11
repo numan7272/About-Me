@@ -33,7 +33,9 @@ const STRINGS = {
     graphicsHigh: "Hoch",
     start: "Los geht's",
     welcome: "Hi, willkommen!",
-    intro: "Stell dir die Welt ein, wie du magst.",
+    tagline: "Eine Insel. Ein Fahrrad. Mein Werdegang.",
+    more: "Mehr Einstellungen",
+    intro: "Gleich kannst du losfahren.",
   },
   en: {
     loading: "Loading …",
@@ -46,7 +48,9 @@ const STRINGS = {
     graphicsHigh: "High",
     start: "Start ride",
     welcome: "Hi, welcome!",
-    intro: "Set the world the way you like it.",
+    tagline: "One island. One bike. My story.",
+    more: "More settings",
+    intro: "You're about to ride.",
   },
 };
 
@@ -88,11 +92,11 @@ export class LoadingSplash {
     } catch (e) {}
   }
 
-  /** Light scene-dim instead of heavy blur. 3D still visible behind. */
+  /** Die Welt bleibt sichtbar — nur ein Hauch dunkler für Kontrast. */
   _applyCanvasDim(on) {
     if (!this.canvas) return;
     this.canvas.style.transition = "filter 0.55s ease";
-    this.canvas.style.filter = on ? "brightness(0.35) saturate(0.85)" : "none";
+    this.canvas.style.filter = on ? "brightness(0.8)" : "none";
   }
 
   _buildUI() {
@@ -101,7 +105,7 @@ export class LoadingSplash {
       position: "fixed",
       inset: "0",
       zIndex: "30",
-      background: "rgba(20, 15, 25, 0.55)",
+      background: "radial-gradient(ellipse at center, rgba(15,11,18,0.10) 30%, rgba(15,11,18,0.52) 100%)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -167,7 +171,9 @@ export class LoadingSplash {
 
     const meta = document.createElement("div");
     meta.className = "hud-kicker";
-    meta.textContent = s.welcome;
+    meta.textContent = this.settings.lang === "en"
+      ? "Business Informatics · Kiel"
+      : "Wirtschaftsinformatik · Kiel";
     meta.style.marginBottom = "6px";
     left.appendChild(meta);
 
@@ -186,13 +192,11 @@ export class LoadingSplash {
     left.appendChild(name);
 
     const sub = document.createElement("div");
-    sub.textContent = this.settings.lang === "en"
-      ? "Business Informatics · Kiel"
-      : "Wirtschaftsinformatik · Kiel";
+    sub.textContent = s.tagline;
     Object.assign(sub.style, {
-      fontSize: "14px",
-      color: "var(--paper-muted)",
-      marginTop: "6px",
+      fontSize: "15px",
+      color: "var(--paper)",
+      marginTop: "8px",
     });
     left.appendChild(sub);
 
@@ -280,18 +284,35 @@ export class LoadingSplash {
     Object.assign(settingsWrap.style, {
       display: "flex",
       flexDirection: "column",
-      gap: "16px",
-      marginBottom: "24px",
+      gap: "14px",
+      marginBottom: "20px",
     });
     this.card.appendChild(settingsWrap);
 
     settingsWrap.appendChild(this._buildLangSection());
     settingsWrap.appendChild(this._hairline());
     settingsWrap.appendChild(this._buildVolumeSection());
+
+    // Grafik + Renderer sind Power-User-Optionen — eingeklappt, damit der
+    // Start-Moment im Fokus bleibt. SettingsPanel im Spiel hat sie auch.
+    const more = document.createElement("details");
+    const sum = document.createElement("summary");
+    sum.className = "hud-kicker";
+    sum.textContent = s.more;
+    Object.assign(sum.style, { cursor: "pointer", listStyle: "none" });
+    more.appendChild(sum);
+    const moreInner = document.createElement("div");
+    Object.assign(moreInner.style, {
+      display: "flex",
+      flexDirection: "column",
+      gap: "14px",
+      marginTop: "14px",
+    });
+    moreInner.appendChild(this._buildGraphicsSection());
+    moreInner.appendChild(this._buildRendererSection());
+    more.appendChild(moreInner);
     settingsWrap.appendChild(this._hairline());
-    settingsWrap.appendChild(this._buildGraphicsSection());
-    settingsWrap.appendChild(this._hairline());
-    settingsWrap.appendChild(this._buildRendererSection());
+    settingsWrap.appendChild(more);
 
     const btn = document.createElement("button");
     btn.type = "button";
