@@ -1,14 +1,18 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <!-- Background — dunkles abgerundetes Quadrat passend zum Portfolio-Look -->
-  <rect width="64" height="64" rx="14" fill="#04060e"/>
-  <!-- Akzent-Strich oben links für etwas Charakter -->
-  <rect x="10" y="10" width="20" height="3" rx="1.5" fill="#7ec8ff"/>
-  <!-- Monogramm "NY" in JetBrains-Mono-Style -->
-  <text x="32" y="46"
-        font-family="'JetBrains Mono', 'SF Mono', 'Consolas', monospace"
-        font-weight="700"
-        font-size="30"
-        fill="#f0f5fa"
-        text-anchor="middle"
-        letter-spacing="-1">NY</text>
+  <!-- Warmes Aubergine-Quadrat — gleiche Fläche wie das UI (--ink → --surface) -->
+  <defs>
+    <radialGradient id="bg" cx="0.25" cy="0.2" r="1.1">
+      <stop offset="0" stop-color="#2b2333"/>
+      <stop offset="1" stop-color="#1d1721"/>
+    </radialGradient>
+  </defs>
+  <rect width="64" height="64" rx="15" fill="url(#bg)"/>
+
+  <!-- "N"-Monogramm mit runden Kappen — freundlich, liest sich bei 16px -->
+  <path d="M 20 46 L 20 19 L 44 46 L 44 18"
+        fill="none" stroke="#ffceca" stroke-width="7"
+        stroke-linecap="round" stroke-linejoin="round"/>
+
+  <!-- Signal-Punkt — das Easter-Egg-Gen der Seite -->
+  <circle cx="51" cy="50" r="4" fill="#d5ff95"/>
 </svg>

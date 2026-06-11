@@ -22,6 +22,7 @@ import { Ui } from "./ui/Ui.js";
 import { AudioManager } from "./core/AudioManager.js";
 import { Debug } from "./core/Debug.js";
 import { LoadingSplash } from "./ui/LoadingSplash.js";
+import { BootReveal } from "./world/BootReveal.js";
 
 export class Game {
   // Singleton-Helper
@@ -69,9 +70,9 @@ export class Game {
     this.scene = new THREE.Scene();
     this.cameraRig = new CameraRig(this);
 
-    // Intro-Inszenierung: nächtliche Welt, Spotlight auf dem Bike-Spawn,
-    // enge Kamera-Kreisfahrt — der Ladescreen ist eine Bühne, kein Formular.
-    // Bei reduced-motion bleibt alles statisch und hell.
+    // Intro-Inszenierung: enge Kamera-Kreisfahrt um den Spawn-Kreis —
+    // der Ladescreen ist eine Bühne, kein Formular. Bei reduced-motion
+    // bleibt alles statisch.
     this._reducedMotion = typeof window !== "undefined"
       && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
     if (!this._reducedMotion) {
@@ -88,18 +89,12 @@ export class Game {
     // Welt-Inhalt
     this.world = new World(this);
 
-    // Intro-Bühne: Welt startet in der Nacht, ein warmer Spot steht auf
-    // dem Spawn. Beim Start-Klick geht die Sonne auf (transitionTo unten).
+    // Boot-Bühne: 3D-Skeleton-Screen — die Welt existiert nur in einem
+    // leuchtenden Kreis um den Spawn, außenrum Blueprint-Gitter. Der
+    // Ring füllt sich mit dem Lade-Fortschritt, beim Klick expandiert
+    // die Welt (BootReveal.reveal()). Tageslicht von Anfang an.
     if (!this._reducedMotion) {
-      this.world.dayCycle?.transitionTo?.(0.5, 0.1, false);
-      const SPAWN = [-4.38, 0.5, 16.63];
-      this._introSpot = new THREE.SpotLight(0xffe8c8, 90, 34, 0.46, 0.7, 1.5);
-      this._introSpot.position.set(SPAWN[0] + 3, SPAWN[1] + 12, SPAWN[2] + 3);
-      this._introSpotTarget = new THREE.Object3D();
-      this._introSpotTarget.position.set(SPAWN[0], SPAWN[1], SPAWN[2]);
-      this.scene.add(this._introSpotTarget);
-      this._introSpot.target = this._introSpotTarget;
-      this.scene.add(this._introSpot);
+      this.bootReveal = new BootReveal(this);
     }
 
     // UI-Overlays (HUD, MiniMap, Settings, InfoCard, DiscoveryHud)
@@ -160,10 +155,12 @@ export class Game {
       const displayName = lang === "en" ? name : (RES_NAME_DE[name] || name);
       const msg = lang === "en" ? `Loading ${displayName}` : `Lädt ${displayName}`;
       this.splash.setProgress(ratio, msg);
+      this.bootReveal?.setProgress?.(ratio);
     });
 
     res.on?.("ready", () => {
       this.splash.setProgress(1, this.splash._strings?.()?.ready || "Ready");
+      this.bootReveal?.setProgress?.(1);
       this.splash.markReady();
     });
 
@@ -184,17 +181,16 @@ export class Game {
         this.cameraRig.followMode = true;
         showOverlay();
       } else {
-        // Sonnenaufgang: die Nacht-Bühne blendet in den Tag, dann läuft
-        // der Auto-Cycle weiter. Der Spot dimmt parallel weg.
-        this.world?.dayCycle?.transitionTo?.(0, 3.2, true);
-        this._introSpotFading = true;
+        // Welt aufdecken: Gras-Radius expandiert, Gebäude poppen rein,
+        // Ring + Blueprint blenden aus.
+        this.bootReveal?.reveal();
 
         // Bike-Drop: kurz anheben, Physik lässt es einfedern während die
         // Kamera anfliegt. Nur wenn der Body schon existiert.
         const body = this.world?.player?.body;
         if (body) {
           const t = body.translation();
-          body.setTranslation({ x: t.x, y: t.y + 5, z: t.z }, true);
+          body.setTranslation({ x: t.x, y: t.y + 4, z: t.z }, true);
           body.setLinvel({ x: 0, y: 0, z: 0 }, true);
         }
         this.cameraRig.endIntroOrbit(showOverlay);
@@ -284,21 +280,12 @@ export class Game {
   }
 
   update() {
-    // Intro-Spot weich ausdimmen sobald der User gestartet hat
-    if (this._introSpotFading && this._introSpot) {
-      this._introSpot.intensity *= 0.94;
-      if (this._introSpot.intensity < 0.5) {
-        this.scene.remove(this._introSpot);
-        this.scene.remove(this._introSpotTarget);
-        this._introSpot.dispose?.();
-        this._introSpot = null;
-        this._introSpotFading = false;
-      }
-    }
-
-    // Reihenfolge: Inputs (passive) → Physics → World → Camera → Render → UI → Audio
+    // Reihenfolge: Inputs (passive) → Physics → World → BootReveal →
+    // Camera → Render → UI → Audio. BootReveal NACH world, damit es
+    // Background/Sichtbarkeit nach dem DayCycle-Write übersteuern kann.
     if (this.physics?.update) this.physics.update();
     if (this.world?.update) this.world.update();
+    if (this.bootReveal?.update) this.bootReveal.update();
     if (this.cameraRig?.update) this.cameraRig.update();
     this.renderer.render(this.scene, this.cameraRig.camera);
     if (this.ui?.update) this.ui.update();
@@ -310,6 +297,7 @@ export class Game {
     this.time?.destroy?.();
     this.sizes?.destroy?.();
     this.inputs?.destroy?.();
+    this.bootReveal?.destroy?.();
     this.world?.destroy?.();
     this.physics?.destroy?.();
     this.renderer?.destroy?.();

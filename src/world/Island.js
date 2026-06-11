@@ -37,6 +37,15 @@ export class Island {
 
     this._traverse();
 
+    // Baum-Spots auf den Boden setzen: die Trunk-Node-Origins liegen
+    // mittig im Stamm (~1m über Grund) — ohne Korrektur schweben die
+    // prozeduralen Bäume. Terrain ist nach _traverse() bekannt.
+    if (this.terrainMesh && this.treeSpots.length) {
+      for (const s of this.treeSpots) {
+        s.y = this._sampleTerrainY(s.x, s.z);
+      }
+    }
+
     // Visual zur Scene hinzufügen
     // Terrain cast't keine Shadow (riesige Mesh, kein optisch sichtbarer
     // Schatten unter sich) — spart unter WebGPU einen kompletten Pass.

@@ -1,60 +1,150 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630"
-                  viewBox="0 0 1200 630">
-  <rect width="1200" height="630" fill="#101218" />
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <defs>
+    <radialGradient id="bg" cx="0.22" cy="0.18" r="1.25">
+      <stop offset="0" stop-color="#2b2333"/>
+      <stop offset="1" stop-color="#171219"/>
+    </radialGradient>
+    <radialGradient id="pool" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#3b4a2c"/>
+      <stop offset="0.85" stop-color="#2c3a20"/>
+      <stop offset="1" stop-color="#243018"/>
+    </radialGradient>
+    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
+      <feGaussianBlur stdDeviation="10" result="b"/>
+      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
 
-  <!-- Frame: 4 Corner-Brackets, 48px Inset -->
-  <path d="M 48 74 L 48 48 L 74 48"
-                fill="none" stroke="rgba(241,239,234,0.40)" stroke-width="2" />
-  <path d="M 1152 74 L 1152 48 L 1126 48"
-                fill="none" stroke="rgba(241,239,234,0.40)" stroke-width="2" />
-  <path d="M 48 556 L 48 582 L 74 582"
-                fill="none" stroke="rgba(241,239,234,0.40)" stroke-width="2" />
-  <path d="M 1152 556 L 1152 582 L 1126 582"
-                fill="none" stroke="rgba(241,239,234,0.40)" stroke-width="2" />
+  <rect width="1200" height="630" fill="url(#bg)"/>
+  <path d="M 43 43 L 53 53 M 53 43 L 43 53"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 139 43 L 149 53 M 149 43 L 139 53"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 235 43 L 245 53 M 245 43 L 235 53"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 331 43 L 341 53 M 341 43 L 331 53"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 427 43 L 437 53 M 437 43 L 427 53"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 523 43 L 533 53 M 533 43 L 523 53"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 619 43 L 629 53 M 629 43 L 619 53"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 715 43 L 725 53 M 725 43 L 715 53"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 811 43 L 821 53 M 821 43 L 811 53"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 907 43 L 917 53 M 917 43 L 907 53"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 1003 43 L 1013 53 M 1013 43 L 1003 53"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 1099 43 L 1109 53 M 1109 43 L 1099 53"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 43 139 L 53 149 M 53 139 L 43 149"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 139 139 L 149 149 M 149 139 L 139 149"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 235 139 L 245 149 M 245 139 L 235 149"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 331 139 L 341 149 M 341 139 L 331 149"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 427 139 L 437 149 M 437 139 L 427 149"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 523 139 L 533 149 M 533 139 L 523 149"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 619 139 L 629 149 M 629 139 L 619 149"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 715 139 L 725 149 M 725 139 L 715 149"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 811 139 L 821 149 M 821 139 L 811 149"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 907 139 L 917 149 M 917 139 L 907 149"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 1003 139 L 1013 149 M 1013 139 L 1003 149"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 1099 139 L 1109 149 M 1109 139 L 1099 149"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 43 235 L 53 245 M 53 235 L 43 245"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 139 235 L 149 245 M 149 235 L 139 245"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 235 235 L 245 245 M 245 235 L 235 245"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 331 235 L 341 245 M 341 235 L 331 245"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 427 235 L 437 245 M 437 235 L 427 245"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 523 235 L 533 245 M 533 235 L 523 245"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 619 235 L 629 245 M 629 235 L 619 245"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 715 235 L 725 245 M 725 235 L 715 245"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 811 235 L 821 245 M 821 235 L 811 245"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 907 235 L 917 245 M 917 235 L 907 245"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 1003 235 L 1013 245 M 1013 235 L 1003 245"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 1099 235 L 1109 245 M 1109 235 L 1099 245"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 43 331 L 53 341 M 53 331 L 43 341"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 139 331 L 149 341 M 149 331 L 139 341"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 235 331 L 245 341 M 245 331 L 235 341"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 331 331 L 341 341 M 341 331 L 331 341"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 427 331 L 437 341 M 437 331 L 427 341"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 523 331 L 533 341 M 533 331 L 523 341"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 619 331 L 629 341 M 629 331 L 619 341"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 715 331 L 725 341 M 725 331 L 715 341"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 811 331 L 821 341 M 821 331 L 811 341"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 907 331 L 917 341 M 917 331 L 907 341"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 1003 331 L 1013 341 M 1013 331 L 1003 341"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 1099 331 L 1109 341 M 1109 331 L 1099 341"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 43 427 L 53 437 M 53 427 L 43 437"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 139 427 L 149 437 M 149 427 L 139 437"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 235 427 L 245 437 M 245 427 L 235 437"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 331 427 L 341 437 M 341 427 L 331 437"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 427 427 L 437 437 M 437 427 L 427 437"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 523 427 L 533 437 M 533 427 L 523 437"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 619 427 L 629 437 M 629 427 L 619 437"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 715 427 L 725 437 M 725 427 L 715 437"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 811 427 L 821 437 M 821 427 L 811 437"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 907 427 L 917 437 M 917 427 L 907 437"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 1003 427 L 1013 437 M 1013 427 L 1003 437"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 1099 427 L 1109 437 M 1109 427 L 1099 437"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 43 523 L 53 533 M 53 523 L 43 533"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 139 523 L 149 533 M 149 523 L 139 533"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 235 523 L 245 533 M 245 523 L 235 533"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 331 523 L 341 533 M 341 523 L 331 533"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 427 523 L 437 533 M 437 523 L 427 533"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 523 523 L 533 533 M 533 523 L 523 533"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 619 523 L 629 533 M 629 523 L 619 533"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 715 523 L 725 533 M 725 523 L 715 533"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 811 523 L 821 533 M 821 523 L 811 533"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 907 523 L 917 533 M 917 523 L 907 533"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 1003 523 L 1013 533 M 1013 523 L 1003 533"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 1099 523 L 1109 533 M 1109 523 L 1099 533"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 43 619 L 53 629 M 53 619 L 43 629"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 139 619 L 149 629 M 149 619 L 139 629"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 235 619 L 245 629 M 245 619 L 235 629"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 331 619 L 341 629 M 341 619 L 331 629"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 427 619 L 437 629 M 437 619 L 427 629"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 523 619 L 533 629 M 533 619 L 523 629"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 619 619 L 629 629 M 629 619 L 619 629"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 715 619 L 725 629 M 725 619 L 715 629"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 811 619 L 821 629 M 821 619 L 811 629"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 907 619 L 917 629 M 917 619 L 907 629"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 1003 619 L 1013 629 M 1013 619 L 1003 629"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/><path d="M 1099 619 L 1109 629 M 1109 619 L 1099 629"
+                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/>
 
-  <!-- TOP ROW: domain (links), status-marker mit signal-caret (rechts) -->
-  <text x="80" y="108" font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="22"
-        fill="#a59f96" letter-spacing="0.02em">
-    // numan-yesil.com
-  </text>
-  <text x="1120" y="108" font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="20"
-        fill="#f1efea" text-anchor="end" letter-spacing="0.08em">
-    <tspan fill="#ff5a3c">▌</tspan><tspan dx="6">3D PORTFOLIO</tspan>
-  </text>
+  <!-- Reveal-Kreis rechts: Gras-Insel-Ausschnitt + leuchtender Ring + Bike -->
+  <circle cx="920" cy="330" r="190" fill="url(#pool)"/>
+  <circle cx="920" cy="330" r="190" fill="none"
+          stroke="#ffceca" stroke-width="6" filter="url(#glow)"/>
 
-  <line x1="80" y1="148" x2="1120" y2="148"
-        stroke="rgba(241,239,234,0.18)" stroke-width="1" />
-
-  <!-- CENTER: Italic-Mono Display Headline, zwei Zeilen.
-       Erste Zeile = Verb-Trilogie, "find." in Signal-Coral als Hierarchie-
-       Endpunkt. Zweite Zeile in muted Paper, ruhiger Statement-Closer.
-       dx="0.5em" gibt einen sauberen Space zwischen "click." und "find."
-       (librsvg kollabiert sonst den literal-Space zwischen tspans). -->
-  <text x="80" y="290" font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="78"
-        font-style="italic" fill="#f1efea" letter-spacing="-0.02em"
-    ><tspan>ride. click.</tspan><tspan fill="#ff5a3c" dx="0.5em">find.</tspan></text>
-  <text x="80" y="378" font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="78"
-        font-style="italic" fill="#a59f96" letter-spacing="-0.02em">
-    this is my portfolio.
-  </text>
-
-  <line x1="80" y1="448" x2="1120" y2="448"
-        stroke="rgba(241,239,234,0.18)" stroke-width="1" />
-
-  <!-- BOTTOM-RIGHT: Author. Bottom-left bewusst leer — Asymmetrie ist
-       brutalist-konform und der Author bekommt mehr visuelles Gewicht. -->
-  <g transform="translate(1120 510)" text-anchor="end">
-    <text font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="22" fill="#f1efea"
-          letter-spacing="-0.01em" font-weight="bold">
-      NUMAN YESIL
-    </text>
-    <text y="28" font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="14"
-          fill="#a59f96" letter-spacing="0.03em">
-      wirtschaftsinformatik · haw kiel
-    </text>
-    <text y="52" font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="13"
-          fill="#736f68" letter-spacing="0.03em">
-      github.com/numan7272
-    </text>
+  <!-- Bike-Piktogramm (Strich-Stil, runde Kappen) -->
+  <g transform="translate(825 280) scale(1.05)"
+     stroke="rgba(255,255,255,0.94)" stroke-width="7" fill="none"
+     stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="40" cy="105" r="36"/>
+    <circle cx="150" cy="105" r="36"/>
+    <path d="M 40 105 L 76 45 L 128 45 L 150 105"/>
+    <path d="M 76 45 L 102 105 L 40 105"/>
+    <path d="M 70 32 L 86 32"/>
+    <path d="M 128 45 L 120 24 L 136 21"/>
   </g>
+
+  <!-- Gras-Büschel am Ring-Boden -->
+  <g stroke="#d5ff95" stroke-width="4" stroke-linecap="round" opacity="0.8">
+    <path d="M 790 450 q -4 -18 2 -28" fill="none"/>
+    <path d="M 802 452 q 2 -16 8 -22" fill="none"/>
+    <path d="M 1030 442 q -2 -18 4 -26" fill="none"/>
+    <path d="M 1044 438 q 4 -14 10 -18" fill="none"/>
+  </g>
+
+  <!-- Links: Kicker, Name, Tagline, Meta -->
+  <text x="84" y="150" font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="22" fill="rgba(255,255,255,0.42)"
+        letter-spacing="0.04em">// numan-yesil.com</text>
+
+  <text x="80" y="305" font-family="'Amatic SC'" font-weight="700"
+        font-size="150" fill="rgba(255,255,255,0.94)">Numan Yesil</text>
+
+  <text x="84" y="375" font-family="'Nunito','DejaVu Sans',sans-serif" font-weight="700" font-size="33"
+        fill="#ffceca">Eine Insel. Ein Fahrrad. Mein Werdegang.</text>
+
+  <text x="84" y="430" font-family="'Nunito','DejaVu Sans',sans-serif" font-size="24" fill="rgba(255,255,255,0.66)">
+    Fahr durch mein interaktives 3D-Portfolio.
+  </text>
+
+  <text x="84" y="540" font-family="'Nunito','DejaVu Sans',sans-serif" font-weight="700" font-size="22" fill="rgba(255,255,255,0.94)">
+    Wirtschaftsinformatik · HAW Kiel
+  </text>
+  <text x="84" y="572" font-family="'DejaVu Sans Mono','Liberation Mono',monospace" font-size="17" fill="rgba(255,255,255,0.42)">
+    github.com/numan7272 · Three.js + WebGPU + Rapier
+  </text>
 </svg>
