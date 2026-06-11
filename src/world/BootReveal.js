@@ -1,36 +1,41 @@
 /**
- * BootReveal — 3D-Skeleton-Screen für den Lade-Moment.
+ * BootReveal — 3D-Skeleton-Screen mit radialem "Sturm"-Clip.
  *
- * Während des Ladens existiert die Welt nur in einem kleinen Kreis um
- * den Bike-Spawn: ein Gras-Teppich (Grass-Shader mit mapRadius=4.4),
- * eine Plattform-Scheibe und das Bike. Außenrum liegt eine Blueprint-
- * Fläche (Architekten-Plane: Gitter + Kreuzchen, CanvasTexture). Der
- * Kreisrand ist ein leuchtender Ring, der als Fortschrittsbogen füllt
- * (geometry.drawRange — funktioniert unter WebGL und WebGPU identisch).
+ * Unter WebGL (Default-Renderer) wird in alle Welt-Materialien per
+ * onBeforeCompile ein radialer Fragment-Discard injiziert: alles
+ * außerhalb des Reveal-Kreises um den Spawn verschwindet — Gebäude,
+ * Bäume und Straße werden an der Kreiskante ABGESCHNITTEN (der
+ * Fortnite-Sturm-Effekt). Der Kreis ist so groß wie der In-World-
+ * Joystick-Ring (~2.4m), das HQ ragt also angeschnitten hinein.
  *
- * Beim Start (reveal()):
- *   - Gras-Radius expandiert 4.4 → 46 (Back-Ease, leichter Overshoot)
- *   - Welt wird sichtbar, Gebäude poppen gestaffelt rein (Scale-Pop
- *     um ihren eigenen Ursprung)
- *   - Ring skaliert auf und blendet aus, Blueprint-Boden blendet aus
- *   - Fog + Himmel kehren zurück
+ * Drumherum: Blueprint-Fläche (Gitter + Kreuzchen), der Kreisrand ist
+ * ein dezent leuchtender Ring, der sich als Fortschrittsbogen füllt
+ * (geometry.drawRange) und bei "bereit" pulsiert. Beim Start-Klick
+ * expandiert der Clip-Radius über die ganze Insel, der Ring wächst
+ * synchron mit und verblasst, das Blueprint blendet aus.
  *
- * Kein custom Shader, keine Tween-Library — kleine eigene Tween-Liste.
+ * Unter WebGPU (onBeforeCompile greift dort nicht) Fallback: Welt
+ * komplett versteckt, Plattform-Scheibe im Kreis, Gebäude-Scale-Pop
+ * beim Reveal.
  */
 
 import * as THREE from "three";
 
 const SPAWN = [-4.38, 0.12, 16.63];
-const CIRCLE_R = 4.4;
-const RING_COLOR = new THREE.Color(1.55, 1.22, 1.16);  // Peach, >1 → bloomt dezent
-const BLUEPRINT_BG = 0x171219;
+const CIRCLE_R = 2.6;          // ≈ Joystick-Ring (2.4m) + schmaler Rand
+const REVEAL_MAX = 130;        // Radius der die ganze Insel abdeckt
+const RING_COLOR = new THREE.Color(1.28, 1.12, 0.86);   // Sand, dezent
+const BLUEPRINT_BG = 0x0f1a19;
 
-function easeBackOut(t, s = 1.4) {
-  const u = t - 1;
-  return 1 + u * u * ((s + 1) * u + s);
-}
 function easeCubicOut(t) {
   return 1 - Math.pow(1 - t, 3);
+}
+function easeCubicIn(t) {
+  return t * t * t;
+}
+function easeBackOut(t, s = 1.5) {
+  const u = t - 1;
+  return 1 + u * u * ((s + 1) * u + s);
 }
 
 function buildBlueprintTexture() {
@@ -39,16 +44,14 @@ function buildBlueprintTexture() {
   c.width = S;
   c.height = S;
   const ctx = c.getContext("2d");
-  ctx.fillStyle = "#241d2c";
+  ctx.fillStyle = "#182723";
   ctx.fillRect(0, 0, S, S);
-  // Feines Gitter
   ctx.strokeStyle = "rgba(255,255,255,0.10)";
   ctx.lineWidth = 1;
   ctx.beginPath();
   ctx.moveTo(0.5, 0); ctx.lineTo(0.5, S);
   ctx.moveTo(0, 0.5); ctx.lineTo(S, 0.5);
   ctx.stroke();
-  // Kreuzchen in der Zellmitte
   ctx.strokeStyle = "rgba(255,255,255,0.17)";
   ctx.lineWidth = 2;
   const m = S / 2, a = 7;
@@ -58,7 +61,7 @@ function buildBlueprintTexture() {
   ctx.stroke();
   const tex = new THREE.CanvasTexture(c);
   tex.wrapS = tex.wrapT = THREE.RepeatWrapping;
-  tex.repeat.set(100, 100);   // 1 Zelle ≈ 4m bei 400m Plane
+  tex.repeat.set(100, 100);
   tex.colorSpace = THREE.SRGBColorSpace;
   return tex;
 }
@@ -71,7 +74,13 @@ export class BootReveal {
     this._progress = 0;
     this._revealing = false;
     this._tweens = [];
-    this._savedFog = null;
+    this._clipMode = false;     // true = WebGL-Sturm-Clip aktiv
+
+    // Geteilte Uniforms für alle injizierten Materialien — EIN Update
+    // trifft die ganze Welt.
+    this._uRevealR  = { value: CIRCLE_R };
+    this._uRevealC  = { value: new THREE.Vector2(SPAWN[0], SPAWN[2]) };
+    this._uRevealOn = { value: 1 };
 
     // ── Blueprint-Boden ──
     this._floorTex = buildBlueprintTexture();
@@ -86,7 +95,8 @@ export class BootReveal {
     this._floor.renderOrder = -50;
     this.scene.add(this._floor);
 
-    // ── Plattform-Scheibe im Kreis ──
+    // ── Plattform-Scheibe (nur WebGPU-Fallback nötig — unter WebGL ist
+    // das echte Terrain im Kreis sichtbar) ──
     this._discMat = new THREE.MeshStandardMaterial({
       color: 0x2c3a20,
       roughness: 0.95,
@@ -96,12 +106,11 @@ export class BootReveal {
     this._disc.rotation.x = -Math.PI / 2;
     this._disc.position.set(SPAWN[0], 0.01, SPAWN[2]);
     this._disc.receiveShadow = true;
+    this._disc.visible = false;
     this.scene.add(this._disc);
 
-    // ── Leucht-Ring als Fortschrittsbogen ──
-    // TorusGeometry-Indices laufen entlang der tubularen Segmente —
-    // drawRange schneidet daraus einen sauberen Bogen.
-    this._ringGeo = new THREE.TorusGeometry(CIRCLE_R + 0.12, 0.05, 8, 128);
+    // ── Leucht-Ring (Fortschrittsbogen via drawRange) ──
+    this._ringGeo = new THREE.TorusGeometry(CIRCLE_R + 0.08, 0.035, 8, 128);
     this._ringMat = new THREE.MeshBasicMaterial({
       color: RING_COLOR,
       toneMapped: false,
@@ -110,20 +119,16 @@ export class BootReveal {
     });
     this._ring = new THREE.Mesh(this._ringGeo, this._ringMat);
     this._ring.rotation.x = -Math.PI / 2;
-    this._ring.position.set(SPAWN[0], 0.06, SPAWN[2]);
+    this._ring.position.set(SPAWN[0], 0.07, SPAWN[2]);
     this._ringIndexCount = this._ringGeo.index.count;
     this._ringGeo.setDrawRange(0, 0);
     this.scene.add(this._ring);
 
-    // Welt-Teile verstecken sobald sie gebaut sind
-    const res = this.game.world?.resources;
-    res?.on?.("ready", () => {
-      // World's eigener ready-Handler lief zuerst (Registrierungs-
-      // Reihenfolge) — die Module existieren jetzt.
-      this._applyWorldHidden();
-    });
+    // Welt-Setup sobald gebaut (World registriert seinen ready-Handler
+    // zuerst — die Module existieren wenn wir dran sind)
+    this.game.world?.resources?.on?.("ready", () => this._setupStage());
 
-    // Fog aus (DayCycle überspringt fog-Updates wenn scene.fog null ist)
+    // Fog aus während des Boots
     this._savedFog = this.scene.fog;
     this.scene.fog = null;
   }
@@ -133,94 +138,188 @@ export class BootReveal {
     this._progress = Math.max(this._progress, Math.min(1, ratio));
   }
 
-  _worldPieces() {
+  /** Radialer Fragment-Clip per onBeforeCompile (nur WebGL). */
+  _injectClip(mat) {
+    if (!mat || mat.userData._revealClipped) return;
+    mat.userData._revealClipped = true;
+    const prev = mat.onBeforeCompile;
+    mat.onBeforeCompile = (shader, renderer) => {
+      prev?.(shader, renderer);
+      shader.uniforms.uRevealR = this._uRevealR;
+      shader.uniforms.uRevealC = this._uRevealC;
+      shader.uniforms.uRevealOn = this._uRevealOn;
+      shader.vertexShader = shader.vertexShader
+        .replace("#include <common>", "#include <common>\nvarying vec2 vRevealW;")
+        .replace("#include <project_vertex>",
+          "#include <project_vertex>\n  vRevealW = (modelMatrix * vec4(transformed, 1.0)).xz;");
+      shader.fragmentShader = shader.fragmentShader
+        .replace("#include <common>",
+          "#include <common>\nvarying vec2 vRevealW;\nuniform float uRevealR;\nuniform vec2 uRevealC;\nuniform float uRevealOn;")
+        .replace("#include <clipping_planes_fragment>",
+          "#include <clipping_planes_fragment>\n  if (uRevealOn > 0.5 && distance(vRevealW, uRevealC) > uRevealR) discard;");
+    };
+    mat.needsUpdate = true;
+  }
+
+  _collectClipMaterials() {
     const w = this.game.world;
-    const n = w?.nature;
+    const mats = new Set();
+    const grab = (root) => {
+      root?.traverse?.((o) => {
+        if (!o.isMesh) return;
+        const list = Array.isArray(o.material) ? o.material : [o.material];
+        for (const m of list) if (m) mats.add(m);
+      });
+    };
+    grab(w?.island?.root);
+    grab(w?.road?.group);
+    grab(w?.streetLamps?.group);
+    for (const m of [w?.nature?.trunkMesh, w?.nature?.blobMesh, w?.nature?.leafMesh]) {
+      if (m?.material) mats.add(m.material);
+    }
+    return mats;
+  }
+
+  /** Bühne aufbauen, sobald die Welt-Module existieren. */
+  _setupStage() {
+    if (!this.active || this._revealing) return;
+    this._clipMode = this.game.renderer?.mode === "webgl";
+
+    if (this._clipMode) {
+      // Sturm-Clip: Welt bleibt sichtbar, alles außerhalb des Kreises
+      // wird im Fragment-Shader weggeschnitten — das HQ ragt angeschnitten
+      // in den Kreis wie bei einem echten Reveal.
+      for (const m of this._collectClipMaterials()) this._injectClip(m);
+    } else {
+      // WebGPU-Fallback: Scheibe zeigen, Welt verstecken (Pop-in später)
+      this._disc.visible = true;
+    }
+    this._applyBootState();
+  }
+
+  _alwaysHidden() {
+    const w = this.game.world;
     return [
-      w?.island?.root,
       w?.ocean?.mesh,
       w?.sky?.mesh,
-      w?.road?.group,
-      w?.streetLamps?.group,
-      n?.trunkMesh, n?.blobMesh, n?.leafMesh, n?.moteMesh,
+      w?.nature?.moteMesh,
       ...(w?.stationLabels?.labels?.map((l) => l.sprite) || []),
     ].filter(Boolean);
   }
 
-  _applyWorldHidden() {
-    if (!this.active || this._revealing) return;
-    for (const obj of this._worldPieces()) obj.visible = false;
-    // Gras nur im Kreis
-    this.game.world?.grass?.material?.userData?.adapter?.setMapRadius?.(CIRCLE_R);
+  _fallbackHidden() {
+    const w = this.game.world;
+    const n = w?.nature;
+    return [
+      w?.island?.root,
+      w?.road?.group,
+      w?.streetLamps?.group,
+      n?.trunkMesh, n?.blobMesh, n?.leafMesh,
+    ].filter(Boolean);
   }
 
-  /** Start-Klick: Welt aufdecken. */
+  _applyBootState() {
+    if (!this.active || this._revealing) return;
+    for (const obj of this._alwaysHidden()) obj.visible = false;
+    if (!this._clipMode) {
+      for (const obj of this._fallbackHidden()) obj.visible = false;
+    }
+    // Gras nur im Spawn-Kreis
+    const a = this.game.world?.grass?.material?.userData?.adapter;
+    a?.setMapCenter?.(SPAWN[0], SPAWN[2]);
+    a?.setMapRadius?.(CIRCLE_R);
+  }
+
+  /** Start-Klick: Sturm zieht auf, Welt erscheint. */
   reveal() {
     if (!this.active || this._revealing) return;
     this._revealing = true;
 
     const w = this.game.world;
-
-    // Fog + Himmel zurück
     if (this._savedFog) this.scene.fog = this._savedFog;
+    for (const obj of this._alwaysHidden()) obj.visible = true;
 
-    // Welt sichtbar
-    for (const obj of this._worldPieces()) obj.visible = true;
-
-    // Gebäude-Pop: jede *_Root-Node skaliert gestaffelt von 0 hoch
-    const roots = [];
-    w?.island?.root?.traverse?.((o) => {
-      if (o.name?.endsWith("_Root")) roots.push(o);
-    });
-    roots.forEach((node, i) => {
-      node.scale.setScalar(0.001);
-      this._tweens.push({
-        delay: 0.25 + i * 0.12,
-        dur: 0.55,
-        ease: (t) => easeBackOut(t, 1.7),
-        apply: (v) => node.scale.setScalar(Math.max(0.001, v)),
-        from: 0.001,
-        to: 1,
-      });
-    });
-
-    // Gras-Radius expandiert
     const grassAdapter = w?.grass?.material?.userData?.adapter;
-    if (grassAdapter?.setMapRadius) {
+
+    if (this._clipMode) {
+      // Clip-Radius über die Insel expandieren — Ring wächst synchron mit
+      this._tweens.push({
+        delay: 0.05,
+        dur: 2.1,
+        ease: easeCubicIn,
+        from: CIRCLE_R,
+        to: REVEAL_MAX,
+        apply: (v, t) => {
+          this._uRevealR.value = v;
+          this._ring.scale.setScalar(v / (CIRCLE_R + 0.08));
+          this._ringMat.opacity = 1 - easeCubicOut(t);
+          // Gras synchron zum Sturm freigeben (Cull-Kreis = Clip-Kreis,
+          // gedeckelt auf den Insel-Radius)
+          const gr = Math.min(46, v);
+          grassAdapter?.setMapRadius?.(gr);
+          const blend = Math.min(1, (v - CIRCLE_R) / 40);
+          grassAdapter?.setMapCenter?.(SPAWN[0] * (1 - blend), SPAWN[2] * (1 - blend));
+        },
+        onDone: () => {
+          this._uRevealOn.value = 0;
+          grassAdapter?.setMapRadius?.(46);
+          grassAdapter?.setMapCenter?.(0, 0);
+        },
+      });
+    } else {
+      // Fallback: Welt einblenden + Gebäude-Pop
+      for (const obj of this._fallbackHidden()) obj.visible = true;
+      const roots = [];
+      w?.island?.root?.traverse?.((o) => {
+        if (o.name?.endsWith("_Root")) roots.push(o);
+      });
+      roots.forEach((node, i) => {
+        node.scale.setScalar(0.001);
+        this._tweens.push({
+          delay: 0.25 + i * 0.12,
+          dur: 0.55,
+          ease: (t) => easeBackOut(t, 1.7),
+          from: 0.001,
+          to: 1,
+          apply: (v) => node.scale.setScalar(Math.max(0.001, v)),
+        });
+      });
       this._tweens.push({
         delay: 0.1,
         dur: 2.0,
         ease: easeBackOut,
-        apply: (v) => grassAdapter.setMapRadius(v),
         from: CIRCLE_R,
         to: 46,
+        apply: (v, t) => {
+          grassAdapter?.setMapRadius?.(v);
+          const blend = Math.min(1, t * 1.4);
+          grassAdapter?.setMapCenter?.(SPAWN[0] * (1 - blend), SPAWN[2] * (1 - blend));
+        },
+      });
+      this._tweens.push({
+        delay: 0,
+        dur: 1.4,
+        ease: easeCubicOut,
+        from: 0,
+        to: 1,
+        apply: (v) => {
+          this._ring.scale.setScalar(1 + v * 9);
+          this._ringMat.opacity = 1 - v;
+        },
       });
     }
 
-    // Ring: aufskalieren + ausblenden
-    this._tweens.push({
-      delay: 0,
-      dur: 1.4,
-      ease: easeCubicOut,
-      apply: (v) => {
-        this._ring.scale.setScalar(1 + v * 9);
-        this._ringMat.opacity = 1 - v;
-      },
-      from: 0,
-      to: 1,
-    });
-
     // Blueprint-Boden + Scheibe ausblenden
     this._tweens.push({
-      delay: 0.4,
-      dur: 1.2,
+      delay: 0.35,
+      dur: 1.3,
       ease: easeCubicOut,
+      from: 0,
+      to: 1,
       apply: (v) => {
         this._floorMat.opacity = 1 - v;
         this._discMat.opacity = 1 - v;
       },
-      from: 0,
-      to: 1,
       onDone: () => this._teardown(),
     });
   }
@@ -242,21 +341,20 @@ export class BootReveal {
     const dt = this.game.time?.delta || 0.016;
 
     if (!this._revealing) {
-      // Versteckt halten (Module bauen teils async nach, z.B. Ocean/Sky)
-      this._applyWorldHidden();
+      this._applyBootState();
 
-      // Background dunkel halten — DayCycle schreibt skyColorA pro Frame,
-      // wir überschreiben danach (BootReveal.update läuft nach world.update)
+      // Background dunkel halten (läuft NACH world.update → übersteuert
+      // den DayCycle-Write)
       if (this.scene.background?.isColor) {
         this.scene.background.setHex(BLUEPRINT_BG);
       }
 
-      // Fortschrittsbogen weich nachziehen + sanfter Puls wenn voll
+      // Fortschrittsbogen weich nachziehen, Puls wenn bereit
       const target = this._progress;
       this._shown = (this._shown ?? 0) + ((target - (this._shown ?? 0)) * Math.min(1, dt * 4));
       this._ringGeo.setDrawRange(0, Math.floor(this._ringIndexCount * this._shown));
       if (this._progress >= 1) {
-        const pulse = 0.85 + 0.15 * Math.sin((this.game.time?.elapsed || 0) * 2.6);
+        const pulse = 0.8 + 0.2 * Math.sin((this.game.time?.elapsed || 0) * 2.6);
         this._ringMat.opacity = pulse;
       }
       return;
@@ -268,7 +366,7 @@ export class BootReveal {
       tw.t = (tw.t ?? 0) + dt;
       const local = Math.min(1, Math.max(0, (tw.t - tw.delay) / tw.dur));
       if (local > 0) {
-        tw.apply(tw.from + (tw.to - tw.from) * tw.ease(local));
+        tw.apply(tw.from + (tw.to - tw.from) * tw.ease(local), local);
       }
       if (local >= 1) {
         this._tweens.splice(i, 1);

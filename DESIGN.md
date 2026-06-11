@@ -4,10 +4,11 @@
 
 ## Aesthetic Lane
 
-**Warm game-world chrome with a mono backbone.** The UI should feel like part
-of a hand-built game, not like a SaaS dashboard: warm dark surfaces, soft
-radii, a handwritten display face for big moments — while small labels,
-status lines and anything terminal-adjacent keep a strict monospace voice.
+**Baltic game-world chrome with a mono backbone ("Ostsee").** The UI should
+feel like part of a hand-built game, not like a SaaS dashboard: deep petrol
+surfaces (Kiel, Förde, island), warm sand accents, a handwritten display
+face for big moments — while small labels, status lines and anything
+terminal-adjacent keep a strict monospace voice.
 
 Anti-references: glassmorphism on HUD chrome, blue-on-dark "tech minimal",
 gradient text, pill-shaped skill chips, default-Bootstrap buttons.
@@ -16,17 +17,17 @@ gradient text, pill-shaped skill chips, default-Bootstrap buttons.
 
 | Token | Value | Use |
 |---|---|---|
-| `--ink` | `#1d1721` | base background (warm aubergine) |
-| `--ink-solid` | `rgba(29,23,33,.95)` | overlay background with alpha |
-| `--surface` | `radial-gradient(#251f2b → #1d1721)` | card/panel fill |
+| `--ink` | `#142120` | base background (deep petrol) |
+| `--ink-solid` | `rgba(20,33,32,.95)` | overlay background with alpha |
+| `--surface` | `radial-gradient(#1c2e2b → #142120)` | card/panel fill |
 | `--paper` | `rgba(255,255,255,.92)` | primary foreground |
 | `--paper-muted` | `rgba(255,255,255,.65)` | metadata, labels |
 | `--paper-dim` | `rgba(255,255,255,.42)` | de-emphasized text |
 | `--rule` | `rgba(255,255,255,.22)` | hairline borders |
 | `--rule-strong` | `rgba(255,255,255,.55)` | button borders, active rules |
-| `--signal` | `#ffceca` | warm peach: active state, CTA |
-| `--success` | `#d5ff95` | success states |
-| `--danger` | `#ff6a7c` | errors, destructive |
+| `--signal` | `#ffd28a` | warm sand/amber: active state, CTA |
+| `--success` | `#8fe3c0` | success states (seafoam) |
+| `--danger` | `#ff8576` | errors, destructive |
 
 Pure `#000`/`#fff` stay banned; white only ever appears with alpha.
 
@@ -36,8 +37,8 @@ Three voices, each with a job:
 
 | Face | Role | Where |
 |---|---|---|
-| **Nunito** (400/700/900, Google) | UI/body | buttons, body copy, panels |
-| **Amatic SC** (700, Google) | Display | names, panel titles, speed numeral, 3D station labels |
+| **Quicksand** (500/600/700, Google) | UI/body | buttons, body copy, panels |
+| **Caveat** (700, Google) | Display | names, panel titles, speed numeral, 3D station labels |
 | **Departure Mono** (self-hosted, OFL) → JetBrains Mono | Mono backbone | `.hud-kicker` labels, status lines, units, FPS, terminals, code |
 
 - `--font-ui`, `--font-display`, `--font-mono` in `:root`.

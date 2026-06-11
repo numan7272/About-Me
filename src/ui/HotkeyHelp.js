@@ -61,7 +61,7 @@ export class HotkeyHelp {
     Object.assign(this.overlay.style, {
       position: "fixed",
       inset: "0",
-      background: "rgba(20, 15, 25, 0.55)",
+      background: "rgba(10, 19, 18, 0.55)",
       zIndex: "15",
       display: "none",
       alignItems: "center",

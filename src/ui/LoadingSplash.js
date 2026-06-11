@@ -90,7 +90,7 @@ export class LoadingSplash {
       fontFamily: "var(--font-ui)",
       color: "var(--paper)",
       background:
-        "radial-gradient(ellipse at center, rgba(10,8,14,0) 35%, rgba(10,8,14,0.65) 100%)",
+        "radial-gradient(ellipse at center, rgba(7,14,13,0) 35%, rgba(7,14,13,0.65) 100%)",
       transition: "opacity 0.6s var(--ease)",
       opacity: "0",
       userSelect: "none",

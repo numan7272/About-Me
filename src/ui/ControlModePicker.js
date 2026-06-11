@@ -64,7 +64,7 @@ export class ControlModePicker {
     const root = document.createElement("div");
     root.style.cssText = `
       position: fixed; inset: 0; z-index: 9998;
-      background: rgba(20, 15, 25, 0.55);
+      background: rgba(10, 19, 18, 0.55);
       display: flex; align-items: center; justify-content: center;
       padding: 20px;
       opacity: 0;

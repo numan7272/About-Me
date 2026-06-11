@@ -306,7 +306,7 @@ export class WalkthroughController {
       position: "fixed",
       inset: "0",
       zIndex: "16",
-      background: "rgba(20, 15, 25, 0.55)",
+      background: "rgba(10, 19, 18, 0.55)",
       display: "flex",
       alignItems: "center",
       justifyContent: "center",

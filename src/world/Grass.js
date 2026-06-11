@@ -69,6 +69,7 @@ const VERTEX_SHADER = /* glsl */ `
   uniform vec2  uRoad[64];
   uniform float uRoadRadiusSq;
   uniform float uMapRadius;
+  uniform vec2  uMapCenter;
 
   uniform vec2  uPressPos;
   uniform float uPressStrength;
@@ -117,7 +118,8 @@ const VERTEX_SHADER = /* glsl */ `
 
     // ── Cull: Insel-Rand, Buildings, Road ──
     float hidden = 0.0;
-    if (dot(blade, blade) > uMapRadius * uMapRadius) hidden = 1.0;
+    vec2 mapRel = blade - uMapCenter;
+    if (dot(mapRel, mapRel) > uMapRadius * uMapRadius) hidden = 1.0;
     for (int i = 0; i < 5; i++) {
       vec2 d = uBuildings[i].xy - blade;
       if (dot(d, d) < uBuildings[i].z) hidden = 1.0;
@@ -302,6 +304,7 @@ function buildGrassMaterialGLSL(buildings, roadCurve) {
       uRoad:         { value: buildRoadArr(roadCurve) },
       uRoadRadiusSq: { value: 3.0 * 3.0 },
       uMapRadius:    { value: MAP_RADIUS },
+      uMapCenter:    { value: new THREE.Vector2(0, 0) },
       uPressPos:     { value: new THREE.Vector2(9999, 9999) },
       uPressStrength:{ value: 0 },
       uPressVel:     { value: new THREE.Vector2() },
@@ -323,6 +326,7 @@ function buildGrassMaterialGLSL(buildings, roadCurve) {
     setTime:        (t) => { u.uTime.value = t; },
     setViewCenter:  (cx, cz) => u.uViewCenter.value.set(cx, cz),
     setMapRadius:   (v) => { u.uMapRadius.value = v; },
+    setMapCenter:   (x, z) => u.uMapCenter.value.set(x, z),
     setTerrainY:    (v) => { u.uTerrainY.value = v; },
     setBikePos:     (x, z) => u.uBikePos.value.set(x, 0, z),
     setBladeHeight: (v) => { u.uBladeHeight.value = v; },
@@ -383,6 +387,7 @@ async function buildGrassMaterialTSL(buildings, roadCurve) {
   const uBladeWidth   = uniform(BLADE_WIDTH);
   const uBladeHeight  = uniform(BLADE_HEIGHT);
   const uMapRadius    = uniform(MAP_RADIUS);
+  const uMapCenter    = uniform(new THREE.Vector2(0, 0));
   const uRoadRadiusSq = uniform(3.0 * 3.0);
   const uPressPos     = uniform(new THREE.Vector2(9999, 9999));
   const uPressStrength = uniform(0);
@@ -435,7 +440,8 @@ async function buildGrassMaterialTSL(buildings, roadCurve) {
 
     // Cull
     const hidden = float(0).toVar();
-    If(dot(blade, blade).greaterThan(uMapRadius.mul(uMapRadius)), () => {
+    const mapRel = blade.sub(uMapCenter);
+    If(dot(mapRel, mapRel).greaterThan(uMapRadius.mul(uMapRadius)), () => {
       hidden.assign(1);
     });
     Loop({ start: 0, end: 5, type: "int" }, ({ i }) => {
@@ -532,6 +538,7 @@ async function buildGrassMaterialTSL(buildings, roadCurve) {
     setTime:        (t) => { uTime.value = t; },
     setViewCenter:  (cx, cz) => uViewCenter.value.set(cx, cz),
     setMapRadius:   (v) => { uMapRadius.value = v; },
+    setMapCenter:   (x, z) => uMapCenter.value.set(x, z),
     setTerrainY:    (v) => { uTerrainY.value = v; },
     setBikePos:     (x, z) => uBikePos.value.set(x, 0, z),
     setBladeHeight: (v) => { uBladeHeight.value = v; },

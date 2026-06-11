@@ -62,7 +62,7 @@ export class Hud {
       fontSize: "clamp(44px, 6vw, 68px)",
       fontWeight: "700",
       lineHeight: "1",
-      // Amatic hat keine Tabular-Ziffern — feste Mindestbreite verhindert,
+      // Der Display-Font hat keine Tabular-Ziffern — feste Mindestbreite verhindert,
       // dass das HUD beim Hochzählen in der Breite zappelt.
       minWidth: "1.3em",
       textAlign: "center",

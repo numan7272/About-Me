@@ -104,7 +104,7 @@ export class Terminal {
     root.style.cssText = `
       position: fixed; inset: 0; z-index: 9999;
       display: flex; align-items: center; justify-content: center;
-      background: rgba(15, 11, 18, 0.62);
+      background: rgba(9, 17, 16, 0.62);
       padding: 3vh 3vw;
       opacity: 0; transition: opacity 220ms ease;
     `;

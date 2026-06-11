@@ -248,7 +248,7 @@ export class NumanOS {
           radial-gradient(1200px 800px at 20% 30%, rgba(85,150,255,0.18), transparent 60%),
           radial-gradient(900px 700px at 80% 70%, rgba(220,90,180,0.13), transparent 60%),
           radial-gradient(700px 500px at 60% 15%, rgba(255,160,120,0.10), transparent 65%),
-          linear-gradient(135deg, #211a26 0%, #0b0b0d 100%);
+          linear-gradient(135deg, #1a2422 0%, #0b0d0d 100%);
         opacity: 0; transition: opacity 320ms ease;
         display: flex; flex-direction: column;
       }

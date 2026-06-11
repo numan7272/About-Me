@@ -137,8 +137,8 @@ export class CameraRig {
     this._introOrbit = true;
     this._introT = 0;
     this._introCenter = opts.center || [-4.4, 0.5, 16.6];
-    this._introRadius = opts.radius ?? 10;
-    this._introHeight = opts.height ?? 5.4;
+    this._introRadius = opts.radius ?? 7.5;
+    this._introHeight = opts.height ?? 3.6;
     this._introSpeed = (Math.PI * 2) / (opts.period ?? 38);
     this._introTargetY = opts.targetY ?? 1.0;
     this.followMode = false;

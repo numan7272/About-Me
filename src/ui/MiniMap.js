@@ -16,13 +16,13 @@ const SIZE = 200;
 const WORLD_RANGE = 60;           // ±60m wird auf Canvas gemappt
 
 // Map ist Telemetrie — Buildings unterscheiden sich über Position + Label,
-// nicht über Regenbogen. Aktive Tour-Station wird im Signal-Peach markiert.
-// Palette = warme Aubergine-Fläche + Weiß-Stufen (gleiche Werte wie :root).
+// nicht über Regenbogen. Aktive Tour-Station wird im Signal-Sand markiert.
+// Palette = Petrol-Fläche + Weiß-Stufen (gleiche Werte wie :root).
 const PAPER       = "rgba(255, 255, 255, 0.92)";
 const PAPER_MUTED = "rgba(255, 255, 255, 0.65)";
 const PAPER_DIM   = "rgba(255, 255, 255, 0.42)";
-const INK_SOFT    = "#2b2433";
-const SIGNAL      = "#ffceca";
+const INK_SOFT    = "#243430";
+const SIGNAL      = "#ffd28a";
 
 export class MiniMap {
   constructor(game) {

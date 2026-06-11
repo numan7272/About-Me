@@ -199,7 +199,7 @@ export class StationLabels3D {
     let size = 64;
     const minSize = 26;
     while (size > minSize) {
-      ctx.font = `700 ${size}px "Amatic SC", "Nunito", sans-serif`;
+      ctx.font = `700 ${size}px "Caveat", "Quicksand", sans-serif`;
       if (ctx.measureText(titleStr).width <= maxW) break;
       size -= 2;
     }

@@ -4,15 +4,15 @@
 
 /* ── Type ────────────────────────────────────────────────────────────────
    Hybrid-Register — warme Spielwelt trifft HUD:
-   - Nunito (400/700/900) als UI-/Body-Font — rund, freundlich
-   - Amatic SC (700) als Display-Font für Titel
+   - Quicksand (500/600/700) als UI-/Body-Font — geometrisch-rund
+   - Caveat (700) als Display-Font — handschriftlich, eigene Stimme
    - Mono bleibt für diegetische Kontexte (Kali-Terminal, SQLi-Lab, FPS) */
 
 :root {
-  /* Flächen — warmes Aubergine-Dunkel */
-  --ink: #1d1721;
-  --ink-solid: rgba(29, 23, 33, 0.95);
-  --surface: radial-gradient(ellipse at top left, #251f2b, #1d1721);
+  /* Flächen — tiefes Ostsee-Petrol (Kiel, Förde, Insel) */
+  --ink: #142120;
+  --ink-solid: rgba(20, 33, 32, 0.95);
+  --surface: radial-gradient(ellipse at top left, #1c2e2b, #142120);
 
   /* Text — Weiß mit Opazitäts-Hierarchie statt getönter Neutrals */
   --paper: rgba(255, 255, 255, 0.92);
@@ -24,15 +24,15 @@
   --rule-strong: rgba(255, 255, 255, 0.55);
 
   /* Akzente — soft statt neon */
-  --signal: #ffceca;          /* warmes Peach: aktiv, CTA */
-  --signal-dim: rgba(255, 206, 202, 0.22);
-  --success: #d5ff95;
-  --danger: #ff6a7c;
+  --signal: #ffd28a;          /* warmer Sand/Bernstein: aktiv, CTA */
+  --signal-dim: rgba(255, 210, 138, 0.22);
+  --success: #8fe3c0;
+  --danger: #ff8576;
 
   /* Lese-Register (InfoCard, Tour) — gleiche dunkle Fläche wie Chrome.
      Variablennamen bleiben für Kompatibilität mit den Komponenten. */
-  --paper-bg: rgba(33, 27, 39, 0.96);
-  --paper-bg-solid: #251f2b;
+  --paper-bg: rgba(24, 38, 36, 0.96);
+  --paper-bg-solid: #1c2e2b;
   --ink-text: rgba(255, 255, 255, 0.92);
   --ink-text-muted: rgba(255, 255, 255, 0.65);
   --ink-text-dim: rgba(255, 255, 255, 0.42);
@@ -43,8 +43,8 @@
   --radius-card: 12px;
 
   --ease: cubic-bezier(0.16, 1, 0.3, 1);
-  --font-ui: "Nunito", "Segoe UI", system-ui, sans-serif;
-  --font-display: "Amatic SC", "Nunito", sans-serif;
+  --font-ui: "Quicksand", "Segoe UI", system-ui, sans-serif;
+  --font-display: "Caveat", "Quicksand", sans-serif;
   --font-mono: "Departure Mono", "JetBrains Mono", ui-monospace, "SF Mono",
                Menlo, monospace;
 }
@@ -61,7 +61,7 @@
 html, body {
   margin: 0;
   padding: 0;
-  background: radial-gradient(farthest-side at 0 0, #251f2b, #1d1721);
+  background: radial-gradient(farthest-side at 0 0, #1c2e2b, #142120);
   color: var(--paper);
   overflow: hidden;
   user-select: none;
@@ -176,7 +176,7 @@ body.is-booting > #settings-panel {
 }
 
 ::selection {
-  color: #251f2b;
+  color: #1c2e2b;
   background-color: #ffffff;
 }
 

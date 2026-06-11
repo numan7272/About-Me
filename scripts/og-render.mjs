@@ -1,13 +1,14 @@
 // OG-Image-Generator. Schreibt public/og-image.png als 1200×630 PNG.
 //
-// Register: warme Spielwelt — Aubergine-Fläche, Amatic-SC-Display,
-// Nunito-Body, der leuchtende Reveal-Ring mit Bike-Piktogramm als Motiv.
+// Register "Ostsee": tiefes Petrol, Sand-Akzent, Caveat-Display +
+// Quicksand-Body. Rein typografisch, als Motiv nur ruhige Wellen-Linien
+// am unteren Rand (Kiel/Förde, ohne Piktogramm).
 //
 // Run:
 //   npm install --no-save sharp
 //   node scripts/og-render.mjs
 //
-// Fonts: Amatic SC Bold + Nunito (TTF in ~/.fonts, fc-cache).
+// Fonts: Caveat + Quicksand (TTF in ~/.fonts, fc-cache -f).
 
 import sharp from "sharp";
 import { writeFileSync } from "fs";
@@ -17,94 +18,58 @@ const H = 630;
 
 const PAPER       = "rgba(255,255,255,0.94)";
 const PAPER_MUTED = "rgba(255,255,255,0.66)";
-const PAPER_DIM   = "rgba(255,255,255,0.42)";
-const SIGNAL      = "#ffceca";
-const SUCCESS     = "#d5ff95";
-const DISPLAY     = "'Amatic SC'";
-const UI          = "'Nunito','DejaVu Sans',sans-serif";
+const PAPER_DIM   = "rgba(255,255,255,0.40)";
+const SIGNAL      = "#ffd28a";
+const SEAFOAM     = "#8fe3c0";
+const DISPLAY     = "'Caveat'";
+const UI          = "'Quicksand','DejaVu Sans',sans-serif";
 const MONO        = "'DejaVu Sans Mono','Liberation Mono',monospace";
 
-// Blueprint-Kreuzchen wie auf dem Boot-Grid
-function crosses() {
+// Ruhige Wellen-Linien (3 Sinus-Züge) als Ostsee-Signatur
+function waves() {
   let out = "";
-  const STEP = 96;
-  for (let y = STEP / 2; y < H; y += STEP) {
-    for (let x = STEP / 2; x < W; x += STEP) {
-      out += `<path d="M ${x - 5} ${y - 5} L ${x + 5} ${y + 5} M ${x + 5} ${y - 5} L ${x - 5} ${y + 5}"
-                    stroke="rgba(255,255,255,0.05)" stroke-width="2" fill="none"/>`;
+  const rows = [
+    { y: 520, amp: 9,  len: 170, color: "rgba(143,227,192,0.35)", w: 3 },
+    { y: 552, amp: 12, len: 210, color: "rgba(143,227,192,0.22)", w: 3 },
+    { y: 586, amp: 15, len: 260, color: "rgba(143,227,192,0.12)", w: 3 },
+  ];
+  for (const r of rows) {
+    let d = `M -20 ${r.y}`;
+    for (let x = -20; x <= W + 20; x += 10) {
+      const y = r.y + Math.sin((x / r.len) * Math.PI * 2) * r.amp;
+      d += ` L ${x} ${y.toFixed(1)}`;
     }
+    out += `<path d="${d}" fill="none" stroke="${r.color}" stroke-width="${r.w}" stroke-linecap="round"/>`;
   }
   return out;
 }
 
-const RING_X = 920;
-const RING_Y = 330;
-const RING_R = 190;
-
 const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
-    <radialGradient id="bg" cx="0.22" cy="0.18" r="1.25">
-      <stop offset="0" stop-color="#2b2333"/>
-      <stop offset="1" stop-color="#171219"/>
+    <radialGradient id="bg" cx="0.25" cy="0.15" r="1.3">
+      <stop offset="0" stop-color="#22332f"/>
+      <stop offset="1" stop-color="#101b1a"/>
     </radialGradient>
-    <radialGradient id="pool" cx="0.5" cy="0.5" r="0.5">
-      <stop offset="0" stop-color="#3b4a2c"/>
-      <stop offset="0.85" stop-color="#2c3a20"/>
-      <stop offset="1" stop-color="#243018"/>
-    </radialGradient>
-    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="10" result="b"/>
-      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
   </defs>
 
   <rect width="${W}" height="${H}" fill="url(#bg)"/>
-  ${crosses()}
+  ${waves()}
 
-  <!-- Reveal-Kreis rechts: Gras-Insel-Ausschnitt + leuchtender Ring + Bike -->
-  <circle cx="${RING_X}" cy="${RING_Y}" r="${RING_R}" fill="url(#pool)"/>
-  <circle cx="${RING_X}" cy="${RING_Y}" r="${RING_R}" fill="none"
-          stroke="${SIGNAL}" stroke-width="6" filter="url(#glow)"/>
-
-  <!-- Bike-Piktogramm (Strich-Stil, runde Kappen) -->
-  <g transform="translate(${RING_X - 95} ${RING_Y - 50}) scale(1.05)"
-     stroke="${PAPER}" stroke-width="7" fill="none"
-     stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="40" cy="105" r="36"/>
-    <circle cx="150" cy="105" r="36"/>
-    <path d="M 40 105 L 76 45 L 128 45 L 150 105"/>
-    <path d="M 76 45 L 102 105 L 40 105"/>
-    <path d="M 70 32 L 86 32"/>
-    <path d="M 128 45 L 120 24 L 136 21"/>
-  </g>
-
-  <!-- Gras-Büschel am Ring-Boden -->
-  <g stroke="${SUCCESS}" stroke-width="4" stroke-linecap="round" opacity="0.8">
-    <path d="M ${RING_X - 130} ${RING_Y + 120} q -4 -18 2 -28" fill="none"/>
-    <path d="M ${RING_X - 118} ${RING_Y + 122} q 2 -16 8 -22" fill="none"/>
-    <path d="M ${RING_X + 110} ${RING_Y + 112} q -2 -18 4 -26" fill="none"/>
-    <path d="M ${RING_X + 124} ${RING_Y + 108} q 4 -14 10 -18" fill="none"/>
-  </g>
-
-  <!-- Links: Kicker, Name, Tagline, Meta -->
-  <text x="84" y="150" font-family="${MONO}" font-size="22" fill="${PAPER_DIM}"
+  <text x="86" y="138" font-family="${MONO}" font-size="21" fill="${PAPER_DIM}"
         letter-spacing="0.04em">// numan-yesil.com</text>
 
-  <text x="80" y="305" font-family="${DISPLAY}" font-weight="700"
-        font-size="150" fill="${PAPER}">Numan Yesil</text>
+  <text x="80" y="300" font-family="${DISPLAY}" font-weight="700"
+        font-size="170" fill="${PAPER}">Numan Yesil</text>
 
-  <text x="84" y="375" font-family="${UI}" font-weight="700" font-size="33"
+  <text x="86" y="372" font-family="${UI}" font-weight="700" font-size="34"
         fill="${SIGNAL}">Eine Insel. Ein Fahrrad. Mein Werdegang.</text>
 
-  <text x="84" y="430" font-family="${UI}" font-size="24" fill="${PAPER_MUTED}">
-    Fahr durch mein interaktives 3D-Portfolio.
-  </text>
+  <text x="86" y="424" font-family="${UI}" font-weight="600" font-size="24"
+        fill="${PAPER_MUTED}">Fahr durch mein interaktives 3D-Portfolio.</text>
 
-  <text x="84" y="540" font-family="${UI}" font-weight="700" font-size="22" fill="${PAPER}">
+  <text x="86" y="488" font-family="${UI}" font-weight="700" font-size="21" fill="${PAPER}">
     Wirtschaftsinformatik · HAW Kiel
-  </text>
-  <text x="84" y="572" font-family="${MONO}" font-size="17" fill="${PAPER_DIM}">
-    github.com/numan7272 · Three.js + WebGPU + Rapier
+    <tspan dx="14" fill="${SEAFOAM}" font-size="19">github.com/numan7272</tspan>
   </text>
 </svg>`;
 

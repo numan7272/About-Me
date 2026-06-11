@@ -102,7 +102,7 @@ export class Renderer {
       // praktisch identisch aus und ist unter WebGPU deutlich billiger.
       r.shadowMap.type = THREE.PCFShadowMap;
     }
-    r.setClearColor(0x1d1721);   // matches --ink token + theme-color in index.html
+    r.setClearColor(0x142120);   // matches --ink token + theme-color in index.html
 
     // Manuelle renderOrder-Sortierung statt teurer Default-Sort.
     // Bei vielen statischen Objekten 0.2-1ms CPU/Frame gespart.

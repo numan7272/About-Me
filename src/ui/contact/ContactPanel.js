@@ -94,7 +94,7 @@ export class ContactPanel {
       position: "fixed",
       inset: "0",
       zIndex: String(Z_INDEX_PANEL - 1),
-      background: "rgba(20, 15, 25, 0.55)",
+      background: "rgba(10, 19, 18, 0.55)",
       opacity: "0",
       pointerEvents: "none",
       transition: "opacity 220ms var(--ease)",
