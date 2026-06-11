@@ -500,6 +500,10 @@ export class DesignaOS extends FakeOS {
   }
 
   open() {
+    // Guard der Basisklasse spiegeln — super.open() returnt bei bereits
+    // offenem OS early, der Code hier darf dann ebenfalls nicht nochmal
+    // Listener/Kacheln/Timer anlegen.
+    if (this.dom) return;
     super.open();
     if (!this.dom) return;
     const desktop = this.dom.desktop;

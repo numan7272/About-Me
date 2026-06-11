@@ -308,6 +308,7 @@ function buildGrassMaterialGLSL(buildings, roadCurve) {
     setTerrainY:    (v) => { u.uTerrainY.value = v; },
     setBikePos:     (x, z) => u.uBikePos.value.set(x, 0, z),
     setBladeHeight: (v) => { u.uBladeHeight.value = v; },
+    setBladeWidth:  (v) => { u.uBladeWidth.value = v; },
     setWind:        (dir, speed, strength) => {
       u.uWindDir.value.copy(dir);
       u.uWindSpeed.value = speed;
@@ -500,6 +501,7 @@ async function buildGrassMaterialTSL(buildings, roadCurve) {
     setTerrainY:    (v) => { uTerrainY.value = v; },
     setBikePos:     (x, z) => uBikePos.value.set(x, 0, z),
     setBladeHeight: (v) => { uBladeHeight.value = v; },
+    setBladeWidth:  (v) => { uBladeWidth.value = v; },
     setWind:        (dir, speed, strength) => {
       uWindDir.value.copy(dir);
       uWindSpeed.value = speed;
@@ -597,12 +599,17 @@ export class Grass {
     const f = debug.addFolder({ title: "Grass", expanded: false });
     this._debugState = {
       bladeHeight: BLADE_HEIGHT,
+      bladeWidth: BLADE_WIDTH,
       mapRadius: MAP_RADIUS,
       visible: true,
     };
     f.addBinding(this._debugState, "bladeHeight", { min: 0.2, max: 2, step: 0.01 })
       .on("change", (ev) => {
         this.material.userData.adapter?.setBladeHeight?.(ev.value);
+      });
+    f.addBinding(this._debugState, "bladeWidth", { min: 0.02, max: 0.4, step: 0.005 })
+      .on("change", (ev) => {
+        this.material.userData.adapter?.setBladeWidth?.(ev.value);
       });
     f.addBinding(this._debugState, "mapRadius", { min: 20, max: 80, step: 1 })
       .on("change", (ev) => {
