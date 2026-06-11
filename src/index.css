@@ -158,6 +158,17 @@ html, body {
   border-color: var(--signal);
 }
 
+/* Während des Boot-Intros (Splash) verschwindet das gesamte HUD-Chrome —
+   die Bühne gehört dem Bike. Alle Chrome-Elemente hängen direkt am body. */
+body.is-booting > button,
+body.is-booting > .hud-btn,
+body.is-booting > .hud-bracket,
+body.is-booting > #hud-root,
+body.is-booting > [data-bld-hint],
+body.is-booting > #settings-panel {
+  display: none !important;
+}
+
 /* Universal focus ring — auch Formularfelder (SQLi-Lab, Kontakt) und Links */
 :where(button, a, input, select, textarea, [role="button"], [tabindex]):focus-visible {
   outline: 2px solid var(--signal);

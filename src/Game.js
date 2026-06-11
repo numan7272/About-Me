@@ -69,10 +69,9 @@ export class Game {
     this.scene = new THREE.Scene();
     this.cameraRig = new CameraRig(this);
 
-    // Solange der Splash steht, kreist die Kamera cinematisch um die
-    // Insel — Ozean/Himmel/Gras sind prozedural und sofort da, die Welt
-    // ist also ab Sekunde 1 der Ladescreen. Bei reduced-motion bleibt
-    // die Kamera statisch (Standard-Standpunkt).
+    // Intro-Inszenierung: nächtliche Welt, Spotlight auf dem Bike-Spawn,
+    // enge Kamera-Kreisfahrt — der Ladescreen ist eine Bühne, kein Formular.
+    // Bei reduced-motion bleibt alles statisch und hell.
     this._reducedMotion = typeof window !== "undefined"
       && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
     if (!this._reducedMotion) {
@@ -88,6 +87,20 @@ export class Game {
 
     // Welt-Inhalt
     this.world = new World(this);
+
+    // Intro-Bühne: Welt startet in der Nacht, ein warmer Spot steht auf
+    // dem Spawn. Beim Start-Klick geht die Sonne auf (transitionTo unten).
+    if (!this._reducedMotion) {
+      this.world.dayCycle?.transitionTo?.(0.5, 0.1, false);
+      const SPAWN = [-4.38, 0.5, 16.63];
+      this._introSpot = new THREE.SpotLight(0xffe8c8, 90, 34, 0.46, 0.7, 1.5);
+      this._introSpot.position.set(SPAWN[0] + 3, SPAWN[1] + 12, SPAWN[2] + 3);
+      this._introSpotTarget = new THREE.Object3D();
+      this._introSpotTarget.position.set(SPAWN[0], SPAWN[1], SPAWN[2]);
+      this.scene.add(this._introSpotTarget);
+      this._introSpot.target = this._introSpotTarget;
+      this.scene.add(this._introSpot);
+    }
 
     // UI-Overlays (HUD, MiniMap, Settings, InfoCard, DiscoveryHud)
     this.ui = new Ui(this);
@@ -171,6 +184,11 @@ export class Game {
         this.cameraRig.followMode = true;
         showOverlay();
       } else {
+        // Sonnenaufgang: die Nacht-Bühne blendet in den Tag, dann läuft
+        // der Auto-Cycle weiter. Der Spot dimmt parallel weg.
+        this.world?.dayCycle?.transitionTo?.(0, 3.2, true);
+        this._introSpotFading = true;
+
         // Bike-Drop: kurz anheben, Physik lässt es einfedern während die
         // Kamera anfliegt. Nur wenn der Body schon existiert.
         const body = this.world?.player?.body;
@@ -266,6 +284,18 @@ export class Game {
   }
 
   update() {
+    // Intro-Spot weich ausdimmen sobald der User gestartet hat
+    if (this._introSpotFading && this._introSpot) {
+      this._introSpot.intensity *= 0.94;
+      if (this._introSpot.intensity < 0.5) {
+        this.scene.remove(this._introSpot);
+        this.scene.remove(this._introSpotTarget);
+        this._introSpot.dispose?.();
+        this._introSpot = null;
+        this._introSpotFading = false;
+      }
+    }
+
     // Reihenfolge: Inputs (passive) → Physics → World → Camera → Render → UI → Audio
     if (this.physics?.update) this.physics.update();
     if (this.world?.update) this.world.update();

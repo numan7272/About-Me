@@ -128,10 +128,19 @@ export class CameraRig {
     this._introT = 0;
   }
 
-  /** Cinematic Insel-Orbit starten (läuft bis endIntroOrbit/flyTo). */
-  startIntroOrbit() {
+  /**
+   * Cinematic Intro-Orbit starten (läuft bis endIntroOrbit/flyTo).
+   * opts: { center: [x,y,z], radius, height, period (s/Runde), targetY }
+   * Default: enge Fahrt um den Bike-Spawn (Spotlight-Moment).
+   */
+  startIntroOrbit(opts = {}) {
     this._introOrbit = true;
     this._introT = 0;
+    this._introCenter = opts.center || [-4.4, 0.5, 16.6];
+    this._introRadius = opts.radius ?? 8.5;
+    this._introHeight = opts.height ?? 4.2;
+    this._introSpeed = (Math.PI * 2) / (opts.period ?? 38);
+    this._introTargetY = opts.targetY ?? 1.0;
     this.followMode = false;
   }
 
@@ -232,17 +241,21 @@ export class CameraRig {
   }
 
   update() {
-    // ── Intro-Orbit: langsame Kreisfahrt um die Insel ──
+    // ── Intro-Orbit: langsame Kreisfahrt um den Spawn-Punkt ──
     if (this._introOrbit) {
       const dt = this.game?.time?.delta || 0.016;
       this._introT += dt;
-      // Sanfter Ein-Schwung in den ersten 2s, dann konstante Fahrt
+      // Sanfter Ein-Schwung in den ersten 2s
       const ease = Math.min(1, this._introT / 2);
-      const a = this._introT * 0.085;          // ~74s pro Runde
-      const r = 40 - ease * 6;                 // zieht leicht rein: 40 → 34
-      const h = 17 - ease * 3;
-      this.camera.position.set(Math.cos(a) * r, h, Math.sin(a) * r);
-      this.controls.target.set(0, 1.5, 0);
+      const a = this._introT * this._introSpeed;
+      const r = this._introRadius + (1 - ease) * 2;
+      const [cx, cy, cz] = this._introCenter;
+      this.camera.position.set(
+        cx + Math.cos(a) * r,
+        cy + this._introHeight,
+        cz + Math.sin(a) * r,
+      );
+      this.controls.target.set(cx, cy + this._introTargetY, cz);
       this.controls.update();
       return;
     }
