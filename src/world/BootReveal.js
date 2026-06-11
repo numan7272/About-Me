@@ -150,6 +150,13 @@ export class BootReveal {
       shader.uniforms.uRevealR = this._uRevealR;
       shader.uniforms.uRevealC = this._uRevealC;
       shader.uniforms.uRevealOn = this._uRevealOn;
+      const anchorsOk =
+        shader.vertexShader.includes("#include <common>")
+        && shader.vertexShader.includes("#include <project_vertex>")
+        && shader.fragmentShader.includes("#include <common>")
+        && shader.fragmentShader.includes("#include <clipping_planes_fragment>");
+      if (!anchorsOk) return;   // lieber ungeclippt sichtbar als kaputt
+
       shader.vertexShader = shader.vertexShader
         .replace("#include <common>", "#include <common>\nvarying vec2 vRevealW;")
         .replace("#include <project_vertex>",
@@ -186,6 +193,15 @@ export class BootReveal {
   async _setupStage() {
     if (!this.active || this._revealing) return;
 
+    // KRITISCH: erst auf den Renderer warten. Während eines (langsamen
+    // oder fehlschlagenden) WebGPU-Versuchs ist mode noch "loading" —
+    // wer da den Node-Pfad wählt, tauscht Materialien ein, die der
+    // spätere WebGL-Fallback nicht rendern kann (unsichtbare Welt).
+    if (this.game.renderer?.ready?.then) {
+      try { await this.game.renderer.ready; } catch (e) {}
+    }
+    if (!this.active || this._revealing) return;
+
     if (this.game.renderer?.mode === "webgl") {
       // Sturm-Clip: Welt bleibt sichtbar, alles außerhalb des Kreises
       // wird im Fragment-Shader weggeschnitten — das HQ ragt angeschnitten
@@ -195,7 +211,14 @@ export class BootReveal {
     } else {
       // WebGPU: gleicher Effekt über NodeMaterial-Konvertierung
       this._clipMode = await this._setupNodeClip();
-      if (!this._clipMode) this._disc.visible = true;
+      if (this._clipMode) {
+        // Während des async Setups hat der Update-Loop die Welt schon
+        // per Fallback-Liste versteckt — wieder zeigen, der Clip
+        // übernimmt ab jetzt das Schneiden.
+        for (const obj of this._fallbackHidden()) obj.visible = true;
+      } else {
+        this._disc.visible = true;
+      }
     }
     this._applyBootState();
   }
@@ -240,8 +263,19 @@ export class BootReveal {
         if (!Cls) return m;
         const nm = new Cls();
         nm.copy(m);
+        // copy() von einem Nicht-Node-Material hinterlässt die Node-Slots
+        // als undefined statt null — der TSL-Builder prüft auf !== null
+        // und crasht dann ("isOutputStructNode of undefined"). Slots
+        // generisch reparieren bevor wir unsere setzen.
+        for (const k in nm) {
+          if (k.endsWith("Node") && nm[k] === undefined) nm[k] = null;
+        }
         nm.opacityNode = opacityNode;
+        // Beides setzen: alphaTestNode (TSL-Slot) UND die klassische
+        // Number-Property — letztere aktiviert den Alpha-Test-Zweig
+        // im Material-Builder zuverlässig.
         nm.alphaTestNode = float(0.5);
+        nm.alphaTest = 0.5;
         cache.set(m, nm);
         return nm;
       };
@@ -306,6 +340,18 @@ export class BootReveal {
   reveal() {
     if (!this.active || this._revealing) return;
     this._revealing = true;
+
+    // Sicherheitsnetz: sollte irgendein Pfad hängen (Tween, Async-Race,
+    // Treiber), wird der Clip nach 8s hart deaktiviert.
+    setTimeout(() => {
+      this._uRevealOn.value = 0;
+      if (this._uOnNode) this._uOnNode.value = 0;
+      const ga = this.game.world?.grass?.material?.userData?.adapter;
+      ga?.setMapRadius?.(46);
+      ga?.setMapCenter?.(0, 0);
+      for (const obj of this._alwaysHidden()) obj.visible = true;
+      for (const obj of this._fallbackHidden()) obj.visible = true;
+    }, 8000);
 
     const w = this.game.world;
     if (this._savedFog) this.scene.fog = this._savedFog;
