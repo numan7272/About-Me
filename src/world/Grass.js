@@ -70,6 +70,9 @@ const VERTEX_SHADER = /* glsl */ `
   uniform float uRoadRadiusSq;
   uniform float uMapRadius;
 
+  uniform vec2  uPressPos;
+  uniform float uPressStrength;
+
   uniform float uSunIntensity;
   uniform vec3  uAmbient;
   uniform float uNightFactor;
@@ -134,6 +137,12 @@ const VERTEX_SHADER = /* glsl */ `
     float edge = max(abs(rel.x), abs(rel.y)) / HALF;
     h *= 1.0 - smoothstep(0.78, 1.0, edge);
 
+    // Druckpunkt (Cursor/Finger auf dem Boden): Halme ducken sich
+    vec2 away = blade - uPressPos;
+    float awayDist = length(away);
+    float press = (1.0 - smoothstep(0.0, 2.4, awayDist)) * uPressStrength;
+    h *= 1.0 - press * 0.5;
+
     // ── Kamera-Billboard pro Halm ──
     vec2 toCam = cameraPosition.xz - blade;
     float toCamLen = max(length(toCam), 0.001);
@@ -146,6 +155,9 @@ const VERTEX_SHADER = /* glsl */ `
     float sway = (sin(phase) + sin(phase * 1.7 + aHash * 6.2831) * 0.4)
                * uWindStrength * h * tip;
     offsetXZ += uWindDir * sway;
+
+    // ... und weichen radial vom Druckpunkt aus (nur die Spitze kippt)
+    offsetXZ += (away / max(awayDist, 0.001)) * press * 0.45 * tip;
 
     vec3 world = vec3(blade.x + offsetXZ.x,
                       uTerrainY + tip * h,
@@ -287,6 +299,8 @@ function buildGrassMaterialGLSL(buildings, roadCurve) {
       uRoad:         { value: buildRoadArr(roadCurve) },
       uRoadRadiusSq: { value: 3.0 * 3.0 },
       uMapRadius:    { value: MAP_RADIUS },
+      uPressPos:     { value: new THREE.Vector2(9999, 9999) },
+      uPressStrength:{ value: 0 },
       uSunIntensity: { value: 1.0 },
       uAmbient:      { value: new THREE.Color(0x445566) },
       uNightFactor:  { value: 0.0 },
@@ -319,6 +333,10 @@ function buildGrassMaterialGLSL(buildings, roadCurve) {
       u.uAmbient.value.copy(ambientColor).multiplyScalar(ambientIntensity);
     },
     setNightFactor: (n) => { u.uNightFactor.value = n; },
+    setPress:       (x, z, st) => {
+      u.uPressPos.value.set(x, z);
+      u.uPressStrength.value = st;
+    },
     setFog:         (color, near, far) => {
       u.uFogColor.value.copy(color);
       u.uFogNear.value = near;
@@ -361,6 +379,8 @@ async function buildGrassMaterialTSL(buildings, roadCurve) {
   const uBladeHeight  = uniform(BLADE_HEIGHT);
   const uMapRadius    = uniform(MAP_RADIUS);
   const uRoadRadiusSq = uniform(3.0 * 3.0);
+  const uPressPos     = uniform(new THREE.Vector2(9999, 9999));
+  const uPressStrength = uniform(0);
   const uSunIntensity = uniform(1.0);
   const uAmbient      = uniform(new THREE.Color(0x445566));
   const uNightFactor  = uniform(0.0);
@@ -435,6 +455,12 @@ async function buildGrassMaterialTSL(buildings, roadCurve) {
     const edge = max(rel.x.abs(), rel.y.abs()).div(HALF);
     h.mulAssign(float(1).sub(smoothstep(0.78, 1.0, edge)));
 
+    // Druckpunkt: ducken + radial ausweichen (Spiegel des GLSL-Pfads)
+    const away = blade.sub(uPressPos);
+    const awayDist = length(away);
+    const press = float(1).sub(smoothstep(0.0, 2.4, awayDist)).mul(uPressStrength);
+    h.mulAssign(float(1).sub(press.mul(0.5)));
+
     // Kamera-Billboard
     const toCam = cameraPosition.xz.sub(blade);
     const toCamLen = max(length(toCam), 0.001);
@@ -448,6 +474,7 @@ async function buildGrassMaterialTSL(buildings, roadCurve) {
       .add(sin(phase.mul(1.7).add(aHash.mul(6.2831))).mul(0.4))
       .mul(uWindStrength).mul(h).mul(tip);
     offsetXZ.addAssign(uWindDir.mul(sway));
+    offsetXZ.addAssign(away.div(max(awayDist, 0.001)).mul(press).mul(0.45).mul(tip));
 
     const world = vec3(
       blade.x.add(offsetXZ.x),
@@ -512,6 +539,10 @@ async function buildGrassMaterialTSL(buildings, roadCurve) {
       uSunIntensity.value = intensity;
     },
     setNightFactor: (n) => { uNightFactor.value = n; },
+    setPress:       (x, z, st) => {
+      uPressPos.value.set(x, z);
+      uPressStrength.value = st;
+    },
     setFog:         (color, near, far) => {
       uFogColor.value.copy(color);
       uFogNear.value = near;
@@ -550,6 +581,28 @@ export class Grass {
     this._lampPosCached = false;
     this._lampPosScratch = Array.from({ length: 12 }, () => new THREE.Vector3());
     this._lastTerrainSample = new THREE.Vector2(Infinity, Infinity);
+    this._lastTerrainY = 0.3;
+
+    // ── Druckpunkt: Cursor/Finger biegt das Gras ──
+    // Pointer-NDC tracken, in update() auf die Boden-Ebene projizieren
+    // (reine Mathematik, kein Mesh-Raycast). Stärke schwingt weich ein
+    // und klingt nach der letzten Bewegung wieder ab.
+    this._pointerNdc = new THREE.Vector2(0, 0);
+    this._pointerMovedAt = 0;
+    this._pressStrength = 0;
+    this._unproj = new THREE.Vector3();
+    this._reducedMotion = typeof window !== "undefined"
+      && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    this._onPointerMove = (e) => {
+      this._pointerNdc.set(
+        (e.clientX / window.innerWidth) * 2 - 1,
+        -(e.clientY / window.innerHeight) * 2 + 1,
+      );
+      this._pointerMovedAt = performance.now();
+    };
+    if (!this._reducedMotion) {
+      window.addEventListener("pointermove", this._onPointerMove, { passive: true });
+    }
 
     this._buildMaterialAndMesh();
   }
@@ -659,8 +712,42 @@ export class Grass {
         this._tmpOrigin.set(cx, 50, cz);
         this._raycaster.set(this._tmpOrigin, this._downDir);
         const hits = this._raycaster.intersectObject(this.terrainMesh, true);
-        if (hits.length > 0) a.setTerrainY(hits[0].point.y);
+        if (hits.length > 0) {
+          this._lastTerrainY = hits[0].point.y;
+          a.setTerrainY(this._lastTerrainY);
+        }
         this._lastTerrainSample.set(cx, cz);
+      }
+    }
+
+    // ── Druckpunkt aktualisieren ──
+    // Pointer-Ray gegen die Gras-Ebene (y = terrainY) schneiden — eine
+    // Division statt Mesh-Raycast. Stärke: 1 solange der Pointer sich in
+    // den letzten 800ms bewegt hat, danach weicher Abfall.
+    if (!this._reducedMotion && a.setPress) {
+      const cam = this.game.cameraRig?.camera;
+      const dt = this.game.time?.delta || 0.016;
+      const fresh = (performance.now() - this._pointerMovedAt) < 800;
+      const target = fresh ? 1 : 0;
+      this._pressStrength += (target - this._pressStrength) * Math.min(1, dt * 6);
+      if (cam && this._pressStrength > 0.01) {
+        this._unproj.set(this._pointerNdc.x, this._pointerNdc.y, 0.5)
+          .unproject(cam)
+          .sub(cam.position)
+          .normalize();
+        const dy = this._unproj.y;
+        if (dy < -0.05) {
+          const t = (this._lastTerrainY - cam.position.y) / dy;
+          if (t > 0 && t < 150) {
+            a.setPress(
+              cam.position.x + this._unproj.x * t,
+              cam.position.z + this._unproj.z * t,
+              this._pressStrength,
+            );
+          }
+        }
+      } else {
+        a.setPress(9999, 9999, 0);
       }
     }
 
@@ -686,6 +773,7 @@ export class Grass {
   }
 
   destroy() {
+    window.removeEventListener("pointermove", this._onPointerMove);
     if (this.mesh) this.scene?.remove?.(this.mesh);
     this.geometry?.dispose?.();
     this.material?.dispose?.();

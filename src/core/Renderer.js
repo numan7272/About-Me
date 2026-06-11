@@ -195,6 +195,7 @@ export class Renderer {
       const { EffectComposer } = await import("three/examples/jsm/postprocessing/EffectComposer.js");
       const { RenderPass } = await import("three/examples/jsm/postprocessing/RenderPass.js");
       const { UnrealBloomPass } = await import("three/examples/jsm/postprocessing/UnrealBloomPass.js");
+      const { ShaderPass } = await import("three/examples/jsm/postprocessing/ShaderPass.js");
       const { OutputPass } = await import("three/examples/jsm/postprocessing/OutputPass.js");
 
       this.composer = new EffectComposer(this.instance);
@@ -209,6 +210,55 @@ export class Renderer {
         0.55, 0.6, 0.85,
       );
       this.composer.addPass(this.bloomPass);
+
+      // ── Pointer-Flow-Distortion ──
+      // Wischen über den Screen verzerrt das Bild wie Wasser: ein kleines
+      // GPU-Strömungsfeld (FlowField) verschiebt die UVs, starke Strömung
+      // trennt die Farbkanäle minimal. Aus bei reduced-motion + Graphics low.
+      const reduced = typeof window !== "undefined"
+        && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+      let lowGfx = false;
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        lowGfx = !!raw && JSON.parse(raw).graphics === "low";
+      } catch (e) {}
+      if (!reduced && !lowGfx) {
+        const { FlowField } = await import("./FlowField.js");
+        this.flowField = new FlowField(this.canvas);
+        this.distortPass = new ShaderPass({
+          uniforms: {
+            tDiffuse:  { value: null },
+            tFlow:     { value: null },
+            uStrength: { value: 0.045 },
+          },
+          vertexShader: /* glsl */ `
+            varying vec2 vUv;
+            void main() {
+              vUv = uv;
+              gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+            }
+          `,
+          fragmentShader: /* glsl */ `
+            uniform sampler2D tDiffuse;
+            uniform sampler2D tFlow;
+            uniform float uStrength;
+            varying vec2 vUv;
+            void main() {
+              vec2 flow = texture2D(tFlow, vUv).rg;
+              vec2 off = flow * uStrength;
+              // Chromatische Trennung skaliert mit Strömungsstärke —
+              // gibt dem Schlieren-Moment den "Linsen"-Charakter
+              float ca = length(flow) * 0.35;
+              vec3 col;
+              col.r = texture2D(tDiffuse, vUv - off * (1.0 + ca)).r;
+              col.g = texture2D(tDiffuse, vUv - off).g;
+              col.b = texture2D(tDiffuse, vUv - off * (1.0 - ca)).b;
+              gl_FragColor = vec4(col, 1.0);
+            }
+          `,
+        });
+        this.composer.addPass(this.distortPass);
+      }
 
       const outputPass = new OutputPass();
       this.composer.addPass(outputPass);
@@ -267,6 +317,12 @@ export class Renderer {
         this.renderPass.scene = scene;
         this.renderPass.camera = camera;
       }
+      // Strömungsfeld VOR dem Composer ticken — der DistortPass liest
+      // die frische Textur im selben Frame
+      if (this.flowField && this.distortPass) {
+        this.flowField.update(this.instance);
+        this.distortPass.uniforms.tFlow.value = this.flowField.texture;
+      }
       this.composer.render();
       return;
     }
@@ -297,6 +353,9 @@ export class Renderer {
     this.composer = null;
     this.renderPass = null;
     this.bloomPass = null;
+    this.flowField?.destroy?.();
+    this.flowField = null;
+    this.distortPass = null;
 
     // WebGPU RenderPipeline. dispose() exists on newer builds.
     try { this.postProcessing?.dispose?.(); } catch (e) {
