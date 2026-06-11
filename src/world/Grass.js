@@ -72,6 +72,7 @@ const VERTEX_SHADER = /* glsl */ `
 
   uniform vec2  uPressPos;
   uniform float uPressStrength;
+  uniform vec2  uPressVel;
 
   uniform float uSunIntensity;
   uniform vec3  uAmbient;
@@ -156,8 +157,10 @@ const VERTEX_SHADER = /* glsl */ `
                * uWindStrength * h * tip;
     offsetXZ += uWindDir * sway;
 
-    // ... und weichen radial vom Druckpunkt aus (nur die Spitze kippt)
-    offsetXZ += (away / max(awayDist, 0.001)) * press * 0.45 * tip;
+    // ... und legen sich in Strich-Richtung um (gekaemmt), mit leichtem
+    // radialem Anteil damit auch ein stehender Finger Wirkung zeigt
+    vec2 pressDir = (away / max(awayDist, 0.001)) * 0.35 + uPressVel * 0.75;
+    offsetXZ += pressDir * press * 0.55 * tip;
 
     vec3 world = vec3(blade.x + offsetXZ.x,
                       uTerrainY + tip * h,
@@ -301,6 +304,7 @@ function buildGrassMaterialGLSL(buildings, roadCurve) {
       uMapRadius:    { value: MAP_RADIUS },
       uPressPos:     { value: new THREE.Vector2(9999, 9999) },
       uPressStrength:{ value: 0 },
+      uPressVel:     { value: new THREE.Vector2() },
       uSunIntensity: { value: 1.0 },
       uAmbient:      { value: new THREE.Color(0x445566) },
       uNightFactor:  { value: 0.0 },
@@ -333,9 +337,10 @@ function buildGrassMaterialGLSL(buildings, roadCurve) {
       u.uAmbient.value.copy(ambientColor).multiplyScalar(ambientIntensity);
     },
     setNightFactor: (n) => { u.uNightFactor.value = n; },
-    setPress:       (x, z, st) => {
+    setPress:       (x, z, st, vx, vz) => {
       u.uPressPos.value.set(x, z);
       u.uPressStrength.value = st;
+      u.uPressVel.value.set(vx || 0, vz || 0);
     },
     setFog:         (color, near, far) => {
       u.uFogColor.value.copy(color);
@@ -381,6 +386,7 @@ async function buildGrassMaterialTSL(buildings, roadCurve) {
   const uRoadRadiusSq = uniform(3.0 * 3.0);
   const uPressPos     = uniform(new THREE.Vector2(9999, 9999));
   const uPressStrength = uniform(0);
+  const uPressVel     = uniform(new THREE.Vector2());
   const uSunIntensity = uniform(1.0);
   const uAmbient      = uniform(new THREE.Color(0x445566));
   const uNightFactor  = uniform(0.0);
@@ -474,7 +480,8 @@ async function buildGrassMaterialTSL(buildings, roadCurve) {
       .add(sin(phase.mul(1.7).add(aHash.mul(6.2831))).mul(0.4))
       .mul(uWindStrength).mul(h).mul(tip);
     offsetXZ.addAssign(uWindDir.mul(sway));
-    offsetXZ.addAssign(away.div(max(awayDist, 0.001)).mul(press).mul(0.45).mul(tip));
+    const pressDir = away.div(max(awayDist, 0.001)).mul(0.35).add(uPressVel.mul(0.75));
+    offsetXZ.addAssign(pressDir.mul(press).mul(0.55).mul(tip));
 
     const world = vec3(
       blade.x.add(offsetXZ.x),
@@ -539,9 +546,10 @@ async function buildGrassMaterialTSL(buildings, roadCurve) {
       uSunIntensity.value = intensity;
     },
     setNightFactor: (n) => { uNightFactor.value = n; },
-    setPress:       (x, z, st) => {
+    setPress:       (x, z, st, vx, vz) => {
       uPressPos.value.set(x, z);
       uPressStrength.value = st;
+      uPressVel.value.set(vx || 0, vz || 0);
     },
     setFog:         (color, near, far) => {
       uFogColor.value.copy(color);
@@ -590,6 +598,8 @@ export class Grass {
     this._pointerNdc = new THREE.Vector2(0, 0);
     this._pointerMovedAt = 0;
     this._pressStrength = 0;
+    this._pressLast = new THREE.Vector2(9999, 9999);
+    this._pressVel = new THREE.Vector2();
     this._unproj = new THREE.Vector3();
     this._reducedMotion = typeof window !== "undefined"
       && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
@@ -739,14 +749,26 @@ export class Grass {
         if (dy < -0.05) {
           const t = (this._lastTerrainY - cam.position.y) / dy;
           if (t > 0 && t < 150) {
-            a.setPress(
-              cam.position.x + this._unproj.x * t,
-              cam.position.z + this._unproj.z * t,
-              this._pressStrength,
-            );
+            const px = cam.position.x + this._unproj.x * t;
+            const pz = cam.position.z + this._unproj.z * t;
+            // Strich-Richtung: Bewegung des Bodenpunkts, geglaettet und
+            // auf Einheitslaenge gedeckelt (sonst peitscht ein schneller
+            // Wisch die Halme flach)
+            if (this._pressLast.x < 9000) {
+              const ivx = (px - this._pressLast.x) / Math.max(dt, 0.001) * 0.12;
+              const ivz = (pz - this._pressLast.y) / Math.max(dt, 0.001) * 0.12;
+              this._pressVel.x += (ivx - this._pressVel.x) * Math.min(1, dt * 10);
+              this._pressVel.y += (ivz - this._pressVel.y) * Math.min(1, dt * 10);
+              const m = this._pressVel.length();
+              if (m > 1) this._pressVel.multiplyScalar(1 / m);
+            }
+            this._pressLast.set(px, pz);
+            a.setPress(px, pz, this._pressStrength, this._pressVel.x, this._pressVel.y);
           }
         }
       } else {
+        this._pressLast.set(9999, 9999);
+        this._pressVel.multiplyScalar(0.9);
         a.setPress(9999, 9999, 0);
       }
     }
