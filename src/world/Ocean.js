@@ -50,8 +50,10 @@ const VERTEX_SHADER = /* glsl */ `
     // die Distanz zum Inselzentrum, 48.0 = Shore-Radius).
     float dC = length(pos.xy);
     float dS = dC - 48.0;
-    float shoreAmp = 1.0 - smoothstep(0.0, 26.0, abs(dS));
-    w += sin(dS * 0.9 - uTime * 1.4) * 0.06 * shoreAmp;
+    // NUR seewärts anheben — landeinwärts würde die Wasserfläche über
+    // das Beach-Mesh steigen und den Strand abschneiden.
+    float shoreAmp = (1.0 - smoothstep(2.0, 26.0, dS)) * smoothstep(-0.5, 2.0, dS);
+    w += sin(dS * 0.9 - uTime * 1.4) * 0.035 * shoreAmp;
     pos.z += w;
     vec4 mPos = modelMatrix * vec4(pos, 1.0);
     vWorldPos = mPos.xyz;
@@ -132,14 +134,17 @@ const FRAGMENT_SHADER = /* glsl */ `
     // hoch, lösen sich auf und setzen neu an (Küsten-Variation über
     // coast, damit die Front nicht als perfekter Ring läuft)
     float cyc1 = fract(uTime * 0.09 + sin(coast * 0.18) * 0.08);
-    float front1 = mix(6.5, -2.5, cyc1);
+    float front1 = mix(6.5, -0.4, cyc1);
     float surf1 = exp(-pow((distToShore - front1) * 1.9, 2.0)) * sin(cyc1 * 3.14159)
                 * (0.55 + 0.65 * n1);
     float cyc2 = fract(uTime * 0.09 + 0.47 + sin(coast * 0.13 + 2.0) * 0.08);
-    float front2 = mix(6.5, -2.5, cyc2);
+    float front2 = mix(6.5, -0.4, cyc2);
     float surf2 = exp(-pow((distToShore - front2) * 2.3, 2.0)) * sin(cyc2 * 3.14159) * 0.75
                 * (0.55 + 0.65 * n2);
-    shoreFoam = max(shoreFoam, max(surf1, surf2) * 0.9);
+    // Zungen enden an der Wasserlinie — die Plane unterm Strand darf
+    // keinen Schaum malen
+    float waterside = smoothstep(-1.0, -0.1, distToShore);
+    shoreFoam = max(shoreFoam, max(surf1, surf2) * 0.9 * waterside);
 
     vec2 windDir = vec2(0.85, 0.53);
     vec2 caustUv = wxz * 0.09 + windDir * uTime * 0.18;
@@ -264,8 +269,8 @@ async function buildOceanMaterialTSL() {
     // Brandung: radiale Wellenzüge mit Ufer-Amplitude (Spiegel des GLSL)
     const dC = length(vec2(p.x, p.y));
     const dS = dC.sub(48.0);
-    const shoreAmp = float(1).sub(smoothstep(0.0, 26.0, abs(dS)));
-    w.addAssign(sin(dS.mul(0.9).sub(uTime.mul(1.4))).mul(0.06).mul(shoreAmp));
+    const shoreAmp = float(1).sub(smoothstep(2.0, 26.0, dS)).mul(smoothstep(-0.5, 2.0, dS));
+    w.addAssign(sin(dS.mul(0.9).sub(uTime.mul(1.4))).mul(0.035).mul(shoreAmp));
     p.z.addAssign(w);
     return p;
   })();
@@ -317,14 +322,15 @@ async function buildOceanMaterialTSL() {
 
     // Rollende Brandung (Spiegel des GLSL-Pfads)
     const cyc1 = fract(uTime.mul(0.09).add(sin(coast.mul(0.18)).mul(0.08)));
-    const front1 = mix(float(6.5), float(-2.5), cyc1);
+    const front1 = mix(float(6.5), float(-0.4), cyc1);
     const surf1 = exp(pow(distToShore.sub(front1).mul(1.9), 2.0).negate())
       .mul(sin(cyc1.mul(3.14159))).mul(n1.mul(0.65).add(0.55));
     const cyc2 = fract(uTime.mul(0.09).add(0.47).add(sin(coast.mul(0.13).add(2.0)).mul(0.08)));
-    const front2 = mix(float(6.5), float(-2.5), cyc2);
+    const front2 = mix(float(6.5), float(-0.4), cyc2);
     const surf2 = exp(pow(distToShore.sub(front2).mul(2.3), 2.0).negate())
       .mul(sin(cyc2.mul(3.14159))).mul(0.75).mul(n2.mul(0.65).add(0.55));
-    const shoreFoam = max(shoreFoamBase, max(surf1, surf2).mul(0.9));
+    const waterside = smoothstep(-1.0, -0.1, distToShore);
+    const shoreFoam = max(shoreFoamBase, max(surf1, surf2).mul(0.9).mul(waterside));
 
     // Offshore-Caustics (mit cheaper fbm2 für weniger ALU-Last).
     // Auch im Flachwasser sichtbar — identische Zone wie GLSL-Pfad.

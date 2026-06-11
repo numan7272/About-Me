@@ -14,9 +14,10 @@
  * expandiert der Clip-Radius über die ganze Insel, der Ring wächst
  * synchron mit und verblasst, das Blueprint blendet aus.
  *
- * Unter WebGPU (onBeforeCompile greift dort nicht) Fallback: Welt
- * komplett versteckt, Plattform-Scheibe im Kreis, Gebäude-Scale-Pop
- * beim Reveal.
+ * Unter WebGPU (onBeforeCompile greift dort nicht) werden die Welt-
+ * Materialien in NodeMaterials konvertiert und der Clip läuft als
+ * opacityNode + alphaTest-Discard (TSL). Schlägt die Konvertierung
+ * fehl: Fallback mit versteckter Welt + Gebäude-Scale-Pop.
  */
 
 import * as THREE from "three";
@@ -182,20 +183,90 @@ export class BootReveal {
   }
 
   /** Bühne aufbauen, sobald die Welt-Module existieren. */
-  _setupStage() {
+  async _setupStage() {
     if (!this.active || this._revealing) return;
-    this._clipMode = this.game.renderer?.mode === "webgl";
 
-    if (this._clipMode) {
+    if (this.game.renderer?.mode === "webgl") {
       // Sturm-Clip: Welt bleibt sichtbar, alles außerhalb des Kreises
       // wird im Fragment-Shader weggeschnitten — das HQ ragt angeschnitten
       // in den Kreis wie bei einem echten Reveal.
+      this._clipMode = true;
       for (const m of this._collectClipMaterials()) this._injectClip(m);
     } else {
-      // WebGPU-Fallback: Scheibe zeigen, Welt verstecken (Pop-in später)
-      this._disc.visible = true;
+      // WebGPU: gleicher Effekt über NodeMaterial-Konvertierung
+      this._clipMode = await this._setupNodeClip();
+      if (!this._clipMode) this._disc.visible = true;
     }
     this._applyBootState();
+  }
+
+  /**
+   * WebGPU-Variante des Sturm-Clips: jedes Welt-Material wird in das
+   * passende NodeMaterial konvertiert (copy() übernimmt Maps/Farben/
+   * PBR-Werte) und bekommt einen opacityNode, der außerhalb des Kreises
+   * 0 liefert — der eingebaute alphaTest discarded die Fragmente.
+   */
+  async _setupNodeClip() {
+    try {
+      const webgpu = await import("three/webgpu");
+      const tsl = await import("three/tsl");
+      const { uniform, float, select, distance, positionWorld } = tsl;
+
+      this._uRNode = uniform(CIRCLE_R);
+      this._uCNode = uniform(new THREE.Vector2(SPAWN[0], SPAWN[2]));
+      this._uOnNode = uniform(1);
+
+      const opacityNode = select(
+        this._uOnNode.greaterThan(0.5)
+          .and(distance(positionWorld.xz, this._uCNode).greaterThan(this._uRNode)),
+        float(0),
+        float(1),
+      );
+
+      const pickClass = (m) => {
+        if (m.isMeshPhysicalMaterial) return webgpu.MeshPhysicalNodeMaterial;
+        if (m.isMeshStandardMaterial) return webgpu.MeshStandardNodeMaterial;
+        if (m.isMeshBasicMaterial)    return webgpu.MeshBasicNodeMaterial;
+        if (m.isMeshPhongMaterial)    return webgpu.MeshPhongNodeMaterial;
+        if (m.isMeshLambertMaterial)  return webgpu.MeshLambertNodeMaterial;
+        return null;
+      };
+
+      const cache = new Map();
+      const conv = (m) => {
+        if (!m) return m;
+        if (cache.has(m)) return cache.get(m);
+        const Cls = pickClass(m);
+        if (!Cls) return m;
+        const nm = new Cls();
+        nm.copy(m);
+        nm.opacityNode = opacityNode;
+        nm.alphaTestNode = float(0.5);
+        cache.set(m, nm);
+        return nm;
+      };
+      const swap = (root) => {
+        root?.traverse?.((o) => {
+          if (!o.isMesh) return;
+          o.material = Array.isArray(o.material)
+            ? o.material.map(conv)
+            : conv(o.material);
+        });
+      };
+
+      const w = this.game.world;
+      swap(w?.island?.root);
+      swap(w?.road?.group);
+      swap(w?.streetLamps?.group);
+      for (const mesh of [w?.nature?.trunkMesh, w?.nature?.blobMesh, w?.nature?.leafMesh]) {
+        if (mesh?.material) mesh.material = conv(mesh.material);
+      }
+      console.log("[BootReveal] WebGPU node-clip aktiv (" + cache.size + " Materialien)");
+      return true;
+    } catch (e) {
+      console.warn("[BootReveal] WebGPU node-clip fehlgeschlagen, Fallback:", e?.message);
+      return false;
+    }
   }
 
   _alwaysHidden() {
@@ -252,6 +323,7 @@ export class BootReveal {
         to: REVEAL_MAX,
         apply: (v, t) => {
           this._uRevealR.value = v;
+          if (this._uRNode) this._uRNode.value = v;
           this._ring.scale.setScalar(v / (CIRCLE_R + 0.08));
           this._ringMat.opacity = 1 - easeCubicOut(t);
           // Gras synchron zum Sturm freigeben (Cull-Kreis = Clip-Kreis,
@@ -263,6 +335,7 @@ export class BootReveal {
         },
         onDone: () => {
           this._uRevealOn.value = 0;
+          if (this._uOnNode) this._uOnNode.value = 0;
           grassAdapter?.setMapRadius?.(46);
           grassAdapter?.setMapCenter?.(0, 0);
         },
