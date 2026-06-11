@@ -353,6 +353,15 @@ export class DesignaOS extends FakeOS {
       }
       .dos-start-power { cursor: default; opacity: 0.7; }
 
+      @media (max-width: 640px) {
+        /* Close-OS-Button (oben rechts) nicht mit der Icon-Reihe kollidieren */
+        .dos .fos-area { padding-top: 48px; }
+        .dos-startbtn { left: 10px; }
+        .dos-tray .dos-tray-glyphs { display: none; }
+        .dos-startmenu { bottom: 56px; }
+        .dos-start-grid { grid-template-columns: repeat(3, 1fr); }
+      }
+
       /* ── App-Styles ── */
       .dos-jira { display: flex; flex-direction: column; height: 100%; }
       .dos-jira-bar {

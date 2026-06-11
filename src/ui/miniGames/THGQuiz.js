@@ -161,8 +161,23 @@ export class THGQuiz {
         margin: 24px auto;
         background: ${THG_PAPER_SOFT};
         border: 1px solid ${THG_RULE};
-        border-left: 3px solid ${THG_VIOLET};
-        padding: 32px 32px 28px;
+        border-top: 4px solid ${THG_VIOLET};
+        border-radius: 10px;
+        box-shadow: 0 14px 40px rgba(40, 30, 70, 0.10);
+        padding: 28px 32px;
+      }
+      .thg-school {
+        font-weight: 700;
+        font-size: 14px;
+        color: ${THG_INK};
+        line-height: 1.2;
+      }
+      .thg-school small {
+        display: block;
+        font-weight: 400;
+        font-size: 11.5px;
+        color: ${THG_MUTED};
+        margin-top: 2px;
       }
       .thg-head {
         display: flex; justify-content: space-between;
@@ -178,6 +193,7 @@ export class THGQuiz {
       .thg-close {
         background: transparent;
         border: 1px solid ${THG_RULE};
+        border-radius: 6px;
         color: ${THG_MUTED};
         padding: 6px 12px;
         font-size: 11.5px;
@@ -195,10 +211,12 @@ export class THGQuiz {
       }
       .thg-progress {
         flex: 1;
-        height: 2px;
+        height: 6px;
+        border-radius: 3px;
         background: ${THG_RULE};
         overflow: hidden;
       }
+      .thg-progress > div { border-radius: 3px; }
       .thg-progress > div {
         height: 100%;
         background: ${THG_VIOLET};
@@ -234,9 +252,10 @@ export class THGQuiz {
         display: flex; flex-direction: column; gap: 8px;
       }
       .thg-opt {
-        padding: 14px 16px;
-        background: transparent;
+        padding: 12px 14px;
+        background: #fff;
         border: 1px solid ${THG_RULE};
+        border-radius: 8px;
         cursor: pointer;
         font-size: 14px;
         line-height: 1.5;
@@ -249,11 +268,20 @@ export class THGQuiz {
       }
       .thg-opt-letter {
         font-family: 'JetBrains Mono', ui-monospace, monospace;
-        font-size: 11px;
-        color: ${THG_DIM};
+        font-size: 12px;
+        color: ${THG_VIOLET};
         flex-shrink: 0;
-        width: 18px;
+        width: 28px; height: 28px;
+        border: 1px solid ${THG_RULE};
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
         text-transform: uppercase;
+        transition: background 150ms, border-color 150ms, color 150ms;
+      }
+      .thg-opt:hover:not(:disabled) .thg-opt-letter {
+        background: ${THG_VIOLET};
+        border-color: ${THG_VIOLET};
+        color: #fff;
       }
       .thg-opt:hover:not(:disabled) {
         border-color: ${THG_VIOLET};
@@ -264,13 +292,17 @@ export class THGQuiz {
         border-color: ${THG_GREEN};
         background: rgba(45, 138, 79, 0.08);
       }
-      .thg-opt.right .thg-opt-letter,
+      .thg-opt.right .thg-opt-letter {
+        background: ${THG_GREEN}; border-color: ${THG_GREEN}; color: #fff;
+      }
       .thg-opt.right .thg-opt-mark { color: ${THG_GREEN}; }
       .thg-opt.wrong {
         border-color: ${THG_RED};
         background: rgba(201, 63, 63, 0.08);
       }
-      .thg-opt.wrong .thg-opt-letter,
+      .thg-opt.wrong .thg-opt-letter {
+        background: ${THG_RED}; border-color: ${THG_RED}; color: #fff;
+      }
       .thg-opt.wrong .thg-opt-mark { color: ${THG_RED}; }
       .thg-opt-mark {
         margin-left: auto;
@@ -282,7 +314,8 @@ export class THGQuiz {
         margin-top: 18px;
         padding: 14px 16px;
         background: ${THG_VIOLET_TINT};
-        border-left: 2px solid ${THG_VIOLET};
+        border-left: 3px solid ${THG_VIOLET};
+        border-radius: 0 8px 8px 0;
         font-size: 13px;
         line-height: 1.6;
         color: ${THG_INK};
@@ -294,6 +327,7 @@ export class THGQuiz {
         padding: 14px;
         background: ${THG_VIOLET};
         border: 0;
+        border-radius: 8px;
         color: #fff;
         font-weight: 600;
         font-size: 14px;
@@ -362,7 +396,8 @@ export class THGQuiz {
       .thg-result-row .nok { color: ${THG_RED}; display: flex; align-items: center; gap: 6px; }
 
       @media (max-width: 640px) {
-        .thg-card { padding: 22px 18px; margin: 12px auto; border-left-width: 3px; }
+        .thg-card { padding: 20px 16px; margin: 4px auto; }
+        .thg-school { font-size: 13px; }
         .thg-q { font-size: 18px; }
         .thg-result-score { font-size: 48px; }
         .thg-result-score .denom { font-size: 22px; }
@@ -388,7 +423,9 @@ export class THGQuiz {
 
     card.innerHTML = `
       <div class="thg-head">
-        <div class="thg-logo">// thg · allgemeinwissen</div>
+        <div>
+          <div class="thg-school">Thor-Heyerdahl-Gymnasium<small>Abi-Quiz · Mathe-LK, Englisch-LK, Allgemeinwissen</small></div>
+        </div>
         <button class="thg-close" type="button" aria-label="Quiz beenden">
           ${ICONS.x}<span>Beenden</span>
         </button>

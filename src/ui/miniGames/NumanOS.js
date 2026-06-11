@@ -785,8 +785,10 @@ export class NumanOS {
       "[ OK ] Welcome.",
     ];
     let i = 0;
-    requestAnimationFrame(() => { this.dom.root.style.opacity = "1"; });
+    requestAnimationFrame(() => { if (this.dom) this.dom.root.style.opacity = "1"; });
     const tick = () => {
+      // Boot kann per Esc abgebrochen werden — Timer nicht auf null-dom laufen lassen
+      if (!this.dom) return;
       if (i >= lines.length) {
         // Boot fertig → Desktop einblenden
         setTimeout(() => this._showDesktop(), 320);
@@ -804,9 +806,10 @@ export class NumanOS {
   }
 
   _showDesktop() {
+    if (!this.dom) return;
     this.dom.boot.style.opacity = "0";
     this.dom.desktop.classList.add("shown");
-    setTimeout(() => { this.dom.boot.style.display = "none"; }, 440);
+    setTimeout(() => { if (this.dom) this.dom.boot.style.display = "none"; }, 440);
   }
 
   // ── File-Open-Dispatcher ──────────────────────────────────────────

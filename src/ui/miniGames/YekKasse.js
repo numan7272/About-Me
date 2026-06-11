@@ -427,13 +427,21 @@ export class YekKasse {
         .yk-station { display: none; }
         .yk-layout {
           grid-template-columns: 1fr;
+          grid-template-rows: 1fr auto;
           padding: 10px;
           gap: 10px;
         }
+        /* Warenkorb als Bottom-Sheet: schattiert, Liste wächst mit Inhalt,
+           Menü behält den Großteil des Screens */
         .yk-cart {
           position: sticky; bottom: 0;
-          max-height: 50vh;
+          max-height: 42vh;
+          box-shadow: 0 -10px 30px rgba(0,0,0,0.12);
         }
+        .yk-cart-list { min-height: 0; max-height: 18vh; overflow: auto; }
+        .yk-cart-empty { padding: 10px 0 !important; }
+        .yk-grid { grid-template-columns: repeat(2, 1fr); }
+        .yk-item { min-height: 56px; }
         .yk-hint {
           position: static;
           max-width: none;
@@ -468,7 +476,7 @@ export class YekKasse {
       </div>
       <aside class="yk-hint" role="note">
         <span class="yk-hint-icon">${ICONS.info}</span>
-        <span><strong>Story.</strong> So sah ein Teil meiner Schichten aus. Hier habe ich übrigens das ungehärtete WLAN-Setup entdeckt — siehe Router-Egg auf der Insel.</span>
+        <span><strong>Story.</strong> So sah ein Teil meiner Schichten aus. Hier habe ich übrigens das ungehärtete WLAN-Setup entdeckt. Siehe Router-Egg auf der Insel.</span>
       </aside>
     `;
 
@@ -534,7 +542,7 @@ export class YekKasse {
     const list = this.dom.cartList;
     const totals = this.dom.totals;
     if (this.cart.length === 0) {
-      list.innerHTML = `<div class="yk-cart-empty">Noch nichts ausgewählt.<br>Tipp ein Item links an.</div>`;
+      list.innerHTML = `<div class="yk-cart-empty">Noch nichts ausgewählt.<br>Tipp ein Gericht an.</div>`;
       totals.innerHTML = "";
       this.dom.payBtn.disabled = true;
       this.dom.clearBtn.disabled = true;
