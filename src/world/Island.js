@@ -33,6 +33,7 @@ export class Island {
     this.colliderMeshes = [];
     this.terrainMesh = null;
     this.worldColliders = { trees: [], rocks: [] };
+    this.treeSpots = [];   // {x,y,z,radius,height} — aus den GLB-Trunk-Nodes
 
     this._traverse();
 
@@ -232,6 +233,23 @@ export class Island {
         if (touched > 0) {
           console.log(`[Island] Egg defensive: ${name} → ${touched} mats touched, ${recolored} recolored`);
         }
+      }
+
+      // GLB-Bäume ausblenden — Nature.js ersetzt sie durch prozedurale
+      // stilisierte Bäume. Die Positionen sammeln wir HIER beim Ausblenden
+      // ein (ein Spot pro Tree_Trunk): world_colliders_json existiert im
+      // GLB nicht, die Trunk-Transforms sind die einzige Quelle.
+      if (name.startsWith("Tree_Trunk") || name.startsWith("Tree_Canopy")) {
+        if (name.startsWith("Tree_Trunk")) {
+          obj.getWorldPosition(tmpPos);
+          this.treeSpots.push({
+            x: tmpPos.x, y: tmpPos.y, z: tmpPos.z,
+            // Radius/Höhe variieren in Nature.js per Positions-Hash
+            radius: 1.5, height: 3.8,
+          });
+        }
+        obj.visible = false;
+        return;
       }
 
       // Blockout-Meshes + Deko-Krempel — komplett ausblenden.

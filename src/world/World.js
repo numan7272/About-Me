@@ -26,6 +26,7 @@ import { ProximityTrigger } from "./ProximityTrigger.js";
 import { Ocean } from "./Ocean.js";
 import { SkyDome } from "./SkyDome.js";
 import { Grass } from "./Grass.js";
+import { Nature } from "./Nature.js";
 import { Wind } from "./Wind.js";
 import { ColliderDebug } from "./ColliderDebug.js";
 import { StationLabels3D } from "../ui/walkthrough/StationLabels3D.js";
@@ -79,6 +80,7 @@ export class World {
       this._buildRoad();
       this._buildStreetLamps();
       this._buildGrass();
+      this._buildNature();
       this._buildStationLabels();
       this._buildPlayer();
       this._buildProximity();
@@ -190,6 +192,17 @@ export class World {
     );
   }
 
+  _buildNature() {
+    if (!this.island) {
+      console.warn("[World] nature skipped — island not built yet");
+      return;
+    }
+    // Prozedurale Bäume (ersetzen die GLB-Trees) + fallende Blätter +
+    // Pollen-Motes. Reine InstancedMesh/Standard-Material-Lösung — läuft
+    // identisch unter WebGL und WebGPU.
+    this.nature = new Nature(this.game, this.island);
+  }
+
   _buildStationLabels() {
     if (!this.island) {
       console.warn("[World] station labels skipped — island not built yet");
@@ -276,6 +289,7 @@ export class World {
     if (this.road?.update) this.road.update();
     if (this.streetLamps?.update) this.streetLamps.update();
     if (this.grass?.update) this.grass.update();
+    if (this.nature?.update) this.nature.update();
     if (this.ocean?.update) this.ocean.update();
     if (this.player?.update) this.player.update();
     if (this.tapToMove?.update) this.tapToMove.update();
@@ -289,6 +303,7 @@ export class World {
     this.road?.destroy?.();
     this.streetLamps?.destroy?.();
     this.grass?.destroy?.();
+    this.nature?.destroy?.();
     this.ocean?.destroy?.();
     this.sky?.destroy?.();
     this.player?.destroy?.();
