@@ -29,6 +29,7 @@ const TURN_SPEED = 2.6;       // rad/s — Drehrate
 const SPEED_FACTOR_FLOOR = 0.55;  // Keyboard: Mindest-Drehrate auch im Stand
 const ANG_CAP_JOY_MULT = 1.6;     // Joystick: ANG_CAP = TURN_SPEED * 1.6
 const JOY_P_GAIN = 5;             // P-Controller für Yaw-Fehler
+const JOY_MIN_THROTTLE = 0.35;    // Mindest-Throttle direkt über der Deadzone
 
 const SUSPENSION_TAU = 0.10;
 const VISUAL_Y_OFFSET = 0.22;
@@ -423,14 +424,22 @@ export class Player {
       const ANG_CAP = TURN_SPEED * ANG_CAP_JOY_MULT;
       angY = THREE.MathUtils.clamp(dy * JOY_P_GAIN, -ANG_CAP, ANG_CAP);
 
-      // Throttle = volle Leistung sobald der Joystick aus der Dead-Zone ist.
-      // Wie auf PC mit W-Taste: kein analoges Skalieren. Heading-Alignment bleibt
-      // damit das Bike bei seitlicher Richtung sanft in die Kurve geht (sonst
-      // schießt es in die alte Richtung weiter). Floor bei 0.4 damit das Bike
-      // bei 90°/180°-Lenken nicht komplett zum Stillstand kommt — es soll
+      // Heading-Alignment: bei seitlicher Richtung geht das Bike sanft in die
+      // Kurve statt in die alte Richtung weiterzuschießen. Floor bei 0.4 damit
+      // es bei 90°/180°-Lenken nicht komplett zum Stillstand kommt — es soll
       // während der Drehung weiter rollen.
       const alignment = Math.max(0.4, 0.5 + 0.5 * Math.cos(dy));
-      const targetSpeed = MAX_SPEED * alignment;
+      // Analoge Magnitude→Speed-Kurve: Throttle = magnitude³ (kubisch) — kleine
+      // Auslenkung = feinfühliges Langsam-Rangieren, volle Auslenkung = Topspeed,
+      // mit viel Auflösung im unteren Bereich. Floor JOY_MIN_THROTTLE damit das
+      // Bike auch knapp über der Deadzone sofort spürbar anfährt (unser
+      // Velocity-Lerp hat keine Physik-Trägheit, reine 0-Kurve fühlt sich tot an).
+      // Tap-to-Move profitiert mit: magnitude=dist/SLOW_RADIUS → kubisch weiches
+      // Ausrollen am Ziel.
+      const joyMag = THREE.MathUtils.clamp(joy.magnitude ?? 1, 0, 1);
+      const throttle = JOY_MIN_THROTTLE
+        + (1 - JOY_MIN_THROTTLE) * joyMag * joyMag * joyMag;
+      const targetSpeed = MAX_SPEED * alignment * throttle;
       targetVx = this._tmpForward.x * targetSpeed;
       targetVz = this._tmpForward.z * targetSpeed;
 
