@@ -270,6 +270,16 @@ export class BootReveal {
         for (const k in nm) {
           if (k.endsWith("Node") && nm[k] === undefined) nm[k] = null;
         }
+        // ACHTUNG: NodeMaterial.copy() überträgt nur Node-Slots plus die
+        // Material-Basis-Props (blending, side, opacity …) — color, map,
+        // roughness, metalness etc. bleiben auf Default (alles weiß!).
+        // Oberflächen-Props deshalb generisch vom Quellmaterial nachziehen.
+        for (const k in m) {
+          if (k === "uuid" || k === "type" || k.endsWith("Node")) continue;
+          const v = m[k];
+          if (typeof v === "function") continue;
+          try { nm[k] = v; } catch (_) { /* read-only Props überspringen */ }
+        }
         nm.opacityNode = opacityNode;
         // Beides setzen: alphaTestNode (TSL-Slot) UND die klassische
         // Number-Property — letztere aktiviert den Alpha-Test-Zweig
