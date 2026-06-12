@@ -1,5 +1,5 @@
 /**
- * DayCycle — Bruno-inspired Tag/Nacht-Zyklus.
+ * DayCycle — Tag/Nacht-Zyklus.
  *
  * Portiert aus altem Next.js lib/dayCycle.js.
  *

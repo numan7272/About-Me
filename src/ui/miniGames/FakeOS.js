@@ -194,6 +194,9 @@ export class FakeOS {
     const text = this.dom.boot.querySelector(".fos-boot-text");
     let i = 0;
     const tick = () => {
+      // User kann das OS während des Boots schließen (Esc) — die
+      // geplanten Timer dürfen dann nicht mehr auf dom zugreifen.
+      if (!this.dom) return;
       if (i >= lines.length) {
         setTimeout(() => this._showDesktop(), 320);
         return;
@@ -209,8 +212,9 @@ export class FakeOS {
   }
 
   _showDesktop() {
+    if (!this.dom) return;
     this.dom.boot.style.opacity = "0";
-    setTimeout(() => { this.dom.boot.style.display = "none"; }, 440);
+    setTimeout(() => { if (this.dom) this.dom.boot.style.display = "none"; }, 440);
   }
 
   // ─── App-Rendering ──────────────────────────────────────────────────

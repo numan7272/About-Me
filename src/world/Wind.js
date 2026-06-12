@@ -1,5 +1,5 @@
 /**
- * Wind — globaler Wind-Singleton à la Bruno's folio-2025.
+ * Wind — globaler Wind-Singleton.
  *
  * Eine zentrale Wind-Quelle. Konsumenten (Grass, Trees, Banner) lesen
  * `wind.direction`, `wind.speed`, `wind.strength` — und sehen alle dieselbe

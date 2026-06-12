@@ -26,10 +26,12 @@ import { ProximityTrigger } from "./ProximityTrigger.js";
 import { Ocean } from "./Ocean.js";
 import { SkyDome } from "./SkyDome.js";
 import { Grass } from "./Grass.js";
+import { Nature } from "./Nature.js";
 import { Wind } from "./Wind.js";
 import { ColliderDebug } from "./ColliderDebug.js";
 import { StationLabels3D } from "../ui/walkthrough/StationLabels3D.js";
 import { getControlMode } from "../ui/controlMode.js";
+import { BIKE_SPAWN } from "./spawn.js";
 
 export class World {
   constructor(game) {
@@ -79,6 +81,7 @@ export class World {
       this._buildRoad();
       this._buildStreetLamps();
       this._buildGrass();
+      this._buildNature();
       this._buildStationLabels();
       this._buildPlayer();
       this._buildProximity();
@@ -126,6 +129,10 @@ export class World {
     const initEnv = () => {
       const renderer = this.game?.renderer?.instance;
       if (!renderer) return;
+      // PMREMGenerator ist eine reine WebGL-API — unter WebGPU crasht
+      // fromScene() intern. Das Bike verliert dort nur die Env-Reflections,
+      // die restliche Beleuchtung bleibt identisch.
+      if (this.game?.renderer?.mode !== "webgl") return;
       try {
         const pmrem = new THREE.PMREMGenerator(renderer);
         const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
@@ -190,6 +197,17 @@ export class World {
     );
   }
 
+  _buildNature() {
+    if (!this.island) {
+      console.warn("[World] nature skipped — island not built yet");
+      return;
+    }
+    // Prozedurale Bäume (ersetzen die GLB-Trees) + fallende Blätter +
+    // Pollen-Motes. Reine InstancedMesh/Standard-Material-Lösung — läuft
+    // identisch unter WebGL und WebGPU.
+    this.nature = new Nature(this.game, this.island);
+  }
+
   _buildStationLabels() {
     if (!this.island) {
       console.warn("[World] station labels skipped — island not built yet");
@@ -205,10 +223,9 @@ export class World {
       return;
     }
 
-    // Spawn vor dem HQ — vom User per Browser-Console festgelegt.
-    // Story-Start "Zu Hause, das letzte Kapitel". Y leicht angehoben für
-    // sauberes Fall-in statt Z-Fighting auf der Auffahrt.
-    const spawn = [-4.38, 1.0, 16.63];
+    // Spawn direkt vor der HQ-Garage (geteilte Konstante, siehe spawn.js).
+    // Y leicht angehoben für sauberes Fall-in.
+    const spawn = [BIKE_SPAWN[0], 1.0, BIKE_SPAWN[2]];
     this.player = new Player(this.game, spawn);
     // Visual-Modell asynchron, sobald RigidBody auch ready ist
     this.player.setBikeModel(bikeGltf.scene.clone(true));
@@ -276,6 +293,7 @@ export class World {
     if (this.road?.update) this.road.update();
     if (this.streetLamps?.update) this.streetLamps.update();
     if (this.grass?.update) this.grass.update();
+    if (this.nature?.update) this.nature.update();
     if (this.ocean?.update) this.ocean.update();
     if (this.player?.update) this.player.update();
     if (this.tapToMove?.update) this.tapToMove.update();
@@ -289,6 +307,7 @@ export class World {
     this.road?.destroy?.();
     this.streetLamps?.destroy?.();
     this.grass?.destroy?.();
+    this.nature?.destroy?.();
     this.ocean?.destroy?.();
     this.sky?.destroy?.();
     this.player?.destroy?.();

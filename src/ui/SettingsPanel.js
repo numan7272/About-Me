@@ -64,22 +64,20 @@ export class SettingsPanel {
     this.btn = document.createElement("button");
     this.btn.type = "button";
     this.btn.className = "hud-btn";
-    this.btn.textContent = "settings";
+    this.btn.textContent = "Settings";
     this.btn.setAttribute("aria-expanded", "false");
     this.btn.setAttribute("aria-controls", "settings-panel");
-    // Settings ist Chrome-Tier: kleinere Schrift, kein ink-solid Frame,
-    // damit Tour + Kontakt prominenter wirken. Plain text-link mit
-    // hover-underline (kommt aus .hud-btn).
+    // Settings ist Chrome-Tier: kleiner als Tour + Kontakt, damit die
+    // prominenter wirken. Outlined-Button-Stil kommt aus .hud-btn.
     Object.assign(this.btn.style, {
       position: "fixed",
-      top: "22px",
+      top: "20px",
       left: "18px",
       zIndex: "12",
-      fontSize: "11px",
+      fontSize: "13px",
       color: "var(--paper-muted)",
-      padding: "6px 8px",
-      minHeight: "32px",
-      background: "transparent",
+      padding: "8px 14px",
+      minHeight: "38px",
     });
     this.btn.addEventListener("click", () => this.toggle());
     document.body.appendChild(this.btn);
@@ -91,10 +89,10 @@ export class SettingsPanel {
       position: "fixed",
       top: "76px",
       left: "20px",
-      width: "240px",
-      padding: "16px 16px 14px",
-      fontFamily: "var(--font-mono)",
-      fontSize: "12px",
+      width: "260px",
+      padding: "18px 18px 16px",
+      fontFamily: "var(--font-ui)",
+      fontSize: "14px",
       color: "var(--paper)",
       zIndex: "12",
       display: "none",
@@ -131,22 +129,19 @@ export class SettingsPanel {
 
   _sectionLabel(text) {
     const lbl = document.createElement("div");
-    lbl.textContent = `> ${text}`;
-    Object.assign(lbl.style, {
-      fontSize: "11px",
-      color: "var(--paper-muted)",
-      marginBottom: "8px",
-    });
+    lbl.className = "hud-kicker";
+    lbl.textContent = text;
+    lbl.style.marginBottom = "8px";
     return lbl;
   }
 
   _buildControlModeRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._sectionLabel("bike control"));
+    wrap.appendChild(this._sectionLabel(this.settings.lang === "en" ? "Bike control" : "Steuerung"));
     wrap.appendChild(this._textToggleGroup(
       [
-        { value: "joystick", label: "joystick" },
-        { value: "tap",      label: "tap-to-move" },
+        { value: "joystick", label: "Joystick" },
+        { value: "tap",      label: "Tap-to-move" },
       ],
       getControlMode(),
       (val) => setControlMode(val),
@@ -193,11 +188,11 @@ export class SettingsPanel {
 
   _buildLanguageRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._sectionLabel("language"));
+    wrap.appendChild(this._sectionLabel(this.settings.lang === "en" ? "Language" : "Sprache"));
     wrap.appendChild(this._textToggleGroup(
       [
-        { label: "de", value: "de" },
-        { label: "en", value: "en" },
+        { label: "DE", value: "de" },
+        { label: "EN", value: "en" },
       ],
       this.settings.lang,
       (val) => {
@@ -211,7 +206,7 @@ export class SettingsPanel {
 
   _buildVolumeRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._sectionLabel("volume"));
+    wrap.appendChild(this._sectionLabel(this.settings.lang === "en" ? "Volume" : "Lautstärke"));
 
     const row = document.createElement("div");
     Object.assign(row.style, {
@@ -228,7 +223,7 @@ export class SettingsPanel {
     slider.setAttribute("aria-label", "volume");
     Object.assign(slider.style, {
       flex: "1",
-      accentColor: "oklch(72% 0.22 25)",
+      accentColor: "var(--signal)",
     });
 
     const valueLabel = document.createElement("span");
@@ -256,11 +251,11 @@ export class SettingsPanel {
 
   _buildGraphicsRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._sectionLabel("graphics"));
+    wrap.appendChild(this._sectionLabel(this.settings.lang === "en" ? "Graphics" : "Grafik"));
     wrap.appendChild(this._textToggleGroup(
       [
-        { label: "low", value: "low" },
-        { label: "high", value: "high" },
+        { label: "Low", value: "low" },
+        { label: "High", value: "high" },
       ],
       this.settings.graphics,
       (val) => {
@@ -274,11 +269,11 @@ export class SettingsPanel {
 
   _buildRendererRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._sectionLabel("renderer"));
+    wrap.appendChild(this._sectionLabel("Renderer"));
     wrap.appendChild(this._textToggleGroup(
       [
-        { label: "webgl", value: "webgl" },
-        { label: "webgpu", value: "webgpu" },
+        { label: "WebGL", value: "webgl" },
+        { label: "WebGPU", value: "webgpu" },
       ],
       this.settings.renderer,
       (val) => {
@@ -297,7 +292,7 @@ export class SettingsPanel {
       fontSize: "10px",
       color: "var(--paper-dim)",
     });
-    hint.textContent = "active: " + (this.game?.renderer?.mode || "loading");
+    hint.textContent = "Active: " + (this.game?.renderer?.mode || "loading");
     wrap.appendChild(hint);
     this._rendererHint = hint;
     return wrap;

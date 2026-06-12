@@ -64,12 +64,12 @@ export class ControlModePicker {
     const root = document.createElement("div");
     root.style.cssText = `
       position: fixed; inset: 0; z-index: 9998;
-      background: oklch(13% 0.015 250 / 0.55);
+      background: rgba(10, 19, 18, 0.55);
       display: flex; align-items: center; justify-content: center;
       padding: 20px;
       opacity: 0;
       transition: opacity 280ms var(--ease);
-      font-family: var(--font-mono);
+      font-family: var(--font-ui);
       color: var(--paper);
     `;
 
@@ -88,9 +88,9 @@ export class ControlModePicker {
     card.innerHTML = `
       <span class="hud-bracket-tr"></span>
       <span class="hud-bracket-bl"></span>
-      <div style="font-size:11px;color:var(--paper-muted);margin-bottom:10px;">${strings.meta}</div>
-      <h2 id="cmp-title" style="margin:0 0 8px;font-size:22px;font-weight:400;line-height:1.15;letter-spacing:-0.01em;color:var(--paper);">${strings.title}</h2>
-      <p style="margin:0 0 18px;font-size:13px;line-height:1.5;color:var(--paper-muted);">${strings.sub}</p>
+      <div class="hud-kicker" style="margin-bottom:10px;">${strings.meta}</div>
+      <h2 id="cmp-title" style="margin:0 0 8px;font-family:var(--font-display);font-size:36px;font-weight:700;line-height:1.05;letter-spacing:0.02em;color:var(--paper);">${strings.title}</h2>
+      <p style="margin:0 0 18px;font-size:15px;line-height:1.5;color:var(--paper-muted);">${strings.sub}</p>
       <hr class="hud-rule" style="margin:0 0 18px;" />
       <div data-cmp-grid style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
         ${this._renderCard("joystick", strings.joystickTitle, strings.joystickDesc, strings.pick, strings.recommended, true)}
@@ -104,25 +104,27 @@ export class ControlModePicker {
         padding: 16px 14px;
         background: transparent;
         border: 1px solid var(--rule);
+        border-radius: var(--radius);
         display: flex; flex-direction: column;
         gap: 10px;
         text-align: left;
-        font-family: var(--font-mono);
+        font-family: var(--font-ui);
       }
       .cmp-card.recommended { border-color: var(--signal); }
-      .cmp-card-title { font-size: 14px; font-weight: 400; margin: 0; color: var(--paper); }
-      .cmp-card-desc { font-size: 12px; line-height: 1.5; color: var(--paper-muted); margin: 0; flex: 1; }
+      .cmp-card-title { font-size: 16px; font-weight: 700; margin: 0; color: var(--paper); }
+      .cmp-card-desc { font-size: 14px; line-height: 1.5; color: var(--paper-muted); margin: 0; flex: 1; }
       .cmp-card-pick {
         margin-top: auto;
         padding: 12px 14px;
         background: transparent;
         border: 1px solid var(--rule-strong);
+        border-radius: var(--radius);
         color: var(--paper);
-        font-family: var(--font-mono);
-        font-size: 12px;
+        font-family: var(--font-ui);
+        font-size: 14px;
+        font-weight: 700;
         cursor: pointer;
         min-height: 44px;
-        text-transform: lowercase;
         transition: border-color 180ms var(--ease), color 180ms var(--ease);
       }
       .cmp-card-pick:hover,

@@ -50,7 +50,6 @@ export class ContactPanel {
       display: "flex",
       alignItems: "center",
       gap: "8px",
-      letterSpacing: "0.04em",
     });
 
     // Caret-Cursor als "available"-Signal. Blinkt langsam, mono-terminal-feel.
@@ -84,7 +83,8 @@ export class ContactPanel {
 
   _updateButtonLabel() {
     const strings = this._strings();
-    this._btnLabel.textContent = (strings.contact || "contact").toLowerCase();
+    const raw = strings.contact || "Contact";
+    this._btnLabel.textContent = raw.charAt(0).toUpperCase() + raw.slice(1);
   }
 
   _buildPanel() {
@@ -94,7 +94,7 @@ export class ContactPanel {
       position: "fixed",
       inset: "0",
       zIndex: String(Z_INDEX_PANEL - 1),
-      background: "oklch(13% 0.015 250 / 0.55)",
+      background: "rgba(10, 19, 18, 0.55)",
       opacity: "0",
       pointerEvents: "none",
       transition: "opacity 220ms var(--ease)",
@@ -114,14 +114,14 @@ export class ContactPanel {
       bottom: "0",
       width: "min(420px, 92vw)",
       zIndex: String(Z_INDEX_PANEL),
-      background: "var(--ink-solid)",
+      background: "var(--surface)",
       borderLeft: "1px solid var(--rule-strong)",
       transform: "translateX(100%)",
       transition: "transform 320ms var(--ease)",
       display: "flex",
       flexDirection: "column",
       padding: "26px 26px 22px",
-      fontFamily: "var(--font-mono)",
+      fontFamily: "var(--font-ui)",
       color: "var(--paper)",
       overflowY: "auto",
     });
@@ -163,31 +163,31 @@ export class ContactPanel {
 
     // ── Header ──
     const eyebrow = document.createElement("div");
+    eyebrow.className = "hud-kicker";
     eyebrow.textContent = isEn ? "> get in touch" : "> kontakt aufnehmen";
     Object.assign(eyebrow.style, {
-      fontSize: "11px",
-      color: "var(--paper-muted)",
       marginBottom: "10px",
       marginTop: "8px",
     });
     this.panel.appendChild(eyebrow);
 
     const name = document.createElement("div");
-    name.textContent = "numan.yesil";
+    name.textContent = "Numan Yesil";
     Object.assign(name.style, {
-      fontSize: "26px",
-      fontWeight: "400",
-      lineHeight: "1.1",
-      letterSpacing: "-0.02em",
+      fontFamily: "var(--font-display)",
+      fontSize: "42px",
+      fontWeight: "700",
+      lineHeight: "1.0",
+      letterSpacing: "0.02em",
       marginBottom: "4px",
       color: "var(--paper)",
     });
     this.panel.appendChild(name);
 
     const loc = document.createElement("div");
-    loc.textContent = (CONTACT.location || "").toLowerCase();
+    loc.textContent = CONTACT.location || "";
     Object.assign(loc.style, {
-      fontSize: "12px",
+      fontSize: "14px",
       color: "var(--paper-muted)",
       marginBottom: "20px",
     });
@@ -273,10 +273,12 @@ export class ContactPanel {
     Object.assign(copyBtn.style, {
       padding: "6px 12px",
       border: "1px solid var(--rule-strong)",
+      borderRadius: "var(--radius)",
       background: "transparent",
       color: "var(--paper-muted)",
-      fontFamily: "var(--font-mono)",
-      fontSize: "11px",
+      fontFamily: "var(--font-ui)",
+      fontSize: "13px",
+      fontWeight: "700",
       cursor: "pointer",
       whiteSpace: "nowrap",
       transition: "color 180ms var(--ease), border-color 180ms var(--ease)",
@@ -321,11 +323,12 @@ export class ContactPanel {
       gap: "14px",
       padding: "12px 14px",
       border: "1px solid var(--rule)",
+      borderRadius: "var(--radius)",
       background: "transparent",
       color: "var(--paper)",
       textDecoration: "none",
       transition: "border-color 180ms var(--ease), color 180ms var(--ease)",
-      fontFamily: "var(--font-mono)",
+      fontFamily: "var(--font-ui)",
     });
     a.addEventListener("mouseenter", () => {
       a.style.borderColor = "var(--signal)";

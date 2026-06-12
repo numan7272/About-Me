@@ -33,8 +33,18 @@ export class Island {
     this.colliderMeshes = [];
     this.terrainMesh = null;
     this.worldColliders = { trees: [], rocks: [] };
+    this.treeSpots = [];   // {x,y,z,radius,height} — aus den GLB-Trunk-Nodes
 
     this._traverse();
+
+    // Baum-Spots auf den Boden setzen: die Trunk-Node-Origins liegen
+    // mittig im Stamm (~1m über Grund) — ohne Korrektur schweben die
+    // prozeduralen Bäume. Terrain ist nach _traverse() bekannt.
+    if (this.terrainMesh && this.treeSpots.length) {
+      for (const s of this.treeSpots) {
+        s.y = this._sampleTerrainY(s.x, s.z);
+      }
+    }
 
     // Visual zur Scene hinzufügen
     // Terrain cast't keine Shadow (riesige Mesh, kein optisch sichtbarer
@@ -232,6 +242,23 @@ export class Island {
         if (touched > 0) {
           console.log(`[Island] Egg defensive: ${name} → ${touched} mats touched, ${recolored} recolored`);
         }
+      }
+
+      // GLB-Bäume ausblenden — Nature.js ersetzt sie durch prozedurale
+      // stilisierte Bäume. Die Positionen sammeln wir HIER beim Ausblenden
+      // ein (ein Spot pro Tree_Trunk): world_colliders_json existiert im
+      // GLB nicht, die Trunk-Transforms sind die einzige Quelle.
+      if (name.startsWith("Tree_Trunk") || name.startsWith("Tree_Canopy")) {
+        if (name.startsWith("Tree_Trunk")) {
+          obj.getWorldPosition(tmpPos);
+          this.treeSpots.push({
+            x: tmpPos.x, y: tmpPos.y, z: tmpPos.z,
+            // Radius/Höhe variieren in Nature.js per Positions-Hash
+            radius: 1.5, height: 3.8,
+          });
+        }
+        obj.visible = false;
+        return;
       }
 
       // Blockout-Meshes + Deko-Krempel — komplett ausblenden.

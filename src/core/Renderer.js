@@ -1,7 +1,7 @@
 /**
  * Renderer — WebGL- oder WebGPU-Setup mit Three.js.
  *
- * Wie Bruno Simon's folio-2025: User wählt zwischen WebGL und WebGPU.
+ * User wählt zwischen WebGL und WebGPU.
  *
  * WebGL-Pfad:
  *   - THREE.WebGLRenderer
@@ -102,9 +102,9 @@ export class Renderer {
       // praktisch identisch aus und ist unter WebGPU deutlich billiger.
       r.shadowMap.type = THREE.PCFShadowMap;
     }
-    r.setClearColor(0x101218);   // matches --ink token + theme-color in index.html
+    r.setClearColor(0x142120);   // matches --ink token + theme-color in index.html
 
-    // Bruno-Pattern: manuelle renderOrder-Sortierung statt teurer Default-Sort.
+    // Manuelle renderOrder-Sortierung statt teurer Default-Sort.
     // Bei vielen statischen Objekten 0.2-1ms CPU/Frame gespart.
     r.sortObjects = false;
     if (r.setOpaqueSort) {
@@ -156,13 +156,39 @@ export class Renderer {
     const device = r?.backend?.device;
     if (!device?.lost?.then) return;
     device.lost.then((info) => {
-      if (this._deviceLossHandled) return;
-      this._deviceLossHandled = true;
       const reason = info?.reason || "unknown";
-      console.warn("[Renderer] WebGPU device lost:", reason, info?.message || "");
-      if (reason !== "unknown") return;
-      this._showDeviceLossOverlay();
+      if (reason !== "unknown") return;   // "destroyed" = absichtlich
+      this._handleDeviceLoss(`${reason} ${info?.message || ""}`);
     }).catch(() => {});
+  }
+
+  /**
+   * Zentrale Device-Loss-Behandlung. Wird vom lost-Promise ODER von der
+   * Render-Exception-Heuristik gerufen (iOS-WebKit resolved device.lost
+   * oft gar nicht — z.B. wenn Safari der Seite während eines Telefonats
+   * die GPU entzieht; danach wirft createCommandEncoder jeden Frame).
+   * Beim zweiten Verlust in derselben Session wechseln wir dauerhaft
+   * auf WebGL, um keine Reload-Schleife zu bauen.
+   */
+  _handleDeviceLoss(message) {
+    if (this._deviceLossHandled) return;
+    this._deviceLossHandled = true;
+    console.warn("[Renderer] WebGPU device lost:", message);
+    let losses = 1;
+    try {
+      losses = (parseInt(sessionStorage.getItem("numan-wgpu-lost") || "0", 10) || 0) + 1;
+      sessionStorage.setItem("numan-wgpu-lost", String(losses));
+    } catch (e) {}
+    if (losses >= 2) {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const p = raw ? JSON.parse(raw) : {};
+        p.renderer = "webgl";
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(p));
+        console.warn("[Renderer] wiederholter GPU-Verlust — wechsle auf WebGL");
+      } catch (e) {}
+    }
+    this._showDeviceLossOverlay();
   }
 
   _showDeviceLossOverlay() {
@@ -272,11 +298,29 @@ export class Renderer {
     }
 
     // WebGPU + PostProcessing-Pfad
-    if (this.postProcessing && this.mode === "webgpu") {
-      // ScenePass-Scene/Camera werden beim Bloom-Setup einmalig gesetzt —
-      // KEIN Re-Assign pro Frame, das könnte sonst die WebGPU-Pipeline
-      // dirty-flaggen und neu kompilieren.
-      this.postProcessing.render();
+    if (this.mode === "webgpu") {
+      try {
+        if (this.postProcessing) {
+          // ScenePass-Scene/Camera werden beim Bloom-Setup einmalig gesetzt —
+          // KEIN Re-Assign pro Frame, das könnte sonst die WebGPU-Pipeline
+          // dirty-flaggen und neu kompilieren.
+          this.postProcessing.render();
+        } else {
+          this.instance.render(scene, camera);
+        }
+        this._renderFails = 0;
+      } catch (e) {
+        // Heuristik für iOS-WebKit: dort resolved device.lost nicht — bei
+        // GPU-Verlust wirft stattdessen jeder Frame eine DOMException.
+        // Nach ~0.5s durchgehender Fehler als Device-Loss behandeln.
+        this._renderFails = (this._renderFails || 0) + 1;
+        if (this._renderFails === 1) {
+          console.warn("[Renderer] WebGPU render failed:", e?.message || e);
+        }
+        if (this._renderFails > 30) {
+          this._handleDeviceLoss(e?.message || String(e));
+        }
+      }
       return;
     }
 

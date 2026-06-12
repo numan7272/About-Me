@@ -1,5 +1,5 @@
 /**
- * TouchJoystick — In-World-3D-Joystick im Stil von About-Me (Bruno-Style).
+ * TouchJoystick — In-World-3D-Joystick als Mesh in der Szene.
  *
  * Zwei dünne Ringe + ein Sweep-Arc (Tortenstück) liegen am Bike auf der
  * Ground-Plane. Kein DOM-Overlay, kein Knob — der Arc zeigt in die Richtung
@@ -281,19 +281,26 @@ export class TouchJoystick {
       nz /= rawMag;
     }
 
+    // Geglättete Deadzone: statt hartem Sprung (0 → 0.10) wird die Magnitude
+    // von [DEAD_ZONE..1] auf [0..1] remapped. Direkt an der Deadzone-Kante
+    // startet der Input also bei 0 und wächst kontinuierlich — kein Ruck beim
+    // Anfahren, feinfühliges Rangieren nahe am Center. Die Richtung (nx,nz)
+    // bleibt unverändert, nur die Länge wird neu skaliert.
     const mag = Math.hypot(nx, nz);
     const dz  = DEAD_ZONE;
-    let outX = nx;
-    let outY = nz;
+    let outX = 0;
+    let outY = 0;
+    let outMag = 0;
 
-    if (mag < dz) {
-      outX = 0;
-      outY = 0;
+    if (mag >= dz) {
+      outMag = Math.min(1, (mag - dz) / (1 - dz));
+      outX = (nx / mag) * outMag;
+      outY = (nz / mag) * outMag;
     }
 
     this.input.x = outX;
     this.input.y = outY;
-    this.input.magnitude = Math.min(1, mag);
+    this.input.magnitude = outMag;
 
     // ─── Dot-Trail vom Center zum Finger ───
     // Jeder Dot sitzt auf einer Linie zwischen Bike-Center und Finger-Position.
@@ -356,15 +363,22 @@ export class TouchJoystick {
     const t = player.body.translation();
     this.group.position.set(t.x, DIAL_Y, t.z);
 
-    // Cam-relative Orientierung — group.local +Z zeigt zur Camera-Forward
+    // Cam-relative Orientierung — Kamera-Konvention: group.local -Z zeigt
+    // in Camera-Forward-Richtung (Screen-Up), local +X = Camera-Right.
     camera.getWorldDirection(this._camFwd);
     this._camFwd.y = 0;
     if (this._camFwd.lengthSq() < 0.0001) return;
     this._camFwd.normalize();
     this._camRight.set(-this._camFwd.z, 0, this._camFwd.x);
 
+    // WICHTIG: zAxis = -camFwd, NICHT +camFwd. (camRight, up, camFwd) wäre
+    // eine LINKSHÄNDIGE Basis (camRight × up = -camFwd, det = -1), also eine
+    // Reflexion — setFromRotationMatrix liefert dafür eine falsche Rotation
+    // (die Dial blieb world-aligned statt cam-aligned → Input um 45° verdreht,
+    // "geradeaus fahren = schräg steuern"-Bug). Mit -camFwd ist die Basis
+    // rechtshändig und _writeFromClient (nz = -lz) liest korrekt Screen-Up.
     this._xAxis.copy(this._camRight);
-    this._zAxis.copy(this._camFwd);
+    this._zAxis.copy(this._camFwd).negate();
     this._basis.makeBasis(this._xAxis, this._yAxis, this._zAxis);
     this.group.quaternion.setFromRotationMatrix(this._basis);
 

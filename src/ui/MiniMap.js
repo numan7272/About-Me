@@ -15,21 +15,21 @@ import { TELEPORT_POINTS } from "../data/stations.js";
 const SIZE = 200;
 const WORLD_RANGE = 60;           // ±60m wird auf Canvas gemappt
 
-// Brutalist-Mono palette. Map ist Telemetrie — Buildings unterscheiden sich
-// über Position + Label, nicht über Regenbogen. Aktive Tour-Station kann
-// optional in --signal eingefärbt werden.
-const PAPER       = "oklch(94% 0.015 75)";
-const PAPER_MUTED = "oklch(72% 0.02 75)";
-const PAPER_DIM   = "oklch(55% 0.02 70)";
-const INK_SOFT    = "oklch(20% 0.02 250)";
-const SIGNAL      = "oklch(72% 0.22 25)";
+// Map ist Telemetrie — Buildings unterscheiden sich über Position + Label,
+// nicht über Regenbogen. Aktive Tour-Station wird im Signal-Sand markiert.
+// Palette = Petrol-Fläche + Weiß-Stufen (gleiche Werte wie :root).
+const PAPER       = "rgba(255, 255, 255, 0.92)";
+const PAPER_MUTED = "rgba(255, 255, 255, 0.65)";
+const PAPER_DIM   = "rgba(255, 255, 255, 0.42)";
+const INK_SOFT    = "#243430";
+const SIGNAL      = "#ffd28a";
 
 export class MiniMap {
   constructor(game) {
     this.game = game;
 
-    // Wrapper — auf Mobile kleiner (130px statt 200px). Rechteckig,
-    // hairline-border, kein blur, brutalist register.
+    // Wrapper — auf Mobile kleiner (130px statt 200px). Runde Karte mit
+    // Hairline-Border, Canvas-Inhalt bleibt Telemetrie-nüchtern.
     const isMobile = window.matchMedia?.("(max-width: 600px)")?.matches;
     const mapSize = isMobile ? 130 : SIZE;
     this._renderSize = mapSize;

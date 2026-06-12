@@ -7,6 +7,7 @@
 
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
+import { BIKE_SPAWN } from "../world/spawn.js";
 
 /**
  * CameraRig — entweder OrbitControls (frei) oder Follow-Cam.
@@ -121,6 +122,51 @@ export class CameraRig {
     this._flyToPos = new THREE.Vector3();
     this._flyToTarget = new THREE.Vector3();
     this._flyOnComplete = null;
+
+    // Intro-Orbit: langsame Kamerafahrt um die Insel solange der
+    // Loading-Splash steht. Die Welt selbst ist der Ladescreen.
+    this._introOrbit = false;
+    this._introT = 0;
+  }
+
+  /**
+   * Intro-Pose starten: statische Kamera auf den Spawn-Kreis gerichtet,
+   * mit kaum wahrnehmbarem Schweben (Atmen, KEIN Orbit — Kreisfahrten
+   * beim Laden machen seekrank).
+   * opts: { center: [x,y,z], offset: [x,y,z], targetY }
+   */
+  startIntroOrbit(opts = {}) {
+    this._introOrbit = true;
+    this._introT = 0;
+    this._introCenter = opts.center || [BIKE_SPAWN[0], 0.5, BIKE_SPAWN[2]];
+    // Gleiche Peilung wie die Follow-Cam — der Ausschwung beim Start
+    // fühlt sich dadurch wie ein Zoom an, nicht wie ein Schwenk.
+    this._introOffset = opts.offset || [7.2, 4.0, 7.2];
+    this._introTargetY = opts.targetY ?? 0.9;
+    this.followMode = false;
+  }
+
+  /**
+   * Intro beenden: aus dem Orbit hinter das Bike schwingen, danach
+   * Follow-Cam aktivieren. onArrive feuert wenn die Kamera steht.
+   */
+  endIntroOrbit(onArrive) {
+    this._introOrbit = false;
+    const t = this.player?.body?.translation?.();
+    if (!t) {
+      this.followMode = true;
+      onArrive?.();
+      return;
+    }
+    this.flyTo([t.x, t.y, t.z], {
+      duration: 1.8,
+      cameraPos: [t.x + FOLLOW_OFFSET.x, t.y + FOLLOW_OFFSET.y, t.z + FOLLOW_OFFSET.z],
+      lookAt: [t.x, t.y + FOLLOW_LOOK_OFFSET.y, t.z],
+      onComplete: () => {
+        this.followMode = true;
+        onArrive?.();
+      },
+    });
   }
 
   /**
@@ -181,7 +227,9 @@ export class CameraRig {
 
   setPlayer(player) {
     this.player = player;
-    this.followMode = true;
+    // Während des Intro-Orbits bleibt die Kamera auf ihrer Inselfahrt —
+    // Follow übernimmt erst nach endIntroOrbit().
+    if (!this._introOrbit) this.followMode = true;
   }
 
   /** Re-enable follow mode (für "Zentrieren"-Button) */
@@ -195,6 +243,21 @@ export class CameraRig {
   }
 
   update() {
+    // ── Intro-Pose: statisch mit minimalem Schweben ──
+    if (this._introOrbit) {
+      const dt = this.game?.time?.delta || 0.016;
+      this._introT += dt;
+      const [cx, cy, cz] = this._introCenter;
+      const [ox, oy, oz] = this._introOffset;
+      // Atmen: ±12cm vertikal, ±8cm lateral, sehr langsam
+      const bobY = Math.sin(this._introT * 0.45) * 0.12;
+      const bobX = Math.sin(this._introT * 0.31 + 1.7) * 0.08;
+      this.camera.position.set(cx + ox + bobX, cy + oy + bobY, cz + oz);
+      this.controls.target.set(cx, cy + this._introTargetY, cz);
+      this.controls.update();
+      return;
+    }
+
     // ── Fly-To läuft? Dann tween'en wir Camera + Target. ──
     if (this._flyActive) {
       const dt = this.game?.time?.delta || 0.016;

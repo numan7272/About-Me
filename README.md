@@ -29,7 +29,7 @@ If you're a developer, the bike physics, the dual-shader pipeline (WebGL `Shader
 | Bundler      | **Vite 8**                            | HMR for shader edits matters more than I expected                                  |
 | Renderer     | **Three.js r184**                     | The post-`v0.170` API split + TSL was the right time to commit                     |
 | Physics      | **Rapier3D-compat 0.19**              | Capsule colliders, deterministic, fast. WASM-loaded async, no native deps          |
-| Shaders      | Custom **GLSL** + **TSL** (WebGPU)    | Two pipelines because Bruno Simon's devlogs were right — WebGPU is the way forward |
+| Shaders      | Custom **GLSL** + **TSL** (WebGPU)    | Two pipelines — WebGPU is the way forward, WebGL stays the safe default            |
 | State        | None                                  | Plain class-based singletons. No Redux, no Context, no overhead                    |
 | Build target | ES2022 modules, no transpilation      | Modern browsers only — this is a portfolio, not enterprise software                |
 
@@ -96,7 +96,7 @@ DayCycle → Wind → Island → Road → StreetLamps → Grass → Ocean
 | Headlight    | `F`                      | (button, planned)               |
 | Camera reset | (button bottom-right)    | (button bottom-right)           |
 
-Movement uses **lerp-based velocity** (`lerpT = min(1, ACCEL * dt)`) rather than m/s² acceleration — the difference at high framerates is the classic Bruno-Simon "feel" where the bike eases into top speed instead of slingshotting. The joystick branch uses a P-controller for yaw correction plus a `cos(dy) * 0.5 + 0.5` alignment factor so the bike doesn't shoot off in the wrong direction during sharp turns.
+Movement uses **lerp-based velocity** (`lerpT = min(1, ACCEL * dt)`) rather than m/s² acceleration — at high framerates the bike eases into top speed instead of slingshotting. The joystick branch uses a P-controller for yaw correction plus a `cos(dy) * 0.5 + 0.5` alignment factor so the bike doesn't shoot off in the wrong direction during sharp turns.
 
 ---
 
@@ -149,9 +149,8 @@ npm run preview    # serve the built version
 
 ---
 
-## Credits & inspiration
+## Credits
 
-- **Bruno Simon** for [folio-2025](https://github.com/brunosimon/folio-2025) — the bike-on-an-island format and a number of small decisions (lerp-based bike feel, joystick as in-world 3D mesh, dual GLSL/TSL pipeline) are directly inspired by his devlogs.
 - **Three.js team** for r184 — the WebGPU + TSL story finally feels production-shaped.
 - **Rapier3D team** for `rapier3d-compat` — the WASM-compat fork makes async setup trivial.
 

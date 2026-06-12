@@ -1,15 +1,14 @@
 // OG-Image-Generator. Schreibt public/og-image.png als 1200×630 PNG.
 //
-// Brutalist-HUD register: ink-solid Background, corner-brackets, italic
-// mono Display-Title, single Coral-Signal-Akzent, kein Gradient-/Glas-/
-// Pill-Slop.
+// Register "Ostsee": tiefes Petrol, Sand-Akzent, Caveat-Display +
+// Quicksand-Body. Rein typografisch, als Motiv nur ruhige Wellen-Linien
+// am unteren Rand (Kiel/Förde, ohne Piktogramm).
 //
 // Run:
 //   npm install --no-save sharp
 //   node scripts/og-render.mjs
 //
-// System-Fonts: DejaVu Sans Mono (Linux) / Liberation Mono. Funktioniert
-// in headless-Render via librsvg/sharp ohne extra Web-Font-Loading.
+// Fonts: Caveat + Quicksand (TTF in ~/.fonts, fc-cache -f).
 
 import sharp from "sharp";
 import { writeFileSync } from "fs";
@@ -17,83 +16,66 @@ import { writeFileSync } from "fs";
 const W = 1200;
 const H = 630;
 
-const INK         = "#101218";
-const PAPER       = "#f1efea";
-const PAPER_MUTED = "#a59f96";
-const PAPER_DIM   = "#736f68";
-const RULE        = "rgba(241,239,234,0.18)";
-const RULE_STRONG = "rgba(241,239,234,0.40)";
-const SIGNAL      = "#ff5a3c";
+const PAPER       = "rgba(255,255,255,0.94)";
+const PAPER_MUTED = "rgba(255,255,255,0.66)";
+const PAPER_DIM   = "rgba(255,255,255,0.40)";
+const SIGNAL      = "#ffd28a";
+const SEAFOAM     = "#8fe3c0";
+const DISPLAY     = "'Caveat'";
+const UI          = "'Quicksand','DejaVu Sans',sans-serif";
 const MONO        = "'DejaVu Sans Mono','Liberation Mono',monospace";
 
-/** L-Shape Corner-Bracket. corner: 'tl'|'tr'|'bl'|'br' */
-function bracket(x, y, corner, arm = 26, stroke = 2, color = RULE_STRONG) {
-  const v = corner.includes("b") ? -arm : arm;
-  const h = corner.includes("r") ? -arm : arm;
-  return `<path d="M ${x} ${y + v} L ${x} ${y} L ${x + h} ${y}"
-                fill="none" stroke="${color}" stroke-width="${stroke}" />`;
+// Ruhige Wellen-Linien (3 Sinus-Züge) als Ostsee-Signatur
+function waves() {
+  let out = "";
+  const rows = [
+    { y: 520, amp: 9,  len: 170, color: "rgba(143,227,192,0.35)", w: 3 },
+    { y: 552, amp: 12, len: 210, color: "rgba(143,227,192,0.22)", w: 3 },
+    { y: 586, amp: 15, len: 260, color: "rgba(143,227,192,0.12)", w: 3 },
+  ];
+  for (const r of rows) {
+    let d = `M -20 ${r.y}`;
+    for (let x = -20; x <= W + 20; x += 10) {
+      const y = r.y + Math.sin((x / r.len) * Math.PI * 2) * r.amp;
+      d += ` L ${x} ${y.toFixed(1)}`;
+    }
+    out += `<path d="${d}" fill="none" stroke="${r.color}" stroke-width="${r.w}" stroke-linecap="round"/>`;
+  }
+  return out;
 }
 
-const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}"
-                  viewBox="0 0 ${W} ${H}">
-  <rect width="${W}" height="${H}" fill="${INK}" />
+const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
+  <defs>
+    <radialGradient id="bg" cx="0.25" cy="0.15" r="1.3">
+      <stop offset="0" stop-color="#22332f"/>
+      <stop offset="1" stop-color="#101b1a"/>
+    </radialGradient>
+  </defs>
 
-  <!-- Frame: 4 Corner-Brackets, 48px Inset -->
-  ${bracket(48, 48,         "tl")}
-  ${bracket(W - 48, 48,     "tr")}
-  ${bracket(48, H - 48,     "bl")}
-  ${bracket(W - 48, H - 48, "br")}
+  <rect width="${W}" height="${H}" fill="url(#bg)"/>
+  ${waves()}
 
-  <!-- TOP ROW: domain (links), status-marker mit signal-caret (rechts) -->
-  <text x="80" y="108" font-family="${MONO}" font-size="22"
-        fill="${PAPER_MUTED}" letter-spacing="0.02em">
-    // numan-yesil.com
+  <text x="86" y="138" font-family="${MONO}" font-size="21" fill="${PAPER_DIM}"
+        letter-spacing="0.04em">// numan-yesil.com</text>
+
+  <text x="80" y="300" font-family="${DISPLAY}" font-weight="700"
+        font-size="170" fill="${PAPER}">Numan Yesil</text>
+
+  <text x="86" y="372" font-family="${UI}" font-weight="700" font-size="34"
+        fill="${SIGNAL}">Eine Insel. Ein Fahrrad. Mein Werdegang.</text>
+
+  <text x="86" y="424" font-family="${UI}" font-weight="600" font-size="24"
+        fill="${PAPER_MUTED}">Fahr durch mein interaktives 3D-Portfolio.</text>
+
+  <text x="86" y="488" font-family="${UI}" font-weight="700" font-size="21" fill="${PAPER}">
+    Wirtschaftsinformatik · HAW Kiel
+    <tspan dx="14" fill="${SEAFOAM}" font-size="19">github.com/numan7272</tspan>
   </text>
-  <text x="${W - 80}" y="108" font-family="${MONO}" font-size="20"
-        fill="${PAPER}" text-anchor="end" letter-spacing="0.08em">
-    <tspan fill="${SIGNAL}">▌</tspan><tspan dx="6">3D PORTFOLIO</tspan>
-  </text>
-
-  <line x1="80" y1="148" x2="${W - 80}" y2="148"
-        stroke="${RULE}" stroke-width="1" />
-
-  <!-- CENTER: Italic-Mono Display Headline, zwei Zeilen.
-       Erste Zeile = Verb-Trilogie, "find." in Signal-Coral als Hierarchie-
-       Endpunkt. Zweite Zeile in muted Paper, ruhiger Statement-Closer.
-       dx="0.5em" gibt einen sauberen Space zwischen "click." und "find."
-       (librsvg kollabiert sonst den literal-Space zwischen tspans). -->
-  <text x="80" y="290" font-family="${MONO}" font-size="78"
-        font-style="italic" fill="${PAPER}" letter-spacing="-0.02em"
-    ><tspan>ride. click.</tspan><tspan fill="${SIGNAL}" dx="0.5em">find.</tspan></text>
-  <text x="80" y="378" font-family="${MONO}" font-size="78"
-        font-style="italic" fill="${PAPER_MUTED}" letter-spacing="-0.02em">
-    this is my portfolio.
-  </text>
-
-  <line x1="80" y1="448" x2="${W - 80}" y2="448"
-        stroke="${RULE}" stroke-width="1" />
-
-  <!-- BOTTOM-RIGHT: Author. Bottom-left bewusst leer — Asymmetrie ist
-       brutalist-konform und der Author bekommt mehr visuelles Gewicht. -->
-  <g transform="translate(${W - 80} 510)" text-anchor="end">
-    <text font-family="${MONO}" font-size="22" fill="${PAPER}"
-          letter-spacing="-0.01em" font-weight="bold">
-      NUMAN YESIL
-    </text>
-    <text y="28" font-family="${MONO}" font-size="14"
-          fill="${PAPER_MUTED}" letter-spacing="0.03em">
-      wirtschaftsinformatik · haw kiel
-    </text>
-    <text y="52" font-family="${MONO}" font-size="13"
-          fill="${PAPER_DIM}" letter-spacing="0.03em">
-      github.com/numan7272
-    </text>
-  </g>
 </svg>`;
 
 writeFileSync("public/og-source.svg", svg);
 
-await sharp(Buffer.from(svg))
+await sharp(Buffer.from(svg), { density: 96 })
   .resize(W, H)
   .png({ compressionLevel: 9 })
   .toFile("public/og-image.png");

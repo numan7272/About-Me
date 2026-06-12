@@ -1,5 +1,5 @@
 /**
- * Terminal — Fullscreen-Overlay Pseudo-Terminal für Easter-Egg Mini-Games.
+ * Terminal — schwebendes Pseudo-Terminal-Fenster für Easter-Egg Mini-Games.
  *
  * Sandbox-Modus: User-Commands werden gegen ein Script-Mapping geprüft. Es
  * gibt KEINE echte Shell — alle Output-Zeilen kommen aus dem Script. Das
@@ -29,33 +29,41 @@
  *   - Promise<...> → awaited then printed
  */
 
+const TERM_FONT = "'Departure Mono','JetBrains Mono','Courier New',monospace";
+
 const THEMES = {
   kali: {
     bg: "#0d0e10",
+    barBg: "rgba(255,255,255,0.04)",
     text: "#e6e6e6",
     promptColor: "#7eff7e",
     accent: "#fb923c",
     error: "#ff6b6b",
     selBg: "rgba(126,255,126,0.25)",
-    fontFamily: "'JetBrains Mono','Courier New',monospace",
+    scanlines: 0.05,
+    fontFamily: TERM_FONT,
   },
   matrix: {
     bg: "#000",
+    barBg: "rgba(40,255,40,0.06)",
     text: "#28ff28",
     promptColor: "#88ff88",
     accent: "#28ff28",
     error: "#ff5555",
     selBg: "rgba(40,255,40,0.4)",
-    fontFamily: "'JetBrains Mono','Courier New',monospace",
+    scanlines: 0.09,
+    fontFamily: TERM_FONT,
   },
   light: {
     bg: "#f8f8f7",
+    barBg: "rgba(0,0,0,0.05)",
     text: "#1a1a1a",
     promptColor: "#0a5e0a",
     accent: "#e35d10",
     error: "#c92a2a",
     selBg: "rgba(126,255,126,0.4)",
-    fontFamily: "'JetBrains Mono','Courier New',monospace",
+    scanlines: 0,
+    fontFamily: TERM_FONT,
   },
 };
 
@@ -88,24 +96,53 @@ export class Terminal {
 
   _buildDom() {
     const t = this.theme;
+    // Backdrop + schwebendes Terminal-Fenster statt Fullscreen-Overlay.
+    // Das Fenster ist diegetisch (gehört zur Spielwelt, nicht zum HUD),
+    // darf also Schatten + größeren Radius tragen.
     const root = document.createElement("div");
     root.className = "term-overlay";
     root.style.cssText = `
       position: fixed; inset: 0; z-index: 9999;
+      display: flex; align-items: center; justify-content: center;
+      background: rgba(9, 17, 16, 0.62);
+      padding: 3vh 3vw;
+      opacity: 0; transition: opacity 220ms ease;
+    `;
+
+    const win = document.createElement("div");
+    win.className = "term-window";
+    win.style.cssText = `
+      position: relative;
       display: flex; flex-direction: column;
+      width: min(940px, 100%); height: min(620px, 100%);
       background: ${t.bg}; color: ${t.text};
       font-family: ${t.fontFamily};
       font-size: 14px; line-height: 1.45;
-      padding: 0; margin: 0;
-      opacity: 0; transition: opacity 220ms ease;
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 10px;
+      box-shadow: 0 24px 80px rgba(0, 0, 0, 0.55);
+      overflow: hidden;
     `;
+    root.appendChild(win);
+
+    // CRT-Scanlines — subtil, nur bei dunklen Themes sichtbar
+    const scan = document.createElement("div");
+    scan.className = "term-scanlines";
+    scan.style.cssText = `
+      position: absolute; inset: 0; pointer-events: none; z-index: 2;
+      background: repeating-linear-gradient(
+        0deg, rgba(0,0,0,0.55) 0px, rgba(0,0,0,0.55) 1px,
+        transparent 1px, transparent 3px);
+      opacity: ${t.scanlines};
+    `;
+    win.appendChild(scan);
 
     // Title-Bar mit Schließen + Theme-Switcher
     const bar = document.createElement("div");
     bar.style.cssText = `
       display: flex; align-items: center; justify-content: space-between;
       padding: 8px 14px;
-      background: rgba(255,255,255,0.04);
+      background: ${t.barBg};
       border-bottom: 1px solid rgba(255,255,255,0.08);
       flex-shrink: 0;
     `;
@@ -123,7 +160,7 @@ export class Terminal {
         <button data-action="close" class="term-btn" style="margin-left:6px;color:${t.error};">✕ Close [Esc]</button>
       </div>
     `;
-    root.appendChild(bar);
+    win.appendChild(bar);
 
     // Style für theme-buttons
     const style = document.createElement("style");
@@ -157,13 +194,15 @@ export class Terminal {
       @keyframes term-blink { 50% { background: transparent; color: ${t.text}; } }
       .term-overlay ::selection { background: ${t.selBg}; }
 
-      /* ── Mobile (≤ 640px) ── */
+      /* ── Mobile (≤ 640px): Fenster wird fullscreen ── */
       @media (max-width: 640px) {
-        .term-overlay { font-size: 12px; }
-        .term-overlay > div:first-of-type {
-          flex-wrap: wrap;
-          padding: 8px 10px;
-          height: auto;
+        .term-overlay { padding: 0; }
+        .term-window {
+          width: 100% !important;
+          height: 100% !important;
+          border-radius: 0 !important;
+          border: 0 !important;
+          font-size: 12px;
         }
         .term-btn {
           padding: 6px 10px;
@@ -176,7 +215,7 @@ export class Terminal {
         .term-cursor::after { font-size: 12px; }
       }
     `;
-    root.appendChild(style);
+    win.appendChild(style);
 
     // Scrollable output
     const output = document.createElement("div");
@@ -185,7 +224,7 @@ export class Terminal {
       flex: 1; overflow-y: auto;
       padding: 16px 18px;
     `;
-    root.appendChild(output);
+    win.appendChild(output);
 
     // Input-Zeile (Prompt + aktuelle Eingabe + Cursor)
     const inputLine = document.createElement("div");
@@ -198,7 +237,7 @@ export class Terminal {
       <span class="term-prompt">${this._escape(this.prompt)}</span>
       <span class="term-buffer" style="margin-left:2px;white-space:pre;"></span>
     `;
-    root.appendChild(inputLine);
+    win.appendChild(inputLine);
 
     // Hidden <textarea> für echte Keyboard-Events (besser als window-Listener
     // wegen iOS-Focus-Verhalten)
@@ -212,10 +251,10 @@ export class Terminal {
     ta.setAttribute("autocorrect", "off");
     ta.setAttribute("autocapitalize", "off");
     ta.setAttribute("spellcheck", "false");
-    root.appendChild(ta);
+    win.appendChild(ta);
 
     this.dom = {
-      root, bar, output, inputLine,
+      root, win, scan, bar, output, inputLine,
       bufferSpan: inputLine.querySelector(".term-buffer"),
       promptSpan: inputLine.querySelector(".term-prompt"),
       ta,
@@ -454,11 +493,13 @@ export class Terminal {
     this.theme = t;
     this.themeName = name;
     // Re-build mit altem Output erhalten — einfacher: in-place updaten
-    const root = this.dom.root;
-    root.style.background = t.bg;
-    root.style.color = t.text;
+    const win = this.dom.win;
+    win.style.background = t.bg;
+    win.style.color = t.text;
+    if (this.dom.bar) this.dom.bar.style.background = t.barBg;
+    if (this.dom.scan) this.dom.scan.style.opacity = String(t.scanlines);
     // Style-Block ersetzen
-    const oldStyle = root.querySelector("style");
+    const oldStyle = win.querySelector("style");
     if (oldStyle) oldStyle.remove();
     // Re-inject style
     const style = document.createElement("style");
@@ -477,7 +518,7 @@ export class Terminal {
       @keyframes term-blink { 50% { background: transparent; color: ${t.text}; } }
       .term-overlay ::selection { background: ${t.selBg}; }
     `;
-    root.appendChild(style);
+    win.appendChild(style);
   }
 
   setPrompt(p) {

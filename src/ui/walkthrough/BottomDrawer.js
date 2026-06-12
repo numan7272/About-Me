@@ -61,7 +61,7 @@ export class BottomDrawer {
       zIndex: String(Z_INDEX),
       padding: "0 16px 16px 16px",
       pointerEvents: "none",       // Container ist click-through, nur Panel fängt
-      fontFamily: "var(--font-mono)",
+      fontFamily: "var(--font-ui)",
       color: "var(--paper)",
       transition: "transform 280ms var(--ease), opacity 200ms var(--ease)",
       transform: "translateY(110%)",
@@ -191,14 +191,14 @@ export class BottomDrawer {
       padding: "12px 16px",
       minHeight: "44px",
       border: "1px solid var(--signal)",
+      borderRadius: "var(--radius)",
       background: "transparent",
       color: "var(--signal)",
-      fontFamily: "var(--font-mono)",
-      fontSize: "13px",
-      letterSpacing: "0.04em",
+      fontFamily: "var(--font-ui)",
+      fontSize: "15px",
+      fontWeight: "700",
       cursor: "pointer",
       transition: "background 180ms var(--ease)",
-      textTransform: "lowercase",
     });
     b.addEventListener("mouseenter", () => {
       b.style.background = "var(--signal-dim)";
@@ -217,13 +217,14 @@ export class BottomDrawer {
       padding: "10px 12px",
       minHeight: "44px",
       border: "1px solid var(--rule-strong)",
+      borderRadius: "var(--radius)",
       background: "transparent",
       color: "var(--paper-muted)",
-      fontFamily: "var(--font-mono)",
-      fontSize: "12px",
+      fontFamily: "var(--font-ui)",
+      fontSize: "14px",
+      fontWeight: "700",
       cursor: "pointer",
       transition: "color 180ms var(--ease), border-color 180ms var(--ease)",
-      textTransform: "lowercase",
     });
     b.addEventListener("mouseenter", () => {
       b.style.color = "var(--paper)";
@@ -478,10 +479,10 @@ export class BottomDrawer {
         display: "grid",
         gridTemplateColumns: "26px 1fr",
         gap: "8px",
-        fontSize: "12.5px",
+        fontSize: "14px",
         lineHeight: "1.5",
         color: "var(--paper)",
-        fontFamily: "var(--font-mono)",
+        fontFamily: "var(--font-ui)",
       });
       const num = document.createElement("span");
       num.textContent = String(i + 1).padStart(2, "0");
@@ -548,23 +549,21 @@ export class BottomDrawer {
 
     // Eyebrow
     const eyebrow = document.createElement("div");
+    eyebrow.className = "hud-kicker";
     eyebrow.textContent = isEn ? "> end of tour" : "> ende der tour";
-    Object.assign(eyebrow.style, {
-      fontSize: "11px",
-      color: "var(--paper-muted)",
-    });
     this.leftCol.appendChild(eyebrow);
 
     // Headline
     const title = document.createElement("div");
     title.textContent = isEn
-      ? "let's talk."
-      : "lass uns sprechen.";
+      ? "Let's talk!"
+      : "Lass uns sprechen!";
     Object.assign(title.style, {
-      fontSize: "22px",
-      fontWeight: "400",
-      lineHeight: "1.2",
-      letterSpacing: "-0.01em",
+      fontFamily: "var(--font-display)",
+      fontSize: "36px",
+      fontWeight: "700",
+      lineHeight: "1.05",
+      letterSpacing: "0.02em",
       color: "var(--paper)",
     });
     this.leftCol.appendChild(title);

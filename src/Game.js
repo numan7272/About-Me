@@ -1,7 +1,7 @@
 /**
  * Game.js — Singleton-Hauptklasse für die 3D-Welt.
  *
- * Folgt Brunos folio-2025-Architektur:
+ * Architektur:
  *   - Game.getInstance() ist überall im Code verfügbar
  *   - Konstruktor instanziiert Core-Module (Time, Sizes, Renderer, ...)
  *   - update() läuft jedes Frame via requestAnimationFrame
@@ -22,6 +22,7 @@ import { Ui } from "./ui/Ui.js";
 import { AudioManager } from "./core/AudioManager.js";
 import { Debug } from "./core/Debug.js";
 import { LoadingSplash } from "./ui/LoadingSplash.js";
+import { BootReveal } from "./world/BootReveal.js";
 
 export class Game {
   // Singleton-Helper
@@ -48,7 +49,7 @@ export class Game {
     this.canvas = canvas;
 
     // ── Loading-Splash zuerst ──
-    // Bruno-Style: Splash deckt den Canvas zu (Canvas blurrred), Settings
+    // Splash deckt den Canvas zu (Canvas gedimmt), Settings
     // (Lang/Volume/Graphics/Renderer) werden vor Game-Start eingestellt.
     // Tour-Overlay kommt erst NACH Splash-Start. Wenn Splash null bleibt,
     // läuft alles wie bisher.
@@ -68,6 +69,16 @@ export class Game {
     this.sizes = new Sizes();
     this.scene = new THREE.Scene();
     this.cameraRig = new CameraRig(this);
+
+    // Intro-Inszenierung: enge Kamera-Kreisfahrt um den Spawn-Kreis —
+    // der Ladescreen ist eine Bühne, kein Formular. Bei reduced-motion
+    // bleibt alles statisch.
+    this._reducedMotion = typeof window !== "undefined"
+      && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    if (!this._reducedMotion) {
+      this.cameraRig.startIntroOrbit();
+    }
+
     this.renderer = new Renderer(this);
     this.physics = new Physics(this);
     this.inputs = new Inputs();
@@ -77,6 +88,14 @@ export class Game {
 
     // Welt-Inhalt
     this.world = new World(this);
+
+    // Boot-Bühne: 3D-Skeleton-Screen — die Welt existiert nur in einem
+    // leuchtenden Kreis um den Spawn, außenrum Blueprint-Gitter. Der
+    // Ring füllt sich mit dem Lade-Fortschritt, beim Klick expandiert
+    // die Welt (BootReveal.reveal()). Tageslicht von Anfang an.
+    if (!this._reducedMotion) {
+      this.bootReveal = new BootReveal(this);
+    }
 
     // UI-Overlays (HUD, MiniMap, Settings, InfoCard, DiscoveryHud)
     this.ui = new Ui(this);
@@ -136,22 +155,47 @@ export class Game {
       const displayName = lang === "en" ? name : (RES_NAME_DE[name] || name);
       const msg = lang === "en" ? `Loading ${displayName}` : `Lädt ${displayName}`;
       this.splash.setProgress(ratio, msg);
+      this.bootReveal?.setProgress?.(ratio);
     });
 
     res.on?.("ready", () => {
       this.splash.setProgress(1, this.splash._strings?.()?.ready || "Ready");
+      this.bootReveal?.setProgress?.(1);
       this.splash.markReady();
     });
 
     // Splash hat eigene Start-Button-Logik — onStart wird gefeuert wenn User
-    // klickt. Wir öffnen IMMER das Tour-Overlay (auch wenn der User schon
-    // mal Tour gesehen hat — er kommt ja gerade frisch vom Splash und will
-    // entscheiden Tour vs Frei-Fahren).
+    // klickt. Choreografie: Bike fällt aus 5m auf die Insel, die Kamera
+    // schwingt aus dem Orbit dahinter ein, DANN kommt das Tour-Overlay.
+    // Der Start ist der Payoff des Intros, kein Formularwechsel.
     this.splash.onStart = () => {
       if (typeof window !== "undefined") {
         window.__deferTourOverlay = false;
       }
-      this.ui?.walkthrough?.showStartOverlayAfterSplash?.();
+
+      const showOverlay = () => {
+        this.ui?.walkthrough?.showStartOverlayAfterSplash?.();
+      };
+
+      if (this._reducedMotion) {
+        this.cameraRig.followMode = true;
+        showOverlay();
+      } else {
+        // Welt aufdecken: Gras-Radius expandiert, Gebäude poppen rein,
+        // Ring + Blueprint blenden aus.
+        this.bootReveal?.reveal();
+
+        // Bike-Drop: kurz anheben, Physik lässt es einfedern während die
+        // Kamera anfliegt. Nur wenn der Body schon existiert.
+        const body = this.world?.player?.body;
+        if (body) {
+          const t = body.translation();
+          body.setTranslation({ x: t.x, y: t.y + 4, z: t.z }, true);
+          body.setLinvel({ x: 0, y: 0, z: 0 }, true);
+        }
+        this.cameraRig.endIntroOrbit(showOverlay);
+      }
+
       // Sobald die Welt sichtbar ist, preloaden wir die Mini-Game-Chunks
       // im Hintergrund. So fühlt sich der erste Building-Click instant an,
       // statt erst den 30-100KB-Chunk laden zu müssen. Network ist eh idle
@@ -236,9 +280,12 @@ export class Game {
   }
 
   update() {
-    // Reihenfolge: Inputs (passive) → Physics → World → Camera → Render → UI → Audio
+    // Reihenfolge: Inputs (passive) → Physics → World → BootReveal →
+    // Camera → Render → UI → Audio. BootReveal NACH world, damit es
+    // Background/Sichtbarkeit nach dem DayCycle-Write übersteuern kann.
     if (this.physics?.update) this.physics.update();
     if (this.world?.update) this.world.update();
+    if (this.bootReveal?.update) this.bootReveal.update();
     if (this.cameraRig?.update) this.cameraRig.update();
     this.renderer.render(this.scene, this.cameraRig.camera);
     if (this.ui?.update) this.ui.update();
@@ -250,6 +297,7 @@ export class Game {
     this.time?.destroy?.();
     this.sizes?.destroy?.();
     this.inputs?.destroy?.();
+    this.bootReveal?.destroy?.();
     this.world?.destroy?.();
     this.physics?.destroy?.();
     this.renderer?.destroy?.();

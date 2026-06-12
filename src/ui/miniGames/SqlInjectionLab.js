@@ -118,7 +118,7 @@ export class SqlInjectionLab {
       background: ${t.overlayBg};
       backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
       opacity: 0; transition: opacity 220ms ease;
-      font-family: 'JetBrains Mono','Courier New',monospace;
+      font-family: 'Departure Mono','JetBrains Mono','Courier New',monospace;
       color: ${t.text};
       padding: ${isMobile ? "0" : "20px"};
       overflow-y: auto;
@@ -186,10 +186,10 @@ export class SqlInjectionLab {
       </div>
 
       <div class="sqli-levels" style="margin-top:14px;display:flex;flex-wrap:wrap;gap:6px;">
-        <span class="sqli-lvl" data-level="1" style="padding:4px 9px;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid ${t.border};font-size:11px;font-family:'JetBrains Mono',monospace;opacity:0.65;">L1 Tautology</span>
-        <span class="sqli-lvl" data-level="2" style="padding:4px 9px;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid ${t.border};font-size:11px;font-family:'JetBrains Mono',monospace;opacity:0.65;">L2 Comment</span>
-        <span class="sqli-lvl" data-level="3" style="padding:4px 9px;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid ${t.border};font-size:11px;font-family:'JetBrains Mono',monospace;opacity:0.65;">L3 UNION</span>
-        <span class="sqli-lvl" data-level="4" style="padding:4px 9px;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid ${t.border};font-size:11px;font-family:'JetBrains Mono',monospace;opacity:0.65;">L4 Blind</span>
+        <span class="sqli-lvl" data-level="1" style="padding:4px 9px;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid ${t.border};font-size:11px;font-family:'Departure Mono','JetBrains Mono',monospace;opacity:0.65;">L1 Tautology</span>
+        <span class="sqli-lvl" data-level="2" style="padding:4px 9px;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid ${t.border};font-size:11px;font-family:'Departure Mono','JetBrains Mono',monospace;opacity:0.65;">L2 Comment</span>
+        <span class="sqli-lvl" data-level="3" style="padding:4px 9px;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid ${t.border};font-size:11px;font-family:'Departure Mono','JetBrains Mono',monospace;opacity:0.65;">L3 UNION</span>
+        <span class="sqli-lvl" data-level="4" style="padding:4px 9px;border-radius:6px;background:rgba(255,255,255,0.05);border:1px solid ${t.border};font-size:11px;font-family:'Departure Mono','JetBrains Mono',monospace;opacity:0.65;">L4 Blind</span>
       </div>
 
       <div class="sqli-status" style="margin-top:14px;font-size:13px;min-height:20px;"></div>

@@ -20,7 +20,7 @@ import * as THREE from "three";
 import { BikeHeadlight } from "./BikeHeadlight.js";
 
 // Konstanten 1:1 aus dem alten About-Me Repo (Player.js).
-// Lerp-basierte Beschleunigung statt m/s² — das gibt das "Bruno-Simon-Feel"
+// Lerp-basierte Beschleunigung statt m/s² — das gibt das weiche Fahrgefühl
 // mit sanftem Anfahren und natürlichem Ausrollen.
 const MAX_SPEED  = 7.5;       // m/s Top-Speed (alt: 4.5 war zu langsam)
 const ACCEL      = 6;         // velocity-lerp-faktor (1/s) → lerpT = min(1, ACCEL*dt)
@@ -29,6 +29,7 @@ const TURN_SPEED = 2.6;       // rad/s — Drehrate
 const SPEED_FACTOR_FLOOR = 0.55;  // Keyboard: Mindest-Drehrate auch im Stand
 const ANG_CAP_JOY_MULT = 1.6;     // Joystick: ANG_CAP = TURN_SPEED * 1.6
 const JOY_P_GAIN = 5;             // P-Controller für Yaw-Fehler
+const JOY_MIN_THROTTLE = 0.35;    // Mindest-Throttle direkt über der Deadzone
 
 const SUSPENSION_TAU = 0.10;
 const VISUAL_Y_OFFSET = 0.22;
@@ -145,11 +146,22 @@ export class Player {
     // Materials des Resources-Loaders nicht touchen, und ziehen sie auf
     // sinnvolle PBR-Defaults.
     let neutralized = 0;
-    const wrap = (mat) => {
+    const wrap = (mat, hasUv) => {
       if (!mat) return mat;
       const m = mat.clone();
       const name = m.name || "unnamed";
       const isLight = /light_rear/i.test(name);
+
+      // Einige Bake-Meshes (Glass, Valve_Heads) tragen Texturen am Material,
+      // obwohl ihre Geometrie kein uv-Attribut hat. WebGL sampelt dann stumm
+      // den Texel bei (0,0), der WebGPU-Node-Builder warnt dagegen pro Frame.
+      // Texturen entfernen → Fallback-BaseColor unten greift.
+      if (!hasUv) {
+        for (const slot of ["map", "alphaMap", "aoMap", "normalMap",
+                            "roughnessMap", "metalnessMap", "emissiveMap"]) {
+          if (m[slot]) m[slot] = null;
+        }
+      }
 
       if (isLight) {
         // Rear-Light soll leuchten, aber zurückgehalten — sonst bloomt es
@@ -187,6 +199,7 @@ export class Player {
           Brakes_material: 0x303035,
           Valves_material: 0x4a4a4d,
           Valve_Heads_material: 0x303033,
+          Glass_material: 0xb9c6cc,
           Kick_Lock_Yellow_material: 0x8a8a16,
         };
         const hex = FALLBACKS[name];
@@ -202,9 +215,10 @@ export class Player {
       if (!obj.isMesh) return;
       obj.castShadow = true;
       obj.receiveShadow = true;
+      const hasUv = !!obj.geometry?.attributes?.uv;
       obj.material = Array.isArray(obj.material)
-        ? obj.material.map(wrap)
-        : wrap(obj.material);
+        ? obj.material.map((m) => wrap(m, hasUv))
+        : wrap(obj.material, hasUv);
     });
     console.log(`[Player] bike materials neutralized: ${neutralized}`);
     this.scene.add(this.visualRoot);
@@ -275,7 +289,7 @@ export class Player {
 
     // ── Joystick-Input (Mobile) ──
     // Wenn der TouchJoystick aktiv ist, nutzen wir Heading-Vector-Logik
-    // (Bruno-Style): Finger zeigt in die Welt-Richtung in die das Bike fahren
+    // Finger zeigt in die Welt-Richtung in die das Bike fahren
     // soll. Bike dreht sich smooth dahin (P-Controller), Throttle = magnitude.
     const joy = this.game?.ui?.touchJoystick?.input;
     const joyActive = !!joy?.active && joy.magnitude > 0.05;
@@ -423,14 +437,22 @@ export class Player {
       const ANG_CAP = TURN_SPEED * ANG_CAP_JOY_MULT;
       angY = THREE.MathUtils.clamp(dy * JOY_P_GAIN, -ANG_CAP, ANG_CAP);
 
-      // Throttle = volle Leistung sobald der Joystick aus der Dead-Zone ist.
-      // Wie auf PC mit W-Taste: kein analoges Skalieren. Heading-Alignment bleibt
-      // damit das Bike bei seitlicher Richtung sanft in die Kurve geht (sonst
-      // schießt es in die alte Richtung weiter). Floor bei 0.4 damit das Bike
-      // bei 90°/180°-Lenken nicht komplett zum Stillstand kommt — es soll
+      // Heading-Alignment: bei seitlicher Richtung geht das Bike sanft in die
+      // Kurve statt in die alte Richtung weiterzuschießen. Floor bei 0.4 damit
+      // es bei 90°/180°-Lenken nicht komplett zum Stillstand kommt — es soll
       // während der Drehung weiter rollen.
       const alignment = Math.max(0.4, 0.5 + 0.5 * Math.cos(dy));
-      const targetSpeed = MAX_SPEED * alignment;
+      // Analoge Magnitude→Speed-Kurve: Throttle = magnitude³ (kubisch) — kleine
+      // Auslenkung = feinfühliges Langsam-Rangieren, volle Auslenkung = Topspeed,
+      // mit viel Auflösung im unteren Bereich. Floor JOY_MIN_THROTTLE damit das
+      // Bike auch knapp über der Deadzone sofort spürbar anfährt (unser
+      // Velocity-Lerp hat keine Physik-Trägheit, reine 0-Kurve fühlt sich tot an).
+      // Tap-to-Move profitiert mit: magnitude=dist/SLOW_RADIUS → kubisch weiches
+      // Ausrollen am Ziel.
+      const joyMag = THREE.MathUtils.clamp(joy.magnitude ?? 1, 0, 1);
+      const throttle = JOY_MIN_THROTTLE
+        + (1 - JOY_MIN_THROTTLE) * joyMag * joyMag * joyMag;
+      const targetSpeed = MAX_SPEED * alignment * throttle;
       targetVx = this._tmpForward.x * targetSpeed;
       targetVz = this._tmpForward.z * targetSpeed;
 

@@ -203,54 +203,163 @@ export class DesignaOS extends FakeOS {
           linear-gradient(135deg, #0a1f3d 0%, #003a8c 50%, #4b1c8a 100%);
       }
 
-      /* Win11-Taskbar unten */
+      /* Win11-Taskbar: volle Breite, Icons zentriert, Acrylic */
       .dos .fos-dock {
-        bottom: 8px;
-        background: rgba(28, 32, 44, 0.85);
+        left: 0; right: 0; bottom: 0;
+        transform: none;
+        justify-content: center;
+        align-items: center;
+        height: 48px;
+        background: rgba(24, 28, 38, 0.78);
         backdrop-filter: blur(28px) saturate(180%);
         -webkit-backdrop-filter: blur(28px) saturate(180%);
-        border: 1px solid rgba(255,255,255,0.10);
-        border-radius: 10px;
-        padding: 6px 12px;
-        gap: 8px;
+        border: 0;
+        border-top: 1px solid rgba(255,255,255,0.08);
+        border-radius: 0;
+        padding: 0 12px;
+        gap: 6px;
       }
       .dos .fos-dock-icon {
-        font-size: 24px;
-        padding: 4px 8px;
+        font-size: 22px;
+        padding: 6px 9px;
         border-radius: 6px;
+        transition: background 120ms ease;
       }
       .dos .fos-dock-icon:hover {
         background: rgba(255,255,255,0.10);
-        transform: translateY(-2px) scale(1.05);
+        transform: none;
       }
 
-      /* Win11-Fenster — eckiger, weniger Rundung als macOS */
+      /* Win11-Fenster: Mica-Fläche, dezente Rundung, Controls rechts */
       .dos .fos-window {
         border-radius: 8px;
         background: rgba(28, 32, 44, 0.96);
+        border: 1px solid rgba(255,255,255,0.09);
       }
       .dos .fos-win-titlebar {
         height: 36px;
         background: linear-gradient(180deg, rgba(36,40,52,0.95), rgba(28,32,44,0.95));
       }
+      .dos .fos-win-controls { gap: 0; }
       .dos .fos-win-controls button {
-        width: 32px; height: 28px;
+        width: 44px; height: 34px;
         border-radius: 0;
+        opacity: 0.8;
+        font-size: 13px;
+        transition: background 100ms ease;
+      }
+      .dos .fos-win-controls button:hover {
+        background: rgba(255,255,255,0.09);
+        opacity: 1;
+      }
+      .dos .fos-win-controls button[data-action="close"]:hover {
+        background: #c42b1c;
+        color: #fff;
       }
 
-      /* Start-Button auf der Taskbar (links) */
+      /* Start-Button — sitzt auf der Taskbar links der zentrierten Icons */
       .dos-startbtn {
         position: absolute;
-        bottom: 8px;
-        left: calc(50% - 200px);
-        width: 38px; height: 38px;
-        background: rgba(28, 32, 44, 0.85);
-        backdrop-filter: blur(28px);
-        border: 1px solid rgba(255,255,255,0.10);
-        border-radius: 8px;
+        bottom: 7px;
+        left: calc(50% - 140px);
+        width: 38px; height: 34px;
+        background: transparent;
+        border: 0;
+        border-radius: 6px;
         display: flex; align-items: center; justify-content: center;
-        font-size: 18px;
-        z-index: 800;
+        font-size: 19px;
+        color: #5aa9ff;
+        cursor: pointer;
+        z-index: 900;
+        transition: background 120ms ease;
+      }
+      .dos-startbtn:hover { background: rgba(255,255,255,0.10); }
+
+      /* System-Tray rechts: Glyphs + Uhr */
+      .dos-tray {
+        position: absolute;
+        right: 10px; bottom: 0;
+        height: 48px;
+        display: flex; align-items: center; gap: 10px;
+        padding: 0 6px;
+        font-size: 11px;
+        line-height: 1.3;
+        text-align: right;
+        z-index: 900;
+        border-radius: 6px;
+      }
+      .dos-tray:hover { background: rgba(255,255,255,0.06); }
+      .dos-tray-glyphs { display: flex; gap: 6px; opacity: 0.85; }
+      .dos-tray-glyphs svg { width: 15px; height: 15px; }
+      .dos-tray-clock { opacity: 0.9; }
+
+      /* Start-Menü — Acrylic-Panel über der Taskbar */
+      .dos-startmenu {
+        position: absolute;
+        bottom: 58px;
+        left: 50%;
+        transform: translateX(-50%);
+        width: min(460px, calc(100vw - 24px));
+        background: rgba(28, 32, 44, 0.92);
+        backdrop-filter: blur(32px) saturate(180%);
+        -webkit-backdrop-filter: blur(32px) saturate(180%);
+        border: 1px solid rgba(255,255,255,0.10);
+        border-radius: 12px;
+        box-shadow: 0 18px 60px rgba(0,0,0,0.5);
+        padding: 18px;
+        z-index: 950;
+      }
+      .dos-start-search {
+        width: 100%;
+        padding: 9px 14px;
+        background: rgba(255,255,255,0.07);
+        border: 1px solid rgba(255,255,255,0.10);
+        border-radius: 999px;
+        color: inherit;
+        font: inherit;
+        font-size: 12px;
+        margin-bottom: 16px;
+      }
+      .dos-start-label {
+        font-size: 12px; font-weight: 600;
+        opacity: 0.8; margin-bottom: 10px;
+      }
+      .dos-start-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 6px;
+        margin-bottom: 14px;
+      }
+      .dos-start-tile {
+        display: flex; flex-direction: column; align-items: center;
+        gap: 7px;
+        padding: 12px 6px 10px;
+        background: transparent;
+        border: 0; border-radius: 6px;
+        color: inherit;
+        font-size: 11px;
+        line-height: 1.25;
+        text-align: center;
+        cursor: pointer;
+        transition: background 120ms ease;
+      }
+      .dos-start-tile:hover { background: rgba(255,255,255,0.08); }
+      .dos-start-tile-icon svg { width: 30px; height: 30px; }
+      .dos-start-footer {
+        display: flex; justify-content: space-between; align-items: center;
+        padding-top: 12px;
+        border-top: 1px solid rgba(255,255,255,0.08);
+        font-size: 12px; opacity: 0.85;
+      }
+      .dos-start-power { cursor: default; opacity: 0.7; }
+
+      @media (max-width: 640px) {
+        /* Close-OS-Button (oben rechts) nicht mit der Icon-Reihe kollidieren */
+        .dos .fos-area { padding-top: 48px; }
+        .dos-startbtn { left: 10px; }
+        .dos-tray .dos-tray-glyphs { display: none; }
+        .dos-startmenu { bottom: 56px; }
+        .dos-start-grid { grid-template-columns: repeat(3, 1fr); }
       }
 
       /* ── App-Styles ── */
@@ -372,7 +481,84 @@ export class DesignaOS extends FakeOS {
   }
 
   _renderChrome() {
-    return `<div class="dos-startbtn" title="Start">⊞</div>`;
+    // Win11-Chrome: Start-Button + System-Tray sitzen auf der Taskbar
+    // (die Taskbar selbst ist die umgestylte .fos-dock), dazu das
+    // Start-Menü-Panel (initial versteckt).
+    const now = new Date();
+    const hhmm = now.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+    const ddmm = now.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+    return `
+      <button class="dos-startbtn" title="Start">⊞</button>
+      <div class="dos-tray">
+        <span class="dos-tray-glyphs" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M5 12.55a11 11 0 0 1 14.08 0"/><path d="M8.5 16.05a6 6 0 0 1 7 0"/><circle cx="12" cy="19.5" r="0.8" fill="currentColor"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/></svg>
+        </span>
+        <span class="dos-tray-clock">${hhmm}<br>${ddmm}</span>
+      </div>
+      <div class="dos-startmenu" hidden>
+        <input class="dos-start-search" type="text" placeholder="Suchen" disabled>
+        <div class="dos-start-label">Angeheftet</div>
+        <div class="dos-start-grid"></div>
+        <div class="dos-start-footer">
+          <span class="dos-start-user">numan.yesil · Werkstudent QA</span>
+          <span class="dos-start-power" title="Nur Deko">⏻</span>
+        </div>
+      </div>
+    `;
+  }
+
+  open() {
+    // Guard der Basisklasse spiegeln — super.open() returnt bei bereits
+    // offenem OS early, der Code hier darf dann ebenfalls nicht nochmal
+    // Listener/Kacheln/Timer anlegen.
+    if (this.dom) return;
+    super.open();
+    if (!this.dom) return;
+    const desktop = this.dom.desktop;
+
+    // Start-Menü mit den Apps füllen + Toggle verkabeln
+    const startBtn = desktop.querySelector(".dos-startbtn");
+    const menu = desktop.querySelector(".dos-startmenu");
+    const grid = desktop.querySelector(".dos-start-grid");
+    if (grid && menu && startBtn) {
+      for (const app of this.apps) {
+        const tile = document.createElement("button");
+        tile.className = "dos-start-tile";
+        tile.innerHTML = `<span class="dos-start-tile-icon">${app.icon}</span><span>${app.label}</span>`;
+        tile.addEventListener("click", () => {
+          menu.hidden = true;
+          this.openApp(app.id);
+        });
+        grid.appendChild(tile);
+      }
+      startBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        menu.hidden = !menu.hidden;
+      });
+      desktop.addEventListener("click", (e) => {
+        if (!e.target.closest(".dos-startmenu") && !e.target.closest(".dos-startbtn")) {
+          menu.hidden = true;
+        }
+      });
+    }
+
+    // Tray-Uhr tickt jede halbe Minute
+    const clock = desktop.querySelector(".dos-tray-clock");
+    if (clock) {
+      this._trayTimer = setInterval(() => {
+        const t = new Date();
+        clock.innerHTML =
+          t.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" })
+          + "<br>"
+          + t.toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit", year: "numeric" });
+      }, 30000);
+    }
+  }
+
+  close() {
+    clearInterval(this._trayTimer);
+    super.close();
   }
 
   _renderWindowChrome(title) {

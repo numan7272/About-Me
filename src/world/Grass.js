@@ -1,30 +1,35 @@
 /**
- * Grass — "Particle-Wave" Eigenkreation mit Dual-Renderer-Support.
+ * Grass — Dreiecks-Halme mit Kamera-Wrap, Dual-Renderer-Support.
  *
- *   WebGL:  klassisches ShaderMaterial mit GLSL (bewährter Pfad, ~250 Zeilen)
- *   WebGPU: MeshBasicNodeMaterial mit TSL (Three Shading Language)
+ *   WebGL:  ShaderMaterial mit GLSL
+ *   WebGPU: MeshBasicNodeMaterial mit TSL
  *
- * Konzept (beide Pfade):
- *   - InstancedBufferGeometry, 1 Quad pro Spot, ~48k Spots
- *   - Per-Instance: aCenter (vec2 World-XZ) + aHash (float)
- *   - Vertex-Shader: Camera-Billboard + Wind-Wedeln + Cull-Logik
- *   - Fragment: Procedural Blade-Mask (4 versetzte Halme/Quad) + Beleuchtung
- *   - Building/Road/Map-Edge-Cull via uniform-Arrays
- *   - Sun/Ambient + Nacht-Dim + Laternen-Hotspots
+ * Technik (beide Pfade identisch):
+ *   - 1 Dreieck pro Halm (Tip + 2 Basis-Ecken), KEIN Quad + Fragment-Discard
+ *     mehr. Der Fragment-Shader gibt nur noch die interpolierte Vertex-Farbe
+ *     aus — die gesamte Arbeit (Form, Wind, Licht, Cull) passiert pro Vertex.
+ *   - Das Halm-Feld ist eine TILE×TILE-Kachel, die per Modulo-Wrap an der
+ *     Kamera klebt: konstante Dichte um den Spieler, egal wo er fährt,
+ *     ohne Instanz-Verwaltung oder Re-Upload.
+ *   - Farbe als Vertex-Gradient: Basis dunkel, Spitze hell. Per-Halm-Hash
+ *     + Patch-Noise geben Flecken-Variation wie auf einer echten Wiese.
+ *   - Halme drehen sich zur Kamera (Billboard pro Halm, nicht pro Feld).
+ *   - Cull (Insel-Rand, Buildings, Road) läuft im Vertex-Shader — die
+ *     Kachel bewegt sich, Pre-Compute ist nicht mehr möglich. Versteckte
+ *     Halme kollabieren zu Null-Flächen-Dreiecken (kostenfrei im Raster).
+ *   - Manueller Fog am Halm (Scene-Fog greift nicht in ShaderMaterial) —
+ *     sonst stehen bei Nacht ungefoggte Halme im gefoggten Terrain.
  */
 
 import * as THREE from "three";
 
-// ─── Geometrie-Parameter ───────────────────────────────────────────────────
-const GRID = 220;
-const SIZE = 110;
-const COUNT = GRID * GRID;
-const SPACING = SIZE / GRID;
-const SPOT_SIZE = SPACING * 0.9;
-const VIEW_RADIUS = 45;
-const VIEW_FADE = 12;
+// ─── Feld-Parameter ────────────────────────────────────────────────────────
+const TILE = 80;                  // Kachel-Kantenlänge (m), zentriert auf Kamera
+const GRID_HIGH = 230;            // 52.9k Halme (Graphics: high)
+const GRID_LOW  = 150;            // 22.5k Halme (Graphics: low)
 const MAP_RADIUS = 46;
-const MAP_FADE = 4;
+const BLADE_WIDTH  = 0.09;
+const BLADE_HEIGHT = 0.7;
 
 // ─── Wind-Defaults ─────────────────────────────────────────────────────────
 const WIND_DIR_X = 0.7;
@@ -32,100 +37,44 @@ const WIND_DIR_Z = 0.3;
 const WIND_SPEED = 0.6;
 const WIND_STRENGTH = 0.25;
 
+// Farben — Basis dunkel, Spitze hell (geteilt zwischen beiden Pfaden)
+const COL_DARK  = [0.13, 0.23, 0.08];
+const COL_LIGHT = [0.42, 0.60, 0.22];
+const TRAIL_TINT = [0.62, 0.48, 0.18];
+
+function pickGrid() {
+  try {
+    const raw = localStorage.getItem("numan-portfolio-settings-v1");
+    if (raw && JSON.parse(raw).graphics === "low") return GRID_LOW;
+  } catch (e) {}
+  return GRID_HIGH;
+}
+
 // ═══════════════════════════════════════════════════════════════════════════
-// WebGL-Pfad: klassisches ShaderMaterial mit GLSL
+// WebGL-Pfad: GLSL
 // ═══════════════════════════════════════════════════════════════════════════
 
 const VERTEX_SHADER = /* glsl */ `
   uniform float uTime;
   uniform vec2  uViewCenter;
-  uniform float uViewRadius;
-  uniform float uViewFade;
   uniform float uTerrainY;
   uniform vec3  uBikePos;
   uniform vec2  uWindDir;
   uniform float uWindSpeed;
   uniform float uWindStrength;
+  uniform float uBladeWidth;
+  uniform float uBladeHeight;
 
-  uniform vec3 uBuildings[5];
-  uniform vec2 uRoad[64];
+  uniform vec3  uBuildings[5];
+  uniform vec2  uRoad[64];
   uniform float uRoadRadiusSq;
   uniform float uMapRadius;
-  uniform float uMapFade;
+  uniform vec2  uMapCenter;
 
-  attribute vec2 aCenter;
-  attribute float aHash;
+  uniform vec2  uPressPos;
+  uniform float uPressStrength;
+  uniform vec2  uPressVel;
 
-  varying vec2  vQuadUv;
-  varying float vHash;
-  varying float vDistance;
-  varying float vTrailWeight;
-  varying float vCulled;
-  varying vec2  vWorldXZ;
-
-  void main() {
-    vec3 pos = position;
-    vQuadUv = pos.xy;
-    vHash = aHash;
-    vWorldXZ = aCenter;
-
-    vec3 quadWorld = vec3(aCenter.x, uTerrainY, aCenter.y);
-
-    vec2 toView = aCenter - uViewCenter;
-    float distView = length(toView);
-    vDistance = distView;
-    float vis = 1.0 - smoothstep(uViewRadius - uViewFade, uViewRadius, distView);
-    float lodScale = mix(0.65, 1.0, vis);
-
-    vec3 right = vec3(modelViewMatrix[0][0], 0.0, modelViewMatrix[2][0]);
-    right = normalize(right);
-    vec3 up = vec3(0.0, 1.0, 0.0);
-
-    float spotSize = float(${SPOT_SIZE}) * lodScale;
-
-    vec3 offset = right * pos.x * spotSize
-                + up    * (pos.y + 0.5) * spotSize;
-
-    vec3 worldPos = quadWorld + offset;
-
-    float windPhase = dot(aCenter, uWindDir) * 0.08 + uTime * uWindSpeed;
-    float bend = sin(windPhase) * 0.6
-               + sin(windPhase * 1.7 + aHash * 6.28) * 0.18;
-    float bendStrength = pos.y + 0.5;
-    worldPos.x += uWindDir.x * bend * bendStrength * spotSize * uWindStrength;
-    worldPos.z += uWindDir.y * bend * bendStrength * spotSize * uWindStrength;
-
-    float bikeDist = length(aCenter - uBikePos.xz);
-    vTrailWeight = 1.0 - smoothstep(0.0, 4.0, bikeDist);
-
-    vCulled = 0.0;
-    if (vis < 0.01) vCulled = 1.0;
-
-    for (int i = 0; i < 5; i++) {
-      vec3 b = uBuildings[i];
-      float dx = b.x - aCenter.x;
-      float dz = b.y - aCenter.y;
-      if (dx * dx + dz * dz < b.z) vCulled = 1.0;
-    }
-    for (int i = 0; i < 64; i++) {
-      vec2 r = uRoad[i];
-      float dx = r.x - aCenter.x;
-      float dz = r.y - aCenter.y;
-      if (dx * dx + dz * dz < uRoadRadiusSq) vCulled = 1.0;
-    }
-
-    float mapDist = length(aCenter);
-    if (mapDist > uMapRadius) vCulled = 1.0;
-
-    if (vCulled > 0.5) {
-      worldPos.y -= spotSize * 3.0;
-    }
-
-    gl_Position = projectionMatrix * viewMatrix * vec4(worldPos, 1.0);
-  }
-`;
-
-const FRAGMENT_SHADER = /* glsl */ `
   uniform float uSunIntensity;
   uniform vec3  uAmbient;
   uniform float uNightFactor;
@@ -133,74 +82,152 @@ const FRAGMENT_SHADER = /* glsl */ `
   uniform vec3  uLampPos[12];
   uniform float uLampRange;
 
-  varying vec2  vQuadUv;
-  varying float vHash;
-  varying float vDistance;
-  varying float vTrailWeight;
-  varying float vCulled;
-  varying vec2  vWorldXZ;
+  uniform vec3  uFogColor;
+  uniform float uFogNear;
+  uniform float uFogFar;
 
-  float singleBlade(vec2 uv, float centerX, float curveDir, float widthBase, float heightLimit) {
-    float y = uv.y + 0.5;
-    if (y < 0.0 || y > heightLimit) return 0.0;
-    float yn = y / heightLimit;
-    float curveOffset = centerX + sin(yn * 3.14159 * 0.5) * 0.06 * curveDir;
-    float widthAtY = widthBase * (1.0 - smoothstep(0.0, 1.0, yn) * 0.85);
-    float tipRound = 1.0 - smoothstep(0.85, 1.0, yn);
-    widthAtY *= mix(1.0, tipRound, smoothstep(0.7, 1.0, yn));
-    float dx = abs(uv.x - curveOffset);
-    return (1.0 - smoothstep(0.0, widthAtY, dx)) * step(dx, widthAtY * 1.5);
+  attribute float aHash;
+
+  varying vec3 vColor;
+
+  float hash21(vec2 p) {
+    return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453123);
   }
 
-  float bladeMask(vec2 uv, float hash) {
-    float h2 = fract(hash * 7.31);
-    float h3 = fract(hash * 13.79);
-    float h4 = fract(hash * 21.13);
-    float m1 = singleBlade(uv, 0.0,                     1.0,                0.085, 0.95);
-    float m2 = singleBlade(uv, -0.13 - h2 * 0.04,      -0.6 + h2 * 0.6,    0.065, 0.72);
-    float m3 = singleBlade(uv,  0.12 + h3 * 0.05,       0.6 - h3 * 0.6,    0.065, 0.78);
-    float m4 = singleBlade(uv, -0.04 + h4 * 0.08,      (h4 - 0.5) * 1.4,   0.05,  0.55);
-    return max(max(m1, m2), max(m3, m4));
+  float vnoise(vec2 p) {
+    vec2 i = floor(p);
+    vec2 f = fract(p);
+    vec2 u = f * f * (3.0 - 2.0 * f);
+    float a = hash21(i);
+    float b = hash21(i + vec2(1.0, 0.0));
+    float c = hash21(i + vec2(0.0, 1.0));
+    float d = hash21(i + vec2(1.0, 1.0));
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
   }
 
   void main() {
-    if (vCulled > 0.5) discard;
-    float alpha = bladeMask(vQuadUv, vHash);
-    if (alpha < 0.5) discard;
+    // position.xy = Halm-Zentrum in Kachel-Koordinaten, position.z = Ecke
+    // (0 = Spitze, 1 = Basis rechts, 2 = Basis links)
+    vec2 local = position.xy;
+    float corner = position.z;
 
-    float vRel = (vQuadUv.y + 0.5);
-    vec3 colDark  = vec3(0.16, 0.26, 0.09);
-    vec3 colLight = vec3(0.36, 0.54, 0.20);
-    vec3 base = mix(colDark, colLight, vRel);
-    base *= mix(0.85, 1.15, vHash);
+    // ── Kachel-Wrap um den View-Center ──
+    const float HALF = ${(TILE / 2).toFixed(1)};
+    vec2 rel = mod(local - uViewCenter + HALF, ${TILE.toFixed(1)}) - HALF;
+    vec2 blade = uViewCenter + rel;
 
-    vec3 trailTint = vec3(0.62, 0.48, 0.18);
-    base = mix(base, mix(base, trailTint, 0.4), vTrailWeight);
+    // ── Cull: Insel-Rand hart, Buildings/Road mit organischem Saum ──
+    float hidden = 0.0;
+    vec2 mapRel = blade - uMapCenter;
+    if (dot(mapRel, mapRel) > uMapRadius * uMapRadius) hidden = 1.0;
 
-    float distFade = 1.0 - smoothstep(20.0, 30.0, vDistance);
-    base = mix(vec3(0.20, 0.32, 0.12), base, distFade);
+    // Statt harter Kreise: Distanz zum nächsten Hindernis messen und den
+    // Saum mit Noise verbeulen + per Halm-Hash ausdünnen — die Wiese
+    // franst natürlich aus statt mit Zirkel-Kante zu enden.
+    float edgeN = vnoise(blade * 0.6);
+
+    float minB = 1e9;
+    for (int i = 0; i < 5; i++) {
+      vec2 d = uBuildings[i].xy - blade;
+      minB = min(minB, dot(d, d) / max(uBuildings[i].z, 0.001));
+    }
+    float bRel = sqrt(minB);                       // 1.0 = Kreisrand
+    float buildF = smoothstep(0.55 + edgeN * 0.35, 1.2 + edgeN * 0.35, bRel);
+
+    float minR = 1e9;
+    for (int i = 0; i < 64; i++) {
+      vec2 d = uRoad[i] - blade;
+      minR = min(minR, dot(d, d));
+    }
+    float rRel = sqrt(minR / uRoadRadiusSq);
+    float roadF = smoothstep(0.8 + edgeN * 0.4, 1.6 + edgeN * 0.4, rRel);
+
+    float occupF = min(buildF, roadF);
+    if (occupF < aHash) hidden = 1.0;
+
+    // ── Form ──
+    float tip = 1.0 - step(0.5, corner);             // Ecke 0 = Spitze
+    float sideSign = mix(1.0, -1.0, step(1.5, corner));
+
+    float patchN = vnoise(blade * 0.16);
+    float h = uBladeHeight * (0.55 + 0.9 * aHash) * (0.62 + 0.76 * patchN);
+
+    // Kachel-Rand: Halme sanft auf 0 schrumpfen statt harter Kante
+    float edge = max(abs(rel.x), abs(rel.y)) / HALF;
+    h *= 1.0 - smoothstep(0.78, 1.0, edge);
+
+    // Saum-Halme werden zur Kante hin kürzer (zusätzlich zum Ausdünnen)
+    h *= 0.45 + 0.55 * occupF;
+
+    // Druckpunkt (Cursor/Finger auf dem Boden): Halme ducken sich
+    vec2 away = blade - uPressPos;
+    float awayDist = length(away);
+    float press = (1.0 - smoothstep(0.0, 2.4, awayDist)) * uPressStrength;
+    h *= 1.0 - press * 0.5;
+
+    // ── Kamera-Billboard pro Halm ──
+    vec2 toCam = cameraPosition.xz - blade;
+    float toCamLen = max(length(toCam), 0.001);
+    vec2 right = vec2(-toCam.y, toCam.x) / toCamLen;
+
+    vec2 offsetXZ = right * sideSign * uBladeWidth * (1.0 - tip);
+
+    // ── Wind — nur die Spitze schwingt, Basis bleibt verwurzelt ──
+    float phase = dot(blade, uWindDir) * 0.35 + uTime * uWindSpeed * 2.0;
+    float sway = (sin(phase) + sin(phase * 1.7 + aHash * 6.2831) * 0.4)
+               * uWindStrength * h * tip;
+    offsetXZ += uWindDir * sway;
+
+    // ... und legen sich in Strich-Richtung um (gekaemmt), mit leichtem
+    // radialem Anteil damit auch ein stehender Finger Wirkung zeigt
+    vec2 pressDir = (away / max(awayDist, 0.001)) * 0.35 + uPressVel * 0.75;
+    offsetXZ += pressDir * press * 0.55 * tip;
+
+    vec3 world = vec3(blade.x + offsetXZ.x,
+                      uTerrainY + tip * h,
+                      blade.y + offsetXZ.y);
+
+    // Versteckte Halme: alle 3 Ecken auf denselben Punkt → Null-Fläche
+    if (hidden > 0.5) world = vec3(0.0, -50.0, 0.0);
+
+    // ── Farbe (per Vertex — Fragment gibt nur noch vColor aus) ──
+    vec3 base = mix(vec3(${COL_DARK.join(",")}), vec3(${COL_LIGHT.join(",")}), tip);
+    base *= 0.82 + 0.36 * aHash;
+    base *= 0.80 + 0.40 * patchN;
+
+    // Trail: plattgefahrenes Gras hinter dem Bike färbt sich strohig
+    float bikeDist = length(blade - uBikePos.xz);
+    float trail = 1.0 - smoothstep(0.0, 4.0, bikeDist);
+    base = mix(base, mix(base, vec3(${TRAIL_TINT.join(",")}), 0.4), trail);
 
     vec3 lighting = uAmbient + vec3(uSunIntensity * 0.55);
-    float nightDim = 1.0 - uNightFactor * 0.88;
-    lighting *= nightDim;
+    lighting *= 1.0 - uNightFactor * 0.88;
 
     if (uLampCount > 0 && uNightFactor > 0.05) {
-      vec3 lampWarm = vec3(1.0, 0.78, 0.42);
       float lampAdd = 0.0;
-      vec2 wxz = vWorldXZ;
       for (int i = 0; i < 12; i++) {
         if (i >= uLampCount) break;
-        vec2 lxz = uLampPos[i].xz;
-        float d = length(wxz - lxz);
+        float d = length(blade - uLampPos[i].xz);
         float falloff = 1.0 - smoothstep(0.0, uLampRange, d);
         lampAdd += falloff * falloff * 0.65;
       }
-      lampAdd = min(lampAdd, 1.4);
-      lighting += lampWarm * lampAdd * uNightFactor;
+      lighting += vec3(1.0, 0.78, 0.42) * min(lampAdd, 1.4) * uNightFactor;
     }
 
-    vec3 col = base * lighting;
-    gl_FragColor = vec4(col, 1.0);
+    vColor = base * lighting;
+
+    // Manueller Fog — Halme müssen mit dem gefoggten Terrain verschmelzen
+    float fogF = smoothstep(uFogNear, uFogFar, distance(world, cameraPosition));
+    vColor = mix(vColor, uFogColor, fogF);
+
+    gl_Position = projectionMatrix * viewMatrix * vec4(world, 1.0);
+  }
+`;
+
+const FRAGMENT_SHADER = /* glsl */ `
+  varying vec3 vColor;
+  void main() {
+    gl_FragColor = vec4(vColor, 1.0);
   }
 `;
 
@@ -208,91 +235,42 @@ const FRAGMENT_SHADER = /* glsl */ `
 // Geometrie-Builder — gleich für beide Pfade
 // ═══════════════════════════════════════════════════════════════════════════
 
-function buildGrassGeometry(buildings, roadCurve) {
-  const baseGeo = new THREE.PlaneGeometry(1, 1);
-  const geo = new THREE.InstancedBufferGeometry();
-  geo.index = baseGeo.index;
-  geo.attributes.position = baseGeo.attributes.position;
-  geo.attributes.uv = baseGeo.attributes.uv;
+function buildGrassGeometry(grid) {
+  const count = grid * grid;
+  const spacing = TILE / grid;
+  const positions = new Float32Array(count * 3 * 3);   // 3 Verts × (cx, cz, corner)
+  const hashes = new Float32Array(count * 3);
 
-  // Pre-compute Cull-Daten: Building-Radii, Road-Punkte.
-  // Die Cull-Berechnung läuft jetzt EINMALIG hier statt pro Vertex pro Frame.
-  // Ergebnis pro Halm: aCulled = 1 wenn permanent versteckt, 0 wenn sichtbar.
-  const RADII = { HQ: 8, HAW: 11, Yek: 8, THG: 15, Designa: 10 };
-  const buildingChecks = [];
-  for (let i = 0; i < 5; i++) {
-    const b = buildings?.[i];
-    if (b) {
-      const r = RADII[b.id] ?? 7;
-      buildingChecks.push({ x: b.position[0], z: b.position[2], r2: r * r });
-    }
-  }
-  const roadPoints = [];
-  if (roadCurve) {
-    const s = roadCurve.getSpacedPoints(63);
-    for (let i = 0; i < 64; i++) roadPoints.push({ x: s[i].x, z: s[i].z });
-  }
-  const ROAD_R2 = 3.0 * 3.0;
-  const MAP_R2 = MAP_RADIUS * MAP_RADIUS;
-
-  const centers = new Float32Array(COUNT * 2);
-  const hashes  = new Float32Array(COUNT);
-  const culled  = new Float32Array(COUNT);
-
-  let idx = 0;
-  let cullCount = 0;
-  for (let iX = 0; iX < GRID; iX++) {
-    const fragmentX = (iX / GRID - 0.5) * SIZE + SPACING * 0.5;
-    for (let iZ = 0; iZ < GRID; iZ++) {
-      const fragmentZ = (iZ / GRID - 0.5) * SIZE + SPACING * 0.5;
-      const cx = fragmentX + (Math.random() - 0.5) * SPACING * 0.7;
-      const cz = fragmentZ + (Math.random() - 0.5) * SPACING * 0.7;
-      centers[idx * 2 + 0] = cx;
-      centers[idx * 2 + 1] = cz;
-      hashes[idx] = Math.random();
-
-      // Cull-Check
-      let isCulled = 0;
-
-      // Map-Radius (außerhalb Insel)
-      if (cx * cx + cz * cz > MAP_R2) isCulled = 1;
-
-      // Building-Check
-      if (!isCulled) {
-        for (let bi = 0; bi < buildingChecks.length; bi++) {
-          const b = buildingChecks[bi];
-          const dx = b.x - cx;
-          const dz = b.z - cz;
-          if (dx * dx + dz * dz < b.r2) { isCulled = 1; break; }
-        }
+  let v = 0;
+  for (let iX = 0; iX < grid; iX++) {
+    const fx = (iX / grid - 0.5) * TILE + spacing * 0.5;
+    for (let iZ = 0; iZ < grid; iZ++) {
+      const fz = (iZ / grid - 0.5) * TILE + spacing * 0.5;
+      const cx = fx + (Math.random() - 0.5) * spacing;
+      const cz = fz + (Math.random() - 0.5) * spacing;
+      const hash = Math.random();
+      for (let c = 0; c < 3; c++) {
+        positions[v * 3 + 0] = cx;
+        positions[v * 3 + 1] = cz;
+        positions[v * 3 + 2] = c;
+        hashes[v] = hash;
+        v++;
       }
-
-      // Road-Check
-      if (!isCulled) {
-        for (let ri = 0; ri < roadPoints.length; ri++) {
-          const r = roadPoints[ri];
-          const dx = r.x - cx;
-          const dz = r.z - cz;
-          if (dx * dx + dz * dz < ROAD_R2) { isCulled = 1; break; }
-        }
-      }
-
-      culled[idx] = isCulled;
-      if (isCulled) cullCount++;
-      idx++;
     }
   }
 
-  geo.setAttribute("aCenter", new THREE.InstancedBufferAttribute(centers, 2));
-  geo.setAttribute("aHash",   new THREE.InstancedBufferAttribute(hashes, 1));
-  geo.setAttribute("aCulled", new THREE.InstancedBufferAttribute(culled, 1));
-  geo.instanceCount = COUNT;
-  console.log(`[Grass] geometry built — ${COUNT} quads (${cullCount} pre-culled, ${COUNT - cullCount} visible)`);
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute("aHash", new THREE.BufferAttribute(hashes, 1));
+  // Kachel folgt der Kamera — Frustum-Cull der Gesamt-Mesh ist sinnlos,
+  // BoundingSphere nur für three-Interna gesetzt.
+  geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), MAP_RADIUS + TILE);
+  console.log(`[Grass] geometry built — ${count} blades (${count * 3} verts, tile ${TILE}m)`);
   return geo;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// WebGL-Material-Factory
+// Uniform-Helfer
 // ═══════════════════════════════════════════════════════════════════════════
 
 function buildBuildingArr(buildings) {
@@ -321,10 +299,11 @@ function buildRoadArr(roadCurve) {
   return arr;
 }
 
-function buildGrassMaterialGLSL(buildings, roadCurve) {
-  const buildingsArr = buildBuildingArr(buildings);
-  const roadArr = buildRoadArr(roadCurve);
+// ═══════════════════════════════════════════════════════════════════════════
+// WebGL-Material-Factory
+// ═══════════════════════════════════════════════════════════════════════════
 
+function buildGrassMaterialGLSL(buildings, roadCurve) {
   const material = new THREE.ShaderMaterial({
     vertexShader: VERTEX_SHADER,
     fragmentShader: FRAGMENT_SHADER,
@@ -333,50 +312,69 @@ function buildGrassMaterialGLSL(buildings, roadCurve) {
     uniforms: {
       uTime:         { value: 0 },
       uViewCenter:   { value: new THREE.Vector2() },
-      uViewRadius:   { value: VIEW_RADIUS },
-      uViewFade:     { value: VIEW_FADE },
       uTerrainY:     { value: 0.3 },
       uBikePos:      { value: new THREE.Vector3() },
       uWindDir:      { value: new THREE.Vector2(WIND_DIR_X, WIND_DIR_Z).normalize() },
       uWindSpeed:    { value: WIND_SPEED },
       uWindStrength: { value: WIND_STRENGTH },
-      uBuildings:    { value: buildingsArr },
-      uRoad:         { value: roadArr },
+      uBladeWidth:   { value: BLADE_WIDTH },
+      uBladeHeight:  { value: BLADE_HEIGHT },
+      uBuildings:    { value: buildBuildingArr(buildings) },
+      uRoad:         { value: buildRoadArr(roadCurve) },
       uRoadRadiusSq: { value: 3.0 * 3.0 },
       uMapRadius:    { value: MAP_RADIUS },
-      uMapFade:      { value: MAP_FADE },
+      uMapCenter:    { value: new THREE.Vector2(0, 0) },
+      uPressPos:     { value: new THREE.Vector2(9999, 9999) },
+      uPressStrength:{ value: 0 },
+      uPressVel:     { value: new THREE.Vector2() },
       uSunIntensity: { value: 1.0 },
       uAmbient:      { value: new THREE.Color(0x445566) },
       uNightFactor:  { value: 0.0 },
       uLampCount:    { value: 0 },
       uLampPos:      { value: Array.from({ length: 12 }, () => new THREE.Vector3()) },
       uLampRange:    { value: 7.0 },
+      uFogColor:     { value: new THREE.Color(0xa8d8ff) },
+      uFogNear:      { value: 60 },
+      uFogFar:       { value: 200 },
     },
   });
 
   // Adapter — gemeinsame API zwischen GLSL- und TSL-Material.
+  const u = material.uniforms;
   material.userData.adapter = {
-    setTime:        (t) => { material.uniforms.uTime.value = t; },
-    setViewCenter:  (cx, cz) => material.uniforms.uViewCenter.value.set(cx, cz),
-    setViewRadius:  (v) => { material.uniforms.uViewRadius.value = v; },
-    setMapRadius:   (v) => { material.uniforms.uMapRadius.value = v; },
-    setTerrainY:    (v) => { material.uniforms.uTerrainY.value = v; },
-    setBikePos:     (x, z) => material.uniforms.uBikePos.value.set(x, 0, z),
+    setTime:        (t) => { u.uTime.value = t; },
+    setViewCenter:  (cx, cz) => u.uViewCenter.value.set(cx, cz),
+    setMapRadius:   (v) => { u.uMapRadius.value = v; },
+    setMapCenter:   (x, z) => u.uMapCenter.value.set(x, z),
+    setTerrainY:    (v) => { u.uTerrainY.value = v; },
+    setBikePos:     (x, z) => u.uBikePos.value.set(x, 0, z),
+    setBladeHeight: (v) => { u.uBladeHeight.value = v; },
+    setBladeWidth:  (v) => { u.uBladeWidth.value = v; },
     setWind:        (dir, speed, strength) => {
-      material.uniforms.uWindDir.value.copy(dir);
-      material.uniforms.uWindSpeed.value = speed;
-      material.uniforms.uWindStrength.value = strength;
+      u.uWindDir.value.copy(dir);
+      u.uWindSpeed.value = speed;
+      u.uWindStrength.value = strength;
     },
     setSun:         (intensity, ambientColor, ambientIntensity) => {
-      material.uniforms.uSunIntensity.value = intensity;
-      material.uniforms.uAmbient.value.copy(ambientColor).multiplyScalar(ambientIntensity);
+      u.uSunIntensity.value = intensity;
+      u.uAmbient.value.copy(ambientColor).multiplyScalar(ambientIntensity);
     },
-    setNightFactor: (n) => { material.uniforms.uNightFactor.value = n; },
+    setNightFactor: (n) => { u.uNightFactor.value = n; },
+    setPress:       (x, z, st, vx, vz) => {
+      u.uPressPos.value.set(x, z);
+      u.uPressStrength.value = st;
+      u.uPressVel.value.set(vx || 0, vz || 0);
+    },
+    setFog:         (color, near, far) => {
+      u.uFogColor.value.copy(color);
+      u.uFogNear.value = near;
+      u.uFogFar.value = far;
+    },
     setLamps:       (positions) => {
-      const arr = material.uniforms.uLampPos.value;
+      const arr = u.uLampPos.value;
       const n = Math.min(positions.length, 12);
       for (let i = 0; i < n; i++) arr[i].copy(positions[i]);
-      material.uniforms.uLampCount.value = n;
+      u.uLampCount.value = n;
     },
   };
 
@@ -387,236 +385,220 @@ function buildGrassMaterialGLSL(buildings, roadCurve) {
 // WebGPU/TSL-Material-Factory
 // ═══════════════════════════════════════════════════════════════════════════
 
-async function buildGrassMaterialTSL() {
+async function buildGrassMaterialTSL(buildings, roadCurve) {
   const webgpu = await import("three/webgpu");
   const tsl = await import("three/tsl");
   const {
     Fn, If, Loop, uniform, uniformArray, attribute, varying,
     vec2, vec3, vec4, float,
-    sin, dot, mix, smoothstep, clamp, max, min, abs, length, fract, normalize, step,
-    positionLocal, cameraPosition,
-    Discard,
+    sin, dot, mix, smoothstep, max, min, sqrt, length, fract, floor, step, distance,
+    positionLocal, cameraPosition, Break,
   } = tsl;
   const { MeshBasicNodeMaterial } = webgpu;
 
-  // ─── Uniforms ───
   const uTime         = uniform(0);
   const uViewCenter   = uniform(new THREE.Vector2());
-  const uViewRadius   = uniform(VIEW_RADIUS);
-  const uViewFade     = uniform(VIEW_FADE);
   const uTerrainY     = uniform(0.3);
   const uBikePos      = uniform(new THREE.Vector3());
   const uWindDir      = uniform(new THREE.Vector2(WIND_DIR_X, WIND_DIR_Z).normalize());
   const uWindSpeed    = uniform(WIND_SPEED);
   const uWindStrength = uniform(WIND_STRENGTH);
+  const uBladeWidth   = uniform(BLADE_WIDTH);
+  const uBladeHeight  = uniform(BLADE_HEIGHT);
   const uMapRadius    = uniform(MAP_RADIUS);
+  const uMapCenter    = uniform(new THREE.Vector2(0, 0));
+  const uRoadRadiusSq = uniform(3.0 * 3.0);
+  const uPressPos     = uniform(new THREE.Vector2(9999, 9999));
+  const uPressStrength = uniform(0);
+  const uPressVel     = uniform(new THREE.Vector2());
   const uSunIntensity = uniform(1.0);
   const uAmbient      = uniform(new THREE.Color(0x445566));
-  const uNightFactor  = uniform(0);
-  const uLampRange    = uniform(7.0);
+  const uNightFactor  = uniform(0.0);
   const uLampCount    = uniform(0);
+  const uLampRange    = uniform(7.0);
+  const uFogColor     = uniform(new THREE.Color(0xa8d8ff));
+  const uFogNear      = uniform(60);
+  const uFogFar       = uniform(200);
 
-  // Lamp-Positions als uniformArray. Default-Positionen weit weg damit
-  // ungenutzte Slots im (jetzt voll-unrolled) Lamp-Loop automatisch durch
-  // den falloff-Clamp aus dem Beleuchtungs-Ergebnis fallen.
-  const FAR_AWAY = 99999;
-  const lampArr = Array.from({ length: 12 }, () =>
-    new THREE.Vector3(FAR_AWAY, FAR_AWAY, FAR_AWAY),
-  );
-  const uLampPos = uniformArray(lampArr, "vec3");
+  const buildingArr = uniformArray(buildBuildingArr(buildings));
+  const roadArr     = uniformArray(buildRoadArr(roadCurve));
+  // JS-seitige Referenz behalten — setLamps mutiert die Vector3 in place,
+  // uniformArray pickt die Werte beim nächsten Upload auf.
+  const lampValues  = Array.from({ length: 12 }, () => new THREE.Vector3());
+  const lampArr     = uniformArray(lampValues);
 
-  // ─── Material ───
-  const material = new MeshBasicNodeMaterial({
-    side: THREE.DoubleSide,
-    transparent: false,
+  const hash21 = Fn(([p]) => {
+    return fract(sin(dot(p, vec2(127.1, 311.7))).mul(43758.5453));
+  });
+  const vnoise = Fn(([p]) => {
+    const i = floor(p);
+    const f = fract(p);
+    const u = f.mul(f).mul(float(3).sub(f.mul(2)));
+    const a = hash21(i);
+    const b = hash21(i.add(vec2(1, 0)));
+    const c = hash21(i.add(vec2(0, 1)));
+    const d = hash21(i.add(vec2(1, 1)));
+    return mix(mix(a, b, u.x), mix(c, d, u.x), u.y);
   });
 
-  // Varying: Quad-UV (positionLocal) → Fragment
-  // TSL's positionLocal im Fragment ist NICHT zuverlässig — wir nutzen
-  // explizites varying() um es vom Vertex zum Fragment zu bringen.
-  const vQuadUv = varying(vec2(0, 0), "vQuadUv");
+  const material = new MeshBasicNodeMaterial();
+  material.side = THREE.DoubleSide;
+  material.fog = false;
 
-  // ─── positionNode mit Camera-Billboard + Wind + Cull ───
+  const vColor = varying(vec3());
+
   material.positionNode = Fn(() => {
-    const aCenter = attribute("aCenter", "vec2");
-    const aHash   = attribute("aHash",   "float");
-    const local   = positionLocal.toVar();
+    const local = positionLocal.xy;
+    const corner = positionLocal.z;
+    const aHash = attribute("aHash");
 
-    // Varying setzen
-    vQuadUv.assign(vec2(local.x, local.y));
+    // Kachel-Wrap
+    const HALF = float(TILE / 2);
+    const rel = local.sub(uViewCenter).add(HALF).mod(TILE).sub(HALF);
+    const blade = uViewCenter.add(rel);
 
-    // Welt-Anker am Boden
-    const anchorWorld = vec3(aCenter.x, uTerrainY, aCenter.y).toVar();
-
-    // View-Distance + LOD-Scale
-    const distView = length(aCenter.sub(uViewCenter));
-    const vis = float(1).sub(smoothstep(uViewRadius.sub(uViewFade), uViewRadius, distView));
-    const lodScale = mix(float(0.65), float(1.0), vis);
-    const sz = float(SPOT_SIZE).mul(lodScale).toVar();
-
-    // Camera-Billboard
-    const toCam = cameraPosition.sub(anchorWorld);
-    const camHor = normalize(vec3(toCam.x, 0, toCam.z));
-    const right = vec3(camHor.z, 0, camHor.x.negate());
-    const up = vec3(0, 1, 0);
-
-    const offset = right.mul(local.x).mul(sz)
-      .add(up.mul(local.y.add(0.5)).mul(sz));
-
-    const worldPos = anchorWorld.add(offset).toVar();
-
-    // ─── Wind-Wedeln ───
-    // Wind-Welle wandert in Windrichtung über die Welt, mit Phasen-Variation
-    // pro Quad damit es nicht synchron aussieht. Nur die Spitze (positives y)
-    // wird ausgelenkt — Wurzel bleibt stehen.
-    const windPhase = dot(aCenter, uWindDir).mul(0.08).add(uTime.mul(uWindSpeed));
-    const bend = sin(windPhase).mul(0.6)
-      .add(sin(windPhase.mul(1.7).add(aHash.mul(6.28))).mul(0.18));
-    const bendStrength = local.y.add(0.5);   // 0 unten, 1 oben
-    worldPos.x.addAssign(uWindDir.x.mul(bend).mul(bendStrength).mul(sz).mul(uWindStrength));
-    worldPos.z.addAssign(uWindDir.y.mul(bend).mul(bendStrength).mul(sz).mul(uWindStrength));
-
-    // ─── Cull-Logik (pre-computed) ───
-    // aCulled wurde beim Geometry-Build EINMALIG berechnet — kein per-Frame
-    // Loop mehr. Spart 18M Distance-Tests/Frame.
-    const aCulled = attribute("aCulled", "float");
-    const culled = aCulled.toVar();
-
-    // Nur View-Radius bleibt dynamisch (Camera bewegt sich)
-    If(vis.lessThan(0.01), () => { culled.assign(1); });
-
-    If(culled.greaterThan(0.5), () => {
-      worldPos.y.subAssign(float(20));
+    // Cull: Insel-Rand hart, Buildings/Road mit organischem Saum
+    const hidden = float(0).toVar();
+    const mapRel = blade.sub(uMapCenter);
+    If(dot(mapRel, mapRel).greaterThan(uMapRadius.mul(uMapRadius)), () => {
+      hidden.assign(1);
     });
 
-    return worldPos;
+    const edgeN = vnoise(blade.mul(0.6));
+
+    const minB = float(1e9).toVar();
+    Loop({ start: 0, end: 5, type: "int" }, ({ i }) => {
+      const b = buildingArr.element(i);
+      const d = b.xy.sub(blade);
+      minB.assign(min(minB, dot(d, d).div(max(b.z, 0.001))));
+    });
+    const bRel = sqrt(minB);
+    const buildF = smoothstep(edgeN.mul(0.35).add(0.55), edgeN.mul(0.35).add(1.2), bRel);
+
+    const minR = float(1e9).toVar();
+    Loop({ start: 0, end: 64, type: "int" }, ({ i }) => {
+      const d = roadArr.element(i).sub(blade);
+      minR.assign(min(minR, dot(d, d)));
+    });
+    const rRel = sqrt(minR.div(uRoadRadiusSq));
+    const roadF = smoothstep(edgeN.mul(0.4).add(0.8), edgeN.mul(0.4).add(1.6), rRel);
+
+    const occupF = min(buildF, roadF);
+    If(occupF.lessThan(aHash), () => { hidden.assign(1); });
+
+    // Form
+    const tip = float(1).sub(step(0.5, corner));
+    const sideSign = mix(float(1), float(-1), step(1.5, corner));
+
+    const patch = vnoise(blade.mul(0.16));
+    const h = uBladeHeight
+      .mul(aHash.mul(0.9).add(0.55))
+      .mul(patch.mul(0.76).add(0.62))
+      .toVar();
+
+    const edge = max(rel.x.abs(), rel.y.abs()).div(HALF);
+    h.mulAssign(float(1).sub(smoothstep(0.78, 1.0, edge)));
+    h.mulAssign(occupF.mul(0.55).add(0.45));
+
+    // Druckpunkt: ducken + radial ausweichen (Spiegel des GLSL-Pfads)
+    const away = blade.sub(uPressPos);
+    const awayDist = length(away);
+    const press = float(1).sub(smoothstep(0.0, 2.4, awayDist)).mul(uPressStrength);
+    h.mulAssign(float(1).sub(press.mul(0.5)));
+
+    // Kamera-Billboard
+    const toCam = cameraPosition.xz.sub(blade);
+    const toCamLen = max(length(toCam), 0.001);
+    const right = vec2(toCam.y.negate(), toCam.x).div(toCamLen);
+
+    const offsetXZ = right.mul(sideSign).mul(uBladeWidth).mul(float(1).sub(tip)).toVar();
+
+    // Wind (nur Spitze)
+    const phase = dot(blade, uWindDir).mul(0.35).add(uTime.mul(uWindSpeed).mul(2.0));
+    const sway = sin(phase)
+      .add(sin(phase.mul(1.7).add(aHash.mul(6.2831))).mul(0.4))
+      .mul(uWindStrength).mul(h).mul(tip);
+    offsetXZ.addAssign(uWindDir.mul(sway));
+    const pressDir = away.div(max(awayDist, 0.001)).mul(0.35).add(uPressVel.mul(0.75));
+    offsetXZ.addAssign(pressDir.mul(press).mul(0.55).mul(tip));
+
+    const world = vec3(
+      blade.x.add(offsetXZ.x),
+      uTerrainY.add(tip.mul(h)),
+      blade.y.add(offsetXZ.y),
+    ).toVar();
+    If(hidden.greaterThan(0.5), () => {
+      world.assign(vec3(0, -50, 0));
+    });
+
+    // Farbe per Vertex
+    const base = mix(vec3(...COL_DARK), vec3(...COL_LIGHT), tip).toVar();
+    base.mulAssign(aHash.mul(0.36).add(0.82));
+    base.mulAssign(patch.mul(0.40).add(0.80));
+
+    const bikeDist = length(blade.sub(uBikePos.xz));
+    const trail = float(1).sub(smoothstep(0.0, 4.0, bikeDist));
+    base.assign(mix(base, mix(base, vec3(...TRAIL_TINT), 0.4), trail));
+
+    const lighting = uAmbient.add(vec3(uSunIntensity.mul(0.55))).toVar();
+    lighting.mulAssign(float(1).sub(uNightFactor.mul(0.88)));
+
+    If(uNightFactor.greaterThan(0.05), () => {
+      const lampAdd = float(0).toVar();
+      Loop({ start: 0, end: 12, type: "int" }, ({ i }) => {
+        If(i.toFloat().greaterThanEqual(uLampCount), () => { Break(); });
+        const d = length(blade.sub(lampArr.element(i).xz));
+        const falloff = float(1).sub(smoothstep(0.0, uLampRange, d));
+        lampAdd.addAssign(falloff.mul(falloff).mul(0.65));
+      });
+      lighting.addAssign(vec3(1.0, 0.78, 0.42).mul(lampAdd.min(1.4)).mul(uNightFactor));
+    });
+
+    vColor.assign(base.mul(lighting));
+
+    // Manueller Fog
+    const fogF = smoothstep(uFogNear, uFogFar, distance(world, cameraPosition));
+    vColor.assign(mix(vColor, uFogColor, fogF));
+
+    return world;
   })();
-
-  // ─── Blade-Mask ───
-  // 3 versetzte S-Kurven-Halme pro Quad. Jeder Halm:
-  //   - center-X via Hash variiert
-  //   - heightLimit via Hash variiert (kleiner-mittel-höher)
-  //   - S-Krümmung via Hash-Direction
-  //   - Smooth-Ramp statt harter Kante
-  const singleBlade = Fn(([uvIn, cx, curveDir, heightLimit]) => {
-    const y01 = uvIn.y.add(0.5);   // 0..1
-
-    // y muss < heightLimit sein, sonst kein Halm
-    const yMask = step(y01, heightLimit);
-
-    // Normalisierte Y innerhalb des Halms (0..1)
-    const yn = y01.div(heightLimit);
-
-    // S-Krümmung
-    const curveOff = sin(yn.mul(3.14159).mul(0.5)).mul(0.06).mul(curveDir);
-
-    // Halm-Breite — linear runter von 0.07 (unten) zu 0.012 (oben)
-    const widthAtY = float(0.07).sub(yn.mul(0.058));
-
-    // Distance zum Halm-Center
-    const dx = abs(uvIn.x.sub(cx).sub(curveOff));
-
-    // Soft-Kontur — konstante Edges 0..1, Skalierung über dx-widthAtY
-    // Wenn dx < widthAtY → inside=1 (im Halm)
-    // Wenn dx > widthAtY → smooth fade zu 0 über 0.01 World-Units
-    const inside = float(1).sub(smoothstep(0, 0.012, dx.sub(widthAtY)));
-
-    return inside.mul(yMask);
-  });
-
-  const bladeMask = Fn(([uvIn, hash]) => {
-    const h2 = fract(hash.mul(7.31));
-    const h3 = fract(hash.mul(13.79));
-
-    // 3 Halme mit unterschiedlicher Höhe und Position
-    const m1 = singleBlade(uvIn, float(0.0),                       float(1.0),                  float(0.95));   // Mittlerer hoher Halm
-    const m2 = singleBlade(uvIn, h2.mul(0.08).sub(0.14),           h2.mul(1.2).sub(0.6),        float(0.72));   // Links niedriger
-    const m3 = singleBlade(uvIn, h3.mul(0.08).add(0.06),           h3.mul(-1.2).add(0.6),       float(0.78));   // Rechts mittelhoch
-
-    return max(max(m1, m2), m3);
-  });
 
   material.colorNode = Fn(() => {
-    const aCenter = attribute("aCenter", "vec2");
-    const aHash   = attribute("aHash",   "float");
-
-    // Quad-UV aus varying lesen (positionLocal funktioniert im Fragment nicht)
-    const uvLocal = vQuadUv;
-
-    // Blade-Mask — discarden wenn außerhalb des Halms
-    const alpha = bladeMask(uvLocal, aHash);
-    If(alpha.lessThan(0.5), () => { Discard(); });
-
-    // Farbgradient vertikal
-    const y01 = uvLocal.y.add(0.5);
-    const colDark  = vec3(0.16, 0.26, 0.09);
-    const colLight = vec3(0.36, 0.54, 0.20);
-    const base = mix(colDark, colLight, y01).toVar();
-
-    // Per-Instance-Variation
-    base.mulAssign(mix(float(0.85), float(1.15), aHash));
-
-    // Trail-Memory
-    const bikeDist = length(aCenter.sub(vec2(uBikePos.x, uBikePos.z)));
-    const trailW = float(1).sub(smoothstep(0, 4.0, bikeDist));
-    const trailTint = vec3(0.62, 0.48, 0.18);
-    base.assign(mix(base, mix(base, trailTint, 0.4), trailW));
-
-    // Distance-Fade zum View-Center
-    const distView = length(aCenter.sub(uViewCenter));
-    const distFade = float(1).sub(smoothstep(20.0, 30.0, distView));
-    base.assign(mix(vec3(0.20, 0.32, 0.12), base, distFade));
-
-    // Beleuchtung: Ambient + Sun + Nacht-Dim
-    const sunTerm = uSunIntensity.mul(0.55);
-    const lighting = uAmbient.add(vec3(sunTerm, sunTerm, sunTerm)).toVar();
-    const nightDim = float(1).sub(uNightFactor.mul(0.88));
-    lighting.mulAssign(nightDim);
-
-    // Lampen-Hotspots — optimiert:
-    // 1) Loop fest unrolled über alle 12 Slots (kein dyn-If pro Iteration)
-    // 2) lengthSq() statt length() → kein sqrt
-    // 3) Ungenutzte Slots haben Lamp-Position weit weg (uLampPos default 9999),
-    //    fallen automatisch raus über falloff
-    const lampAdd = float(0).toVar();
-    const rangeSq = uLampRange.mul(uLampRange);
-    Loop({ start: 0, end: 12, type: "int" }, ({ i }) => {
-      const lp = uLampPos.element(i);
-      const lxz = vec2(lp.x, lp.z);
-      const diff = aCenter.sub(lxz);
-      const dSq = diff.dot(diff);
-      const falloff = clamp(float(1).sub(dSq.div(rangeSq)), 0, 1);
-      lampAdd.addAssign(falloff.mul(falloff).mul(0.65));
-    });
-    const lampClamped = min(lampAdd, float(1.4));
-    const lampWarm = vec3(1.0, 0.78, 0.42);
-    lighting.addAssign(lampWarm.mul(lampClamped).mul(uNightFactor));
-
-    const col = base.mul(lighting);
-    return vec4(col, 1);
+    return vec4(vColor, 1);
   })();
 
-  // ─── Adapter ───
   material.userData.adapter = {
     setTime:        (t) => { uTime.value = t; },
     setViewCenter:  (cx, cz) => uViewCenter.value.set(cx, cz),
-    setViewRadius:  (v) => { uViewRadius.value = v; },
     setMapRadius:   (v) => { uMapRadius.value = v; },
+    setMapCenter:   (x, z) => uMapCenter.value.set(x, z),
     setTerrainY:    (v) => { uTerrainY.value = v; },
     setBikePos:     (x, z) => uBikePos.value.set(x, 0, z),
+    setBladeHeight: (v) => { uBladeHeight.value = v; },
+    setBladeWidth:  (v) => { uBladeWidth.value = v; },
     setWind:        (dir, speed, strength) => {
       uWindDir.value.copy(dir);
       uWindSpeed.value = speed;
       uWindStrength.value = strength;
     },
     setSun:         (intensity, ambientColor, ambientIntensity) => {
-      uSunIntensity.value = intensity;
       uAmbient.value.copy(ambientColor).multiplyScalar(ambientIntensity);
+      uSunIntensity.value = intensity;
     },
     setNightFactor: (n) => { uNightFactor.value = n; },
+    setPress:       (x, z, st, vx, vz) => {
+      uPressPos.value.set(x, z);
+      uPressStrength.value = st;
+      uPressVel.value.set(vx || 0, vz || 0);
+    },
+    setFog:         (color, near, far) => {
+      uFogColor.value.copy(color);
+      uFogNear.value = near;
+      uFogFar.value = far;
+    },
     setLamps:       (positions) => {
       const n = Math.min(positions.length, 12);
-      for (let i = 0; i < n; i++) lampArr[i].copy(positions[i]);
+      for (let i = 0; i < n; i++) lampValues[i].copy(positions[i]);
       uLampCount.value = n;
     },
   };
@@ -636,7 +618,9 @@ export class Grass {
     this.buildings = buildings || [];
     this.roadCurve = roadCurve || null;
 
-    this.geometry = buildGrassGeometry(this.buildings, this.roadCurve);
+    // Dichte hängt am Graphics-Setting (greift beim nächsten Load —
+    // Pixel-Ratio/Schatten schalten live, die Halm-Zahl nicht).
+    this.geometry = buildGrassGeometry(pickGrid());
 
     this._raycaster = new THREE.Raycaster();
     this._raycaster.firstHitOnly = true;
@@ -644,6 +628,31 @@ export class Grass {
     this._tmpOrigin = new THREE.Vector3();
     this._lampPosCached = false;
     this._lampPosScratch = Array.from({ length: 12 }, () => new THREE.Vector3());
+    this._lastTerrainSample = new THREE.Vector2(Infinity, Infinity);
+    this._lastTerrainY = 0.3;
+
+    // ── Druckpunkt: Cursor/Finger biegt das Gras ──
+    // Pointer-NDC tracken, in update() auf die Boden-Ebene projizieren
+    // (reine Mathematik, kein Mesh-Raycast). Stärke schwingt weich ein
+    // und klingt nach der letzten Bewegung wieder ab.
+    this._pointerNdc = new THREE.Vector2(0, 0);
+    this._pointerMovedAt = 0;
+    this._pressStrength = 0;
+    this._pressLast = new THREE.Vector2(9999, 9999);
+    this._pressVel = new THREE.Vector2();
+    this._unproj = new THREE.Vector3();
+    this._reducedMotion = typeof window !== "undefined"
+      && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    this._onPointerMove = (e) => {
+      this._pointerNdc.set(
+        (e.clientX / window.innerWidth) * 2 - 1,
+        -(e.clientY / window.innerHeight) * 2 + 1,
+      );
+      this._pointerMovedAt = performance.now();
+    };
+    if (!this._reducedMotion) {
+      window.addEventListener("pointermove", this._onPointerMove, { passive: true });
+    }
 
     this._buildMaterialAndMesh();
   }
@@ -656,7 +665,7 @@ export class Grass {
 
     try {
       if (mode === "webgpu") {
-        this.material = await buildGrassMaterialTSL();
+        this.material = await buildGrassMaterialTSL(this.buildings, this.roadCurve);
       } else {
         this.material = buildGrassMaterialGLSL(this.buildings, this.roadCurve);
       }
@@ -677,23 +686,13 @@ export class Grass {
     }
 
     this.mesh = new THREE.Mesh(this.geometry, this.material);
-    // BoundingSphere setzen statt frustumCulled=false. Grass deckt eine
-    // begrenzte Fläche (SIZE Meter Radius) — wenn die Camera weg-schaut,
-    // soll der Driver die ganze Submission skippen können. Unter WebGPU
-    // spart das BindGroup-Setup pro Frame deutlich.
-    this.geometry.boundingSphere = new THREE.Sphere(
-      new THREE.Vector3(0, 0, 0),
-      SIZE * 0.75,
-    );
-    this.mesh.frustumCulled = true;
-    // Grass cast't keine Shadows (würde mit dem Discard-Pattern eh nicht
-    // funktionieren) — verhindert dass die 48k Instances im Shadow-Pass
-    // landen. Größter WebGPU-Speedup.
+    // Kachel klebt an der Kamera — Frustum-Cull würde nur falsch greifen.
+    this.mesh.frustumCulled = false;
     this.mesh.castShadow = false;
     this.mesh.receiveShadow = false;
     this.scene.add(this.mesh);
 
-    console.log(`[Grass] Particle-Wave (${mode}): ${COUNT} quads, global wind`);
+    console.log(`[Grass] triangle blades (${mode}), tile follows camera`);
     this._setupDebug();
   }
 
@@ -702,13 +701,18 @@ export class Grass {
     if (!debug?.active || !this.material) return;
     const f = debug.addFolder({ title: "Grass", expanded: false });
     this._debugState = {
-      viewRadius: VIEW_RADIUS,
+      bladeHeight: BLADE_HEIGHT,
+      bladeWidth: BLADE_WIDTH,
       mapRadius: MAP_RADIUS,
       visible: true,
     };
-    f.addBinding(this._debugState, "viewRadius", { min: 10, max: 80, step: 1 })
+    f.addBinding(this._debugState, "bladeHeight", { min: 0.2, max: 2, step: 0.01 })
       .on("change", (ev) => {
-        this.material.userData.adapter?.setViewRadius?.(ev.value);
+        this.material.userData.adapter?.setBladeHeight?.(ev.value);
+      });
+    f.addBinding(this._debugState, "bladeWidth", { min: 0.02, max: 0.4, step: 0.005 })
+      .on("change", (ev) => {
+        this.material.userData.adapter?.setBladeWidth?.(ev.value);
       });
     f.addBinding(this._debugState, "mapRadius", { min: 20, max: 80, step: 1 })
       .on("change", (ev) => {
@@ -735,14 +739,12 @@ export class Grass {
 
     // Bike-Position
     const player = this.game.world?.player;
-    let bx = 0, bz = 0;
     if (player?.body) {
       const t = player.body.translation();
-      bx = t.x; bz = t.z;
+      a.setBikePos(t.x, t.z);
     }
-    a.setBikePos(bx, bz);
 
-    // View-Center
+    // View-Center — Kachel folgt dem Kamera-Target
     const target = this.game.cameraRig?.controls?.target;
     let cx = 0, cz = 0;
     if (target) {
@@ -750,19 +752,73 @@ export class Grass {
       a.setViewCenter(cx, cz);
     }
 
-    // Terrain-Y
+    // Terrain-Y — Raycast nur wenn die Kamera >2m gewandert ist
     if (this.terrainMesh) {
-      this._tmpOrigin.set(cx, 50, cz);
-      this._raycaster.set(this._tmpOrigin, this._downDir);
-      const hits = this._raycaster.intersectObject(this.terrainMesh, true);
-      if (hits.length > 0) a.setTerrainY(hits[0].point.y);
+      const moved = Math.hypot(
+        cx - this._lastTerrainSample.x,
+        cz - this._lastTerrainSample.y,
+      );
+      if (moved > 2) {
+        this._tmpOrigin.set(cx, 50, cz);
+        this._raycaster.set(this._tmpOrigin, this._downDir);
+        const hits = this._raycaster.intersectObject(this.terrainMesh, true);
+        if (hits.length > 0) {
+          this._lastTerrainY = hits[0].point.y;
+          a.setTerrainY(this._lastTerrainY);
+        }
+        this._lastTerrainSample.set(cx, cz);
+      }
     }
 
-    // Sun + nightFactor
+    // ── Druckpunkt aktualisieren ──
+    // Pointer-Ray gegen die Gras-Ebene (y = terrainY) schneiden — eine
+    // Division statt Mesh-Raycast. Stärke: 1 solange der Pointer sich in
+    // den letzten 800ms bewegt hat, danach weicher Abfall.
+    if (!this._reducedMotion && a.setPress) {
+      const cam = this.game.cameraRig?.camera;
+      const dt = this.game.time?.delta || 0.016;
+      const fresh = (performance.now() - this._pointerMovedAt) < 800;
+      const target = fresh ? 1 : 0;
+      this._pressStrength += (target - this._pressStrength) * Math.min(1, dt * 6);
+      if (cam && this._pressStrength > 0.01) {
+        this._unproj.set(this._pointerNdc.x, this._pointerNdc.y, 0.5)
+          .unproject(cam)
+          .sub(cam.position)
+          .normalize();
+        const dy = this._unproj.y;
+        if (dy < -0.05) {
+          const t = (this._lastTerrainY - cam.position.y) / dy;
+          if (t > 0 && t < 150) {
+            const px = cam.position.x + this._unproj.x * t;
+            const pz = cam.position.z + this._unproj.z * t;
+            // Strich-Richtung: Bewegung des Bodenpunkts, geglaettet und
+            // auf Einheitslaenge gedeckelt (sonst peitscht ein schneller
+            // Wisch die Halme flach)
+            if (this._pressLast.x < 9000) {
+              const ivx = (px - this._pressLast.x) / Math.max(dt, 0.001) * 0.12;
+              const ivz = (pz - this._pressLast.y) / Math.max(dt, 0.001) * 0.12;
+              this._pressVel.x += (ivx - this._pressVel.x) * Math.min(1, dt * 10);
+              this._pressVel.y += (ivz - this._pressVel.y) * Math.min(1, dt * 10);
+              const m = this._pressVel.length();
+              if (m > 1) this._pressVel.multiplyScalar(1 / m);
+            }
+            this._pressLast.set(px, pz);
+            a.setPress(px, pz, this._pressStrength, this._pressVel.x, this._pressVel.y);
+          }
+        }
+      } else {
+        this._pressLast.set(9999, 9999);
+        this._pressVel.multiplyScalar(0.9);
+        a.setPress(9999, 9999, 0);
+      }
+    }
+
+    // Sun + nightFactor + Fog
     const dc = this.game.world?.dayCycle?.live;
     if (dc) {
       a.setSun(dc.sunIntensity, dc.ambientColor, dc.ambientIntensity);
       a.setNightFactor(dc.nightFactor ?? 0);
+      a.setFog(dc.fogColor, dc.fogNear, dc.fogFar);
     }
 
     // Laternen (einmalig cachen)
@@ -779,6 +835,7 @@ export class Grass {
   }
 
   destroy() {
+    window.removeEventListener("pointermove", this._onPointerMove);
     if (this.mesh) this.scene?.remove?.(this.mesh);
     this.geometry?.dispose?.();
     this.material?.dispose?.();

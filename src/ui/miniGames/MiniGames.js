@@ -64,7 +64,13 @@ export class MiniGames {
       return;
     }
     try {
-      const GameClass = await loader();
+      // Kamera-Fly-In zum Gebäude/Egg + Chunk-Load laufen parallel.
+      // Das Overlay erscheint erst wenn die Kamera angekommen ist — der
+      // Boot-Screen liest sich dann als "der Rechner da drin geht an".
+      const [GameClass] = await Promise.all([
+        loader(),
+        this._flyIntro(eggId),
+      ]);
       // Falls inzwischen ein anderes Mini-Game offen ist, abbrechen
       if (this.active) {
         this._opening = false;
@@ -81,6 +87,8 @@ export class MiniGames {
         this.active = null;
         this._resetPointerStates();
         this._unlockBodyScroll();
+        // Kamera gleitet zurück zum Bike (Follow-Lerp übernimmt den Weg)
+        this.game?.cameraRig?.recenter?.();
       };
       this.active.open();
     } catch (err) {
@@ -88,6 +96,68 @@ export class MiniGames {
     } finally {
       this._opening = false;
     }
+  }
+
+  /**
+   * Findet den 3D-Anker (Position + Anflugrichtung) für ein Mini-Game.
+   * Buildings nutzen ihre frontWorld-Richtung (Kamera stellt sich vor die
+   * Fassade), Eggs werden von der aktuellen Kamera-Seite aus angeflogen.
+   */
+  _findFlyAnchor(eggId) {
+    const island = this.game?.world?.island;
+    if (!island) return null;
+    const idLow = String(eggId).toLowerCase();
+
+    const b = island.buildings?.find?.((x) => String(x.id).toLowerCase() === idLow);
+    if (b) {
+      return { pos: b.position, front: b.frontWorld, dist: 7.5, height: 3.2, lookY: 2.2 };
+    }
+    const e = island.eggs?.find?.((x) => String(x.id).toLowerCase() === idLow);
+    if (e) {
+      return { pos: e.position, front: null, dist: 4.0, height: 1.8, lookY: 0.6 };
+    }
+    return null;
+  }
+
+  /**
+   * Cinematic Fly-In vor das Gebäude. Resolved nach Ablauf der Flugdauer —
+   * auch wenn der User den Flug per Drag/Wheel abbricht (cancelFly), damit
+   * das Mini-Game in jedem Fall öffnet. Übersprungen bei reduced-motion,
+   * fehlendem Anker oder laufender Tour (deren Kamera hat Vorrang).
+   */
+  _flyIntro(eggId) {
+    return new Promise((resolve) => {
+      const rig = this.game?.cameraRig;
+      const anchor = this._findFlyAnchor(eggId);
+      const reduced = typeof window !== "undefined"
+        && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+      if (!rig?.flyTo || !anchor || reduced || this.game?.ui?.walkthrough?.active) {
+        resolve();
+        return;
+      }
+
+      const [bx, by, bz] = anchor.pos;
+      let fx, fz;
+      if (Array.isArray(anchor.front)) {
+        fx = anchor.front[0];
+        fz = anchor.front[2];
+      } else {
+        // Kein frontWorld (Eggs): von der aktuellen Kamera-Seite anfliegen
+        fx = rig.camera.position.x - bx;
+        fz = rig.camera.position.z - bz;
+      }
+      const fl = Math.hypot(fx, fz) || 1;
+      fx /= fl;
+      fz /= fl;
+
+      const duration = 1.1;
+      rig.flyTo([bx, by, bz], {
+        duration,
+        cameraPos: [bx + fx * anchor.dist, by + anchor.height, bz + fz * anchor.dist],
+        lookAt: [bx, by + anchor.lookY, bz],
+      });
+      setTimeout(resolve, duration * 1000 + 120);
+    });
   }
 
   _lockBodyScroll() {
