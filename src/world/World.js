@@ -129,6 +129,10 @@ export class World {
     const initEnv = () => {
       const renderer = this.game?.renderer?.instance;
       if (!renderer) return;
+      // PMREMGenerator ist eine reine WebGL-API — unter WebGPU crasht
+      // fromScene() intern. Das Bike verliert dort nur die Env-Reflections,
+      // die restliche Beleuchtung bleibt identisch.
+      if (this.game?.renderer?.mode !== "webgl") return;
       try {
         const pmrem = new THREE.PMREMGenerator(renderer);
         const envTex = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;

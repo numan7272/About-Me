@@ -146,11 +146,22 @@ export class Player {
     // Materials des Resources-Loaders nicht touchen, und ziehen sie auf
     // sinnvolle PBR-Defaults.
     let neutralized = 0;
-    const wrap = (mat) => {
+    const wrap = (mat, hasUv) => {
       if (!mat) return mat;
       const m = mat.clone();
       const name = m.name || "unnamed";
       const isLight = /light_rear/i.test(name);
+
+      // Einige Bake-Meshes (Glass, Valve_Heads) tragen Texturen am Material,
+      // obwohl ihre Geometrie kein uv-Attribut hat. WebGL sampelt dann stumm
+      // den Texel bei (0,0), der WebGPU-Node-Builder warnt dagegen pro Frame.
+      // Texturen entfernen → Fallback-BaseColor unten greift.
+      if (!hasUv) {
+        for (const slot of ["map", "alphaMap", "aoMap", "normalMap",
+                            "roughnessMap", "metalnessMap", "emissiveMap"]) {
+          if (m[slot]) m[slot] = null;
+        }
+      }
 
       if (isLight) {
         // Rear-Light soll leuchten, aber zurückgehalten — sonst bloomt es
@@ -188,6 +199,7 @@ export class Player {
           Brakes_material: 0x303035,
           Valves_material: 0x4a4a4d,
           Valve_Heads_material: 0x303033,
+          Glass_material: 0xb9c6cc,
           Kick_Lock_Yellow_material: 0x8a8a16,
         };
         const hex = FALLBACKS[name];
@@ -203,9 +215,10 @@ export class Player {
       if (!obj.isMesh) return;
       obj.castShadow = true;
       obj.receiveShadow = true;
+      const hasUv = !!obj.geometry?.attributes?.uv;
       obj.material = Array.isArray(obj.material)
-        ? obj.material.map(wrap)
-        : wrap(obj.material);
+        ? obj.material.map((m) => wrap(m, hasUv))
+        : wrap(obj.material, hasUv);
     });
     console.log(`[Player] bike materials neutralized: ${neutralized}`);
     this.scene.add(this.visualRoot);
