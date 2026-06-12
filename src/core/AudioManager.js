@@ -78,9 +78,12 @@ export class AudioManager {
     this._nextGullAt = 0;      // ctx.currentTime der nächsten Möwe
     this._nextGustDriftAt = 0; // wann die Böen-LFO-Rate neu driftet
 
-    // WebAudio darf erst nach User-Interaction starten (Autoplay-Policy)
+    // WebAudio darf erst nach User-Interaction starten (Autoplay-Policy).
+    // pointerUP statt pointerdown: auf Mobile zählt Chrome erst das
+    // Loslassen (pointerup/touchend/click) als User-Aktivierung — bei
+    // pointerdown startet der Context suspendiert und play() wird geblockt.
     this._onFirstInteract = () => this._init();
-    window.addEventListener("pointerdown", this._onFirstInteract, { once: true });
+    window.addEventListener("pointerup", this._onFirstInteract, { once: true });
     window.addEventListener("keydown", this._onFirstInteract, { once: true });
   }
 
@@ -89,6 +92,7 @@ export class AudioManager {
     try {
       const AC = window.AudioContext || window.webkitAudioContext;
       this.ctx = new AC();
+      if (this.ctx.state === "suspended") this.ctx.resume().catch(() => {});
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this._volume();
       this.masterGain.connect(this.ctx.destination);
@@ -115,10 +119,13 @@ export class AudioManager {
       g.gain.value = AMBIENT_VOLUME;
       src.connect(g).connect(this.masterGain);
 
-      // Loop starten — fängt evtl. erst spät an wenn Browser noch lädt
-      el.play().catch(err => {
-        console.warn("[Audio] ambient autoplay blocked, will retry:", err?.message);
+      // Loop starten — fängt evtl. erst spät an wenn Browser noch lädt.
+      // Wird play() trotzdem geblockt (z.B. synthetisches Event), bei der
+      // nächsten echten Geste erneut versuchen.
+      const tryPlay = () => el.play().catch(() => {
+        window.addEventListener("pointerup", tryPlay, { once: true });
       });
+      tryPlay();
 
       this.ambientEl = el;
       this.ambientSrc = src;
@@ -552,7 +559,7 @@ export class AudioManager {
 
   destroy() {
     // K6-Fix: alle Listeners + WebAudio-Nodes sauber freigeben.
-    window.removeEventListener("pointerdown", this._onFirstInteract);
+    window.removeEventListener("pointerup", this._onFirstInteract);
     window.removeEventListener("keydown", this._onFirstInteract);
     this._destroyAmbience();
     if (this.engineOsc) {

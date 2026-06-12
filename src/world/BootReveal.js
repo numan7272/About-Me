@@ -124,6 +124,9 @@ export class BootReveal {
     this._ring.position.set(SPAWN[0], 0.07, SPAWN[2]);
     this._ringIndexCount = this._ringGeo.index.count;
     this._ringGeo.setDrawRange(0, 0);
+    // Bei count=0 unsichtbar lassen — WebGPU validiert sonst den leeren
+    // Draw-Call ("Draw with an index count of 0 is unusual").
+    this._ring.visible = false;
     this.scene.add(this._ring);
 
     // Welt-Setup sobald gebaut (World registriert seinen ready-Handler
@@ -482,7 +485,9 @@ export class BootReveal {
       // Fortschrittsbogen weich nachziehen, Puls wenn bereit
       const target = this._progress;
       this._shown = (this._shown ?? 0) + ((target - (this._shown ?? 0)) * Math.min(1, dt * 4));
-      this._ringGeo.setDrawRange(0, Math.floor(this._ringIndexCount * this._shown));
+      const ringCount = Math.floor(this._ringIndexCount * this._shown);
+      this._ringGeo.setDrawRange(0, ringCount);
+      this._ring.visible = ringCount > 0;
       if (this._progress >= 1) {
         const pulse = 0.8 + 0.2 * Math.sin((this.game.time?.elapsed || 0) * 2.6);
         this._ringMat.opacity = pulse;
