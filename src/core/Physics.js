@@ -33,15 +33,30 @@ export class Physics extends EventEmitter {
     this.RAPIER = RAPIER;
     this.world = new RAPIER.World(this.gravity);
     this.world.integrationParameters.dt = 1 / 60;
+    this._accumulator = 0;
     this.ready = true;
     this.trigger("ready", []);
   }
 
   update() {
     if (!this.ready || !this.world) return;
-    // Variable timestep via game.time.delta — Rapier handled das selbst
-    // mit substepping wenn delta > dt.
-    this.world.step();
+    // Fixed-Timestep-Accumulator. world.step() simuliert exakt dt=1/60s
+    // pro Aufruf — Rapier macht KEIN automatisches Substepping. Einmal pro
+    // Frame steppen hieße: Simulationszeit = Framerate/60 → das Bike fährt
+    // auf einem 40fps-Handy langsamer und auf einem 144Hz-Desktop schneller
+    // als gedacht. Stattdessen echte Zeit akkumulieren und in festen
+    // Schritten abarbeiten (time.delta ist bereits auf 0.05s geclamped).
+    const FIXED_DT = 1 / 60;
+    this._accumulator += this.game.time.delta;
+    let steps = 0;
+    while (this._accumulator >= FIXED_DT && steps < 4) {
+      this.world.step();
+      this._accumulator -= FIXED_DT;
+      steps++;
+    }
+    // Überlast: Rest verwerfen statt aufholen — lieber kurz Zeitlupe als
+    // eine Spiral-of-Death aus immer mehr Steps pro Frame.
+    if (steps === 4 && this._accumulator >= FIXED_DT) this._accumulator = 0;
   }
 
   destroy() {
