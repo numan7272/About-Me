@@ -4,11 +4,13 @@
  * Permanenter "Kontakt →"-Button oben rechts. Klick öffnet Side-Panel mit:
  *   - Numan + Standort
  *   - E-Mail (klickbar + Kopieren-Button)
+ *   - Lebenslauf (öffentliche Online-Version, /cv.html)
  *   - LinkedIn
  *   - GitHub
  *
- * KEIN CV-Download — Lebenslauf wird auf Anfrage individuell verschickt
- * (DSGVO + saubere Bewerbungspraxis).
+ * Der verlinkte Web-CV ist bewusst die redaktierte Fassung ohne Wohnadresse
+ * und Telefonnummer (noindex). Die vollständige Version mit allen Kontaktdaten
+ * liegt unter cv/ und wird gezielt bei konkreten Bewerbungen verschickt.
  *
  * Schließen: ESC, Klick außerhalb, X-Button.
  */
@@ -211,6 +213,12 @@ export class ContactPanel {
     });
 
     buttonsWrap.appendChild(this._buildLinkRow({
+      label: isEn ? "résumé" : "lebenslauf",
+      sub: isEn ? "view online / save as PDF" : "online ansehen / als PDF",
+      url: "/cv.html",
+      icon: this._svgDoc(),
+    }));
+    buttonsWrap.appendChild(this._buildLinkRow({
       label: "linkedin",
       sub: "/in/numan-yesil",
       url: CONTACT.linkedin,
@@ -379,6 +387,10 @@ export class ContactPanel {
     a.appendChild(arrow);
 
     return a;
+  }
+
+  _svgDoc() {
+    return '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></svg>';
   }
 
   _svgLinkedIn() {
