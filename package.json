@@ -1,8 +1,11 @@
 {
   "name": "about-me-vite",
   "private": true,
-  "version": "0.0.0",
+  "version": "2.0.0",
   "type": "module",
+  "license": "MIT",
+  "author": "Numan Yesil",
+  "homepage": "https://numan-yesil.com",
   "scripts": {
     "dev": "vite",
     "build": "vite build",

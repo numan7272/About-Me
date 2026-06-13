@@ -1,39 +1,54 @@
 # About-Me · v2
 
-> An interactive 3D portfolio. Drive a bike around a small island, discover stations that map to my education, work, and projects, and find a few hidden labs along the way.
+> An interactive 3D portfolio. Drive a bike around a small island, visit stations that map to my education and work, browse my projects in a little harbor, and find a few hidden labs along the way.
 >
-> Built by **Numan Yesil** — Wirtschaftsinformatik @ HAW Kiel.
+> Built by **Numan Yesil**, Wirtschaftsinformatik @ HAW Kiel.
 
 [![Three.js](https://img.shields.io/badge/three.js-r184-000000?logo=three.js)](https://threejs.org)
 [![Vite](https://img.shields.io/badge/vite-8.x-646CFF?logo=vite&logoColor=white)](https://vitejs.dev)
 [![Rapier3D](https://img.shields.io/badge/rapier3d-0.19-2A2A2A)](https://rapier.rs)
-[![WebGPU](https://img.shields.io/badge/WebGPU-experimental-FF6B6B)](https://www.w3.org/TR/webgpu/)
-[![License](https://img.shields.io/badge/license-MIT-green)](#license)
+[![Renderer](https://img.shields.io/badge/renderer-WebGL%20%2B%20WebGPU-FF6B6B)](https://www.w3.org/TR/webgpu/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+**Live:** [numan-yesil.com](https://numan-yesil.com)
 
 ---
 
 ## What this is
 
-A from-scratch rewrite of [my old Next.js portfolio](https://github.com/numan7272/About-Me/tree/main) on a modern stack. Same idea — recruiters drive a bike, click stations, learn about me — but every layer rebuilt with the constraints of someone who's tired of fighting framework abstractions and wants tight control over the render loop, physics tick, and shader pipeline.
+A from-scratch rewrite of my old Next.js portfolio on a modern, framework-light stack. Same idea (you drive a bike, visit stations, learn about me), but every layer is rebuilt by someone who wanted tight control over the render loop, the physics tick, and the shader pipeline instead of fighting framework abstractions.
 
-If you're a recruiter or hiring manager, the easiest entry is the **▶ Tour** button at the top of the page. It walks you through the 5 stations in 3-4 minutes.
+Two ways in:
 
-If you're a developer, the bike physics, the dual-shader pipeline (WebGL `ShaderMaterial` + WebGPU `NodeMaterial`/TSL), and the in-world joystick are probably the most interesting bits in the source.
+- **If you're hiring:** hit the **▶ Tour** button at the top. It walks you through the career stations in a few minutes. The contact panel (top-right) also links my **résumé**.
+- **If you're a developer:** the bike physics, the dual-shader pipeline (WebGL `ShaderMaterial` + WebGPU `NodeMaterial`/TSL), the boot reveal, and the in-world joystick are the interesting parts of the source.
 
 ---
 
 ## Tech stack
 
-| Layer        | Choice                                | Why                                                                                |
-| ------------ | ------------------------------------- | ---------------------------------------------------------------------------------- |
-| Bundler      | **Vite 8**                            | HMR for shader edits matters more than I expected                                  |
-| Renderer     | **Three.js r184**                     | The post-`v0.170` API split + TSL was the right time to commit                     |
-| Physics      | **Rapier3D-compat 0.19**              | Capsule colliders, deterministic, fast. WASM-loaded async, no native deps          |
-| Shaders      | Custom **GLSL** + **TSL** (WebGPU)    | Two pipelines — WebGPU is the way forward, WebGL stays the safe default            |
-| State        | None                                  | Plain class-based singletons. No Redux, no Context, no overhead                    |
-| Build target | ES2022 modules, no transpilation      | Modern browsers only — this is a portfolio, not enterprise software                |
+| Layer        | Choice                             | Why                                                                       |
+| ------------ | ---------------------------------- | ------------------------------------------------------------------------- |
+| Bundler      | **Vite 8**                         | HMR for shader edits matters more than I expected                         |
+| Renderer     | **Three.js r184**                  | The post-`v0.170` API split + TSL was the right time to commit            |
+| Physics      | **Rapier3D-compat 0.19**           | Capsule colliders, deterministic, WASM-loaded async, no native deps       |
+| Shaders      | Custom **GLSL** + **TSL** (WebGPU) | Two pipelines: WebGL stays the safe default, WebGPU is the opt-in path     |
+| UI shell     | **React 19**                       | Only the menu chrome (settings, drawer, contact). The canvas is not React |
+| State        | Plain class singletons             | No Redux, no Context, no global store                                     |
+| Build target | ES2022 modules                     | Modern browsers only; this is a portfolio, not enterprise software       |
 
-There's a **React shell** for the menu chrome (`Settings`, `BottomDrawer`, `ContactPanel`, etc.) — but the canvas, the game loop, the physics step, and every shader live in plain ES modules. Wrapping `<Canvas>` in `react-three-fiber` would have been a downgrade for this use case.
+The canvas, the game loop, the physics step, and every shader live in plain ES modules. React only renders the surrounding menu chrome; wrapping `<Canvas>` in react-three-fiber would have been a downgrade here.
+
+---
+
+## Highlights
+
+- **Dual renderer.** WebGL by default; WebGPU is selectable in Settings. Every custom shader exists twice, as GLSL (`onBeforeCompile` injection) and as TSL `NodeMaterial`, and the world looks identical on both.
+- **Boot reveal.** On load the world is clipped to a small circle around the spawn (a "storm"-style radial cut, à la a certain battle-royale), then expands over the whole island on the first click. Works under both renderers (fragment discard on WebGL, `opacityNode` + alpha-test on WebGPU).
+- **Project harbor.** A pier by the water with one crate per flagship GitHub project. Click a crate to open an info card with the stack and a repo link.
+- **Lighthouse.** Sits on a headland the code finds itself (terrain sampling). At night the lamp glows and a beam sweeps out over the water.
+- **Day/night cycle**, procedural grass and ocean, wind-driven trees and falling leaves, street lamps that light up at dusk, and a gentle ambient soundscape.
+- **Two control schemes:** keyboard/joystick, or tap-to-move (LoL-style), switchable on first launch and in Settings.
 
 ---
 
@@ -41,73 +56,100 @@ There's a **React shell** for the menu chrome (`Settings`, `BottomDrawer`, `Cont
 
 ```
 src/
-├── Game.js                # Singleton — owns scene, time, inputs, world
+├── Game.js                  # Singleton: owns scene, time, inputs, renderer, world, UI
 ├── core/
-│   ├── Renderer.js        # WebGL + WebGPU swappable. Bloom postprocess.
-│   ├── CameraRig.js       # Follow-cam + OrbitControls + cinematic flyTo
-│   ├── Time.js            # delta, elapsed, frame counter
-│   ├── Inputs.js          # Keyboard + pointer + canvas events
-│   └── Physics.js         # Rapier world, async-init, debug overlay
+│   ├── Renderer.js          # WebGL + WebGPU swappable; bloom postprocess; device-loss recovery
+│   ├── CameraRig.js         # Follow-cam + OrbitControls + cinematic fly-to
+│   ├── Time.js              # delta (clamped), elapsed, tick events
+│   ├── Inputs.js            # Keyboard + pointer + canvas events
+│   ├── Physics.js           # Rapier world, async WASM init, fixed-timestep accumulator
+│   ├── AudioManager.js      # Ambient loop + procedural seaside soundscape
+│   └── Debug.js             # Tweakpane panels (opt-in via ?debug=1)
 ├── world/
-│   ├── World.js           # Orchestrator: builds island, road, player, etc.
-│   ├── Island.js          # GLB loader, building/egg/landmark indexing
-│   ├── Player.js          # Bike rigidbody + visual + control logic
-│   ├── Road.js            # Procedural curve through stations
-│   ├── Grass.js           # Instanced grass — GLSL + TSL variants
-│   ├── Ocean.js           # 2-octave fBm caustics
-│   ├── SkyDome.js         # Gradient sky + sun disc + night stars (GLSL + TSL)
-│   ├── StreetLamps.js     # Light-pool along the road
-│   ├── DayCycle.js        # Time-of-day → ambient + sky
-│   ├── ProximityTrigger.js
-│   └── EggClickHandler.js # Raycast-clickable easter-egg meshes
+│   ├── World.js             # Orchestrator: builds island, road, harbor, lighthouse, player…
+│   ├── Island.js            # GLB loader, building/egg/landmark indexing, terrain sampling
+│   ├── Player.js            # Bike rigidbody + visual + control logic
+│   ├── BikeHeadlight.js     # Spotlight that follows the bike
+│   ├── Road.js              # Procedural curve through the stations
+│   ├── Grass.js             # Instanced triangle-blade grass, GLSL + TSL, camera-follow tile
+│   ├── Ocean.js             # Animated water with rolling surf at the shore
+│   ├── SkyDome.js           # Gradient sky + sun disc + night stars (GLSL + TSL)
+│   ├── Nature.js            # Procedural trees, falling leaves, pollen motes (InstancedMesh)
+│   ├── Wind.js              # Global wind singleton feeding grass + trees
+│   ├── Harbor.js            # Project harbor: clickable GitHub-project crates
+│   ├── Lighthouse.js        # Headland lighthouse with night beam
+│   ├── StreetLamps.js       # Light-pools along the road
+│   ├── DayCycle.js          # Time-of-day → sun/ambient/sky/fog + nightFactor
+│   ├── BootReveal.js        # Storm-clip boot screen (WebGL + WebGPU paths)
+│   ├── ProximityTrigger.js  # Egg + building enter/exit
+│   ├── EggClickHandler.js   # Raycast-clickable egg/crate meshes
+│   ├── TapToMoveController.js
+│   ├── ColliderDebug.js     # Collider wireframes (toggle: C)
+│   └── spawn.js             # Shared spawn constant
 ├── ui/
-│   ├── Hud.js             # Speed display
-│   ├── MiniMap.js         # Top-right island map, collapsible
-│   ├── TouchJoystick.js   # In-world 3D dot-trail joystick (mobile)
-│   ├── walkthrough/       # Tour state machine + drawer
-│   ├── miniGames/         # Easter-egg labs (see below)
-│   └── ...
+│   ├── Ui.js                # UI orchestrator
+│   ├── Hud.js, MiniMap.js, InfoCard.js, LoadingSplash.js, …
+│   ├── TouchJoystick.js     # In-world 3D dot-trail joystick (mobile)
+│   ├── ControlModePicker.js # Joystick vs tap-to-move
+│   ├── contact/             # Contact panel (email, résumé link, LinkedIn, GitHub)
+│   ├── walkthrough/         # Tour state machine + bottom drawer + 3D station labels
+│   └── miniGames/           # Building apps + hidden labs (see below)
 └── data/
-    ├── content.js         # i18n strings (DE/EN)
-    └── stations.js        # Station copy + tour order + camera setups
+    ├── content.js           # i18n strings + project-harbor copy (DE/EN)
+    └── stations.js          # Station copy + tour order + camera setups
+
+cv/        # Full résumé (with address/phone); NOT deployed, sent on application
+public/    # Static assets + cv.html (public, redacted résumé)
 ```
 
 ### Game loop
 
-The canonical update order, applied in `World.update()` every frame:
+Update order, applied in `World.update()` every frame:
 
 ```
-DayCycle → Wind → Island → Road → StreetLamps → Grass → Ocean
-       → Player (reads inputs, writes physics)
-       → ProximityTrigger (egg + building enter/exit)
-       → StationLabels (3D-text billboarding)
+DayCycle → Sky → Wind → Island → Road → StreetLamps → Grass → Nature
+        → Harbor → Lighthouse → Ocean
+        → Player (reads inputs, writes physics)
+        → ProximityTrigger → StationLabels
 ```
 
-`CameraRig.update()` runs separately after the world step, in `Game.update()`.
+`Physics.update()` steps the Rapier world on a **fixed 1/60 s timestep accumulator** (it accumulates real elapsed time and runs whole steps), so the bike moves at the same real-world speed regardless of framerate. `CameraRig.update()` runs separately in `Game.update()` after the world step.
 
 ### Bike controls
 
-| Action       | Desktop                  | Mobile                          |
-| ------------ | ------------------------ | ------------------------------- |
-| Forward      | `W` / `↑`                | Joystick up                     |
-| Backward     | `S` / `↓`                | Joystick down                   |
-| Steer        | `A` `D` / `←` `→`        | Joystick left/right             |
-| Brake        | `Space`                  | Pull joystick back hard         |
-| Headlight    | `F`                      | (button, planned)               |
-| Camera reset | (button bottom-right)    | (button bottom-right)           |
+| Action       | Desktop               | Mobile                    |
+| ------------ | --------------------- | ------------------------- |
+| Forward      | `W` / `↑`             | Joystick up               |
+| Backward     | `S` / `↓`             | Joystick down             |
+| Steer        | `A` `D` / `←` `→`     | Joystick left/right       |
+| Brake        | `Space`               | Pull the joystick back    |
+| Headlight    | `F`                   | n/a                       |
+| Camera reset | (button bottom-right) | (button bottom-right)     |
 
-Movement uses **lerp-based velocity** (`lerpT = min(1, ACCEL * dt)`) rather than m/s² acceleration — at high framerates the bike eases into top speed instead of slingshotting. The joystick branch uses a P-controller for yaw correction plus a `cos(dy) * 0.5 + 0.5` alignment factor so the bike doesn't shoot off in the wrong direction during sharp turns.
+Or switch to **tap-to-move**: click/tap a spot and the bike drives there on its own. Movement uses lerp-based velocity (`lerpT = min(1, ACCEL · dt)`) so the bike eases into top speed instead of slingshotting at high framerates.
 
 ---
 
-## Hidden labs (easter eggs)
+## Stations, harbor & hidden labs
 
-A handful of **interactive labs** are scattered around the island. Two of them are small offensive-security walkthroughs framed inside the story, not as a CTF showcase — but if you're from security you'll recognize the references.
+**Career stations** (the ▶ Tour visits them in order): the family business (Yek), school (THG), university (HAW), the working-student job (Designa), and HQ. Each building is clickable and opens a themed in-world app:
 
-- **Router-Egg** (somewhere on the island) — opens a sandboxed Kali-style terminal. Audit a fictional Hikvision IP-cam: `nmap`, `curl` for the banner, `telnet` with default credentials. CVE-2017-7921 is the reference. Story is real: this was the first network audit I did (my family's restaurant, 2022).
-- **HQ-Building** (clickable directly) — boots a fake macOS desktop ("NumanOS"). Browser, Projects folder, Terminal, README. Hidden on the desktop: a `TODO_fix_sql_injection.txt` that opens a vulnerable login form with live SQL-query preview. Classic `' OR 1=1 --` bypass, plus an optional `UNION SELECT` level for exfiltration.
+| Building | App            | What it is                                                              |
+| -------- | -------------- | ----------------------------------------------------------------------- |
+| HQ       | **NumanOS**    | Fake macOS desktop (my dev setup). Hides a **SQL-injection lab**.       |
+| Designa  | **DesignaOS**  | Windows-11-style desktop with a fake Jira clone ("TestLab Tracker").    |
+| HAW      | **HAWMoodle**  | A Moodle-style LMS, rebuilt to look like the real thing.                |
+| THG      | **THGQuiz**    | A short general-knowledge quiz styled like an exam paper.               |
+| Yek      | **YekKasse**   | A fake point-of-sale system, deliberately utilitarian.                  |
 
-Both labs are **client-side sandboxes** — no real commands executed, no real network traffic. They exist to demonstrate that I can think through an attack path, not to claim wizard-level expertise.
+**Project harbor**: crates by the water, one per flagship GitHub project (Synapser, CTP, funke, Somnoscope, AI Password Awareness). Click one for the description, stack, and repo link.
+
+**Hidden labs**: two small offensive-security walkthroughs framed inside the story:
+
+- **Router egg** → a sandboxed Kali-style terminal. Audit a fictional IP-cam: `nmap`, `curl` for the banner, `telnet` with default credentials (CVE-2017-7921 is the reference). The story is real: this was my first network audit, at my family's restaurant in 2022.
+- **SQL-injection lab** (inside NumanOS) → a vulnerable login form with a live SQL-query preview. The classic `' OR 1=1 --` bypass, plus an optional `UNION SELECT` exfiltration level.
+
+Both labs are **client-side sandboxes**: no real commands run, no real network traffic. They show I can reason through an attack path, not that I'm claiming wizardry.
 
 ---
 
@@ -117,56 +159,57 @@ Both labs are **client-side sandboxes** — no real commands executed, no real n
 git clone -b v2 https://github.com/numan7272/About-Me.git
 cd About-Me
 npm install
-npm run dev
+npm run dev          # → http://localhost:5173/
 ```
-
-Opens at `http://localhost:5173/`. Append `?touch=1` to force the mobile joystick on desktop.
-
-### Build
 
 ```bash
-npm run build      # → dist/
-npm run preview    # serve the built version
+npm run build        # → dist/
+npm run preview      # serve the built version
+npm run lint         # eslint
 ```
 
-### Useful URL parameters
+The renderer (WebGL / WebGPU) is chosen in the in-app **Settings** panel and stored in `localStorage`; WebGL is the default.
 
-| Param           | Effect                                         |
-| --------------- | ---------------------------------------------- |
-| `?touch=1`      | Force mobile-style controls + joystick         |
-| `?renderer=webgpu` | Try the WebGPU pipeline (Chromium 113+)     |
-| `?debug=collider`  | Render physics-collider wireframes          |
+### URL parameters
+
+| Param      | Effect                                            |
+| ---------- | ------------------------------------------------- |
+| `?touch=1` | Force mobile-style controls + the in-world joystick |
+| `?fps`     | Show an FPS counter                               |
+| `?debug=1` | Open the Tweakpane debug panels                   |
+
+In-world keys: `C` toggles collider wireframes; `T` / `N` / `M` / `B` control the day/night cycle (pause / night / day / resume auto).
 
 ---
 
 ## Performance notes
 
-- WebGL pipeline: stable 100-120 FPS on mid-range laptops (RTX 3050, integrated AMD, etc.)
-- WebGPU pipeline: similar with shadows enabled; bloom adds ~6-8% GPU cost
-- Mobile: tested on Android Chrome — comfortable 55-60 FPS on devices ≥ 2022
-- Grass: pre-culled per-instance via `aCulled` attribute, ~50% saved on a flat island
-- Capsule collider on the bike instead of cuboid — fixed a long-standing "sticking on trimesh edges" bug
+- WebGL: stable 100–120 FPS on mid-range laptops; WebGPU is comparable with shadows on.
+- Mobile: tested on Android Chrome and iOS Safari; comfortable 55–60 FPS on devices from ~2022 on.
+- Grass is one camera-following tile, culled per blade around buildings and the road.
+- The bike uses a capsule collider instead of a cuboid, which fixed a long-standing "sticking on trimesh edges" bug.
+- WebGPU device loss (e.g. iOS backgrounding the tab) is detected and recovered with a reload; a repeated loss falls back to WebGL.
 
 ---
 
 ## Credits
 
-- **Three.js team** for r184 — the WebGPU + TSL story finally feels production-shaped.
-- **Rapier3D team** for `rapier3d-compat` — the WASM-compat fork makes async setup trivial.
+- **Three.js** team for r184: the WebGPU + TSL story finally feels production-shaped.
+- **Rapier3D** team for `rapier3d-compat`: the WASM-compat fork makes async setup trivial.
 
 ---
 
 ## License
 
-MIT — see [LICENSE](LICENSE). The bike GLB and island GLB are my own (Blender + procedural touch-ups); textures are royalty-free.
+The **source code** is licensed under the [MIT License](LICENSE).
+
+It does **not** cover the bundled 3D models, textures, or fonts. Some of those are third-party works under their own licenses (including a VanMoof bicycle model and several Sketchfab-derived props). If you reuse this code, bring your own assets.
 
 ---
 
 ## Contact
 
+- Live demo: [numan-yesil.com](https://numan-yesil.com)
+- Email: hi@numan-yesil.com
 - GitHub: [@numan7272](https://github.com/numan7272)
 - LinkedIn: [in/numan-yesil](https://www.linkedin.com/in/numan-yesil)
-- Email: hi@numan-yesil.com
-- Live demo: https://numan-yesil.com
-
-If you're hiring, my old portfolio's case-study is at [numan7272/About-Me on the legacy `main` branch](https://github.com/numan7272/About-Me/tree/main). This `v2` branch is the active one.
