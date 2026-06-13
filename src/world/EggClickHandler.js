@@ -144,6 +144,12 @@ export class EggClickHandler {
       try { navigator.vibrate(10); } catch {}
     }
 
+    // Projekthafen-Kisten öffnen die InfoCard, kein Mini-Game.
+    if (String(eggId).startsWith("Project_")) {
+      this.game.world?.harbor?.openProject?.(eggId);
+      return;
+    }
+
     const miniGames = this.game.ui?.miniGames;
     if (miniGames?.open) {
       miniGames.open(eggId);

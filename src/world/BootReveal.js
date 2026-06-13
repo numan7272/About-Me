@@ -186,6 +186,8 @@ export class BootReveal {
     grab(w?.island?.root);
     grab(w?.road?.group);
     grab(w?.streetLamps?.group);
+    grab(w?.harbor?.group);
+    grab(w?.lighthouse?.group);
     for (const m of [w?.nature?.trunkMesh, w?.nature?.blobMesh, w?.nature?.leafMesh]) {
       if (m?.material) mats.add(m.material);
     }
@@ -305,6 +307,8 @@ export class BootReveal {
       swap(w?.island?.root);
       swap(w?.road?.group);
       swap(w?.streetLamps?.group);
+      swap(w?.harbor?.group);
+      swap(w?.lighthouse?.group);
       for (const mesh of [w?.nature?.trunkMesh, w?.nature?.blobMesh, w?.nature?.leafMesh]) {
         if (mesh?.material) mesh.material = conv(mesh.material);
       }
@@ -333,6 +337,8 @@ export class BootReveal {
       w?.island?.root,
       w?.road?.group,
       w?.streetLamps?.group,
+      w?.harbor?.group,
+      w?.lighthouse?.group,
       n?.trunkMesh, n?.blobMesh, n?.leafMesh,
     ].filter(Boolean);
   }

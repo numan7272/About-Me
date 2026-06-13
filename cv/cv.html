@@ -1,0 +1,243 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="robots" content="noindex" />
+<title>Lebenslauf Numan Yesil</title>
+<meta name="description" content="Lebenslauf Numan Yesil, Wirtschaftsinformatik-Student und Werkstudent, Softwareentwicklung und IT-Sicherheit, Kiel." />
+<style>
+  /* ATS-freundlich: eine Spalte, Standard-Sans, echter Text, keine
+     Grafiken-als-Text, keine Tabellen-Layouts. Druckt sauber als A4.
+     break-inside: avoid verhindert, dass ein Abschnitt oder Eintrag
+     ueber zwei Seiten zerrissen wird. */
+  :root {
+    --ink: #16201e;
+    --muted: #44524e;
+    --accent: #1f3b36;
+    --rule: #c9c1b2;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+    color: var(--ink);
+    background: #e8e2d6;
+    line-height: 1.46;
+    font-size: 10.7pt;
+    -webkit-font-smoothing: antialiased;
+  }
+  .sheet {
+    max-width: 820px;
+    margin: 24px auto;
+    background: #fff;
+    padding: 44px 52px 48px;
+    box-shadow: 0 12px 40px rgba(0,0,0,0.12);
+  }
+  .hint {
+    max-width: 820px;
+    margin: 20px auto 0;
+    padding: 12px 16px;
+    background: #142120;
+    color: #cdd8d2;
+    font-size: 9.5pt;
+    border-left: 3px solid #ffd28a;
+    line-height: 1.55;
+  }
+  .hint b { color: #ffd28a; }
+  .hint code { font-family: ui-monospace, Menlo, monospace; color: #ffd28a; }
+
+  header { text-align: center; border-bottom: 1.5px solid var(--accent); padding-bottom: 16px; margin-bottom: 20px; }
+  h1 { font-size: 25pt; margin: 0; letter-spacing: 0.02em; font-weight: 700; }
+  .role { font-size: 11pt; color: var(--accent); font-weight: 600; margin-top: 5px; }
+  .contact { font-size: 9.6pt; color: var(--muted); margin-top: 11px; line-height: 1.7; }
+  .contact a { color: var(--muted); text-decoration: none; }
+
+  section { margin-top: 17px; break-inside: avoid; page-break-inside: avoid; }
+  h2 {
+    font-size: 10.5pt; text-transform: uppercase; letter-spacing: 0.14em;
+    color: var(--accent); margin: 0 0 9px; padding-bottom: 5px;
+    border-bottom: 1px solid var(--rule);
+    break-after: avoid; page-break-after: avoid;
+  }
+  p { margin: 0 0 7px; }
+  .lead { font-size: 10.7pt; }
+
+  .item { margin-bottom: 12px; break-inside: avoid; page-break-inside: avoid; }
+  .item:last-child { margin-bottom: 0; }
+  .item .row { display: flex; justify-content: space-between; gap: 16px; align-items: baseline; }
+  .item .title { font-weight: 700; }
+  .item .when { color: var(--muted); font-size: 9.6pt; white-space: nowrap; }
+  .item .where { color: var(--muted); font-size: 9.8pt; margin-top: 1px; }
+  ul { margin: 6px 0 0; padding-left: 17px; }
+  li { margin-bottom: 3px; }
+
+  .proj .stack { color: var(--muted); font-size: 9.4pt; margin-top: 3px; }
+
+  .grid { display: grid; grid-template-columns: 168px 1fr; gap: 5px 18px; break-inside: avoid; }
+  .grid dt { font-weight: 700; color: var(--accent); font-size: 10pt; }
+  .grid dd { margin: 0; }
+  .langs { line-height: 1.7; }
+
+  @media print {
+    body { background: #fff; font-size: 10.4pt; }
+    .hint { display: none; }
+    .sheet { box-shadow: none; margin: 0; max-width: none; padding: 0; }
+    a { color: var(--ink); }
+  }
+  @page { size: A4; margin: 15mm 16mm; }
+</style>
+</head>
+<body>
+
+<div class="hint" role="note">
+  <b>PDF erzeugen:</b> <code>Strg/Cmd + P</code> &rarr; &bdquo;Als PDF speichern&ldquo; &rarr; R&auml;nder &bdquo;Standard&ldquo;,
+  Hintergrundgrafiken aus. Abschnitte sind gegen Seitenumbruch gesch&uuml;tzt, sodass kein Eintrag
+  mitten durchgetrennt wird.
+</div>
+
+<main class="sheet">
+  <header>
+    <h1>Numan Yesil</h1>
+    <div class="role">Wirtschaftsinformatik-Student &amp; Werkstudent</div>
+    <div class="contact">
+      Schiefe Horn 15 &middot; 24111 Kiel &middot; +49 177 5531755 &middot; <a href="mailto:hi@numan-yesil.com">hi@numan-yesil.com</a><br />
+      <a href="https://numan-yesil.com">numan-yesil.com</a> &middot;
+      <a href="https://linkedin.com/in/numan-yesil">linkedin.com/in/numan-yesil</a> &middot;
+      <a href="https://github.com/numan7272">github.com/numan7272</a>
+    </div>
+  </header>
+
+  <section>
+    <h2>Kurzprofil</h2>
+    <p class="lead">
+      Wirtschaftsinformatik-Student an der HAW Kiel und Werkstudent in der
+      Software-Qualit&auml;tssicherung bei Designa. Ich lerne sehr schnell und arbeite mich z&uuml;gig
+      in neue Technologien und Aufgaben ein. Das zeigt sich an der Bandbreite meiner Projekte:
+      Backends mit Python und FastAPI, eine self-hosted Kommunikationsplattform, ein interaktives
+      3D-Portfolio im Browser und eine Sicherheitsschicht f&uuml;r KI-Agenten in Rust. So habe ich
+      in vielen Bereichen praktische Erfahrung gesammelt und bin bereit, immer mehr dazuzulernen.
+    </p>
+  </section>
+
+  <section>
+    <h2>Berufserfahrung</h2>
+    <div class="item">
+      <div class="row">
+        <span class="title">Werkstudent Qualit&auml;tssicherung</span>
+        <span class="when">seit 11/2025</span>
+      </div>
+      <div class="where">Designa Verkehrsleittechnik GmbH &middot; Kiel</div>
+      <ul>
+        <li>Test und Fehleranalyse f&uuml;r Parkraum-Hardware und die Verwaltungs-Software WinOperate und WinPos</li>
+        <li>Strukturierte Bug-Dokumentation in Jira mit Reproduktionsschritten und Severity-Einstufung, etwa zwei bis drei Tickets pro Woche</li>
+        <li>Datenauswertung im MS SQL Server Management Studio und Hardware-Diagnose per Telnet auf eingebetteten Ger&auml;ten</li>
+      </ul>
+    </div>
+    <div class="item">
+      <div class="row">
+        <span class="title">Mitarbeiter im Familienbetrieb</span>
+        <span class="when">01/2022 &ndash; 03/2025</span>
+      </div>
+      <div class="where">Yek D&ouml;ner und Pizzeria &middot; Heikendorf</div>
+      <ul>
+        <li>Drei Jahre parallel zur Oberstufe Verantwortung f&uuml;r Service, Kasse, Einkauf, Kalkulation und Schichtkoordination</li>
+        <li>Auf eigene Initiative L&uuml;cken in der WLAN-Konfiguration und im Kamerasystem des Betriebs gefunden und behoben</li>
+      </ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Bildung</h2>
+    <div class="item">
+      <div class="row">
+        <span class="title">B.Sc. Wirtschaftsinformatik</span>
+        <span class="when">seit 09/2025</span>
+      </div>
+      <div class="where">Hochschule f&uuml;r Angewandte Wissenschaften (HAW) Kiel</div>
+      <ul><li>Aktuell 2. Semester; Modul &bdquo;Einf&uuml;hrung in die Programmierung&ldquo; mit der Note 1,0 abgeschlossen</li></ul>
+    </div>
+    <div class="item">
+      <div class="row">
+        <span class="title">Google Cybersecurity Professional Certificate</span>
+        <span class="when">seit 02/2026</span>
+      </div>
+      <div class="where">Coursera &middot; in Bearbeitung</div>
+    </div>
+    <div class="item">
+      <div class="row">
+        <span class="title">Allgemeine Hochschulreife</span>
+        <span class="when">06/2025</span>
+      </div>
+      <div class="where">Thor-Heyerdahl-Gymnasium &middot; Kiel</div>
+      <ul><li>Leistungskurse Mathematik, Englisch und Wirtschaft/Politik</li></ul>
+    </div>
+  </section>
+
+  <section>
+    <h2>Projekte und Selbststudium</h2>
+
+    <div class="item proj">
+      <div class="title">Synapser, KI-gest&uuml;tzter Tagesplaner (Backend)</div>
+      <p>Backend eines intelligenten Tagesplaners, das mathematische Optimierung mit einem
+      Sprachmodell verbindet. Aufgaben werden per nat&uuml;rlicher Sprache &uuml;ber Google Gemini
+      erfasst und kategorisiert, dann als Constraint-Satisfaction-Problem mit OR-Tools CP-SAT
+      optimal geplant, bei sehr vollen Tagen &uuml;ber einen schnellen Greedy-Algorithmus.
+      Integriert Google Maps f&uuml;r Fahrzeiten und Open-Meteo f&uuml;r wetterabh&auml;ngige Aufgaben.</p>
+      <div class="stack">Stack: Python, FastAPI, Pydantic, Google OR-Tools (CP-SAT), Google Gemini API, Docker, Firebase</div>
+    </div>
+
+    <div class="item proj">
+      <div class="title">Contextual Trust Protocol (CTP), Zero-Trust-Schicht f&uuml;r KI-Agenten</div>
+      <p>Schutzschicht, die einen Sprachmodell-Agenten von der Au&szlig;enwelt abschirmt: ein
+      statischer Scanner und ein abgeschottetes W&auml;chter-Modell in eigenem Prozess (nur lokaler
+      Socket, kein Netzzugriff) pr&uuml;fen jede Tool-Ein- und -Ausgabe in beide Richtungen und
+      blockieren im Zweifelsfall. Threat Model mit offen dokumentierten Grenzen.</p>
+      <div class="stack">Stack: Rust, gRPC, systemd-Sandboxing</div>
+    </div>
+
+    <div class="item proj">
+      <div class="title">Interaktives 3D-Portfolio, numan-yesil.com</div>
+      <p>Spielbare 3D-Welt im Browser mit eigenen Shadern, Physik-Integration und mobiler
+      Touch-Steuerung, nah am Render-Loop ohne Framework-Abstraktion.</p>
+      <div class="stack">Stack: Three.js, Vite, Rapier3D, WebGPU/TSL, GLSL, Tailwind CSS</div>
+    </div>
+
+    <div class="item proj">
+      <div class="title">Funke, self-hosted Kommunikationsplattform</div>
+      <p>Discord-Alternative mit Text-Messaging, Sprach-Chat und Screen-Sharing &uuml;ber einen
+      eigenen Signaling-Server.</p>
+      <div class="stack">Stack: Node.js, Socket.IO, WebRTC, Electron</div>
+    </div>
+
+    <div class="item proj">
+      <div class="title">LLM-Sicherheit, eigene Experimente</div>
+      <p>Praktische Angriffsversuche auf Sprachmodelle in lokaler Testumgebung (u.&nbsp;a. das
+      schrittweise Aushebeln eines W&auml;chter-Modells &uuml;ber die Crescendo-Technik); die
+      LLM-Security-Labs der PortSwigger Web Security Academy durchgearbeitet.</p>
+      <div class="stack">Themen: Jailbreaks, Prompt Injection, Crescendo</div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Kenntnisse</h2>
+    <dl class="grid">
+      <dt>Programmiersprachen</dt><dd>Python, TypeScript, JavaScript, Rust, SQL, Dart</dd>
+      <dt>Web &amp; Backend</dt><dd>React, Next.js, Node.js, FastAPI, Three.js</dd>
+      <dt>IT-Sicherheit</dt><dd>OWASP Top 10, Netzwerk-Audit, Log-Analyse, OSINT, Kali Linux, LLM-Sicherheit (Grundlagen)</dd>
+      <dt>Datenbanken</dt><dd>MS SQL Server, PostgreSQL</dd>
+      <dt>Werkzeuge</dt><dd>Git, Docker, Linux/Bash, Jira</dd>
+    </dl>
+  </section>
+
+  <section>
+    <h2>Sprachen</h2>
+    <div class="langs">
+      Deutsch und Kurdisch (Muttersprache) &middot; Englisch (verhandlungssicher, C1) &middot;
+      Franz&ouml;sisch (Grundkenntnisse, A2) &middot; D&auml;nisch (Grundkenntnisse, A2)
+    </div>
+  </section>
+</main>
+
+</body>
+</html>

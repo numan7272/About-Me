@@ -27,6 +27,8 @@ import { Ocean } from "./Ocean.js";
 import { SkyDome } from "./SkyDome.js";
 import { Grass } from "./Grass.js";
 import { Nature } from "./Nature.js";
+import { Harbor } from "./Harbor.js";
+import { Lighthouse } from "./Lighthouse.js";
 import { Wind } from "./Wind.js";
 import { ColliderDebug } from "./ColliderDebug.js";
 import { StationLabels3D } from "../ui/walkthrough/StationLabels3D.js";
@@ -82,6 +84,8 @@ export class World {
       this._buildStreetLamps();
       this._buildGrass();
       this._buildNature();
+      this._buildHarbor();
+      this._buildLighthouse();
       this._buildStationLabels();
       this._buildPlayer();
       this._buildProximity();
@@ -208,6 +212,27 @@ export class World {
     this.nature = new Nature(this.game, this.island);
   }
 
+  _buildHarbor() {
+    if (!this.island) {
+      console.warn("[World] harbor skipped — island not built yet");
+      return;
+    }
+    // Projekthafen: kuratierte GitHub-Projekte als klickbare Fracht-Kisten
+    // am Wasser. Muss VOR _buildProximity laufen (Klick-Registrierung dort)
+    // und vor BootReveal-Setup (Clip-Materialsammlung erfasst die Gruppe).
+    this.harbor = new Harbor(this.game, this.island);
+  }
+
+  _buildLighthouse() {
+    if (!this.island) {
+      console.warn("[World] lighthouse skipped — island not built yet");
+      return;
+    }
+    // Leuchtturm auf einer Landzunge — Atmosphäre + Ostsee-Identität,
+    // nachts mit rotierendem Leuchtfeuer. Rein dekorativ (kein Collider).
+    this.lighthouse = new Lighthouse(this.game, this.island);
+  }
+
   _buildStationLabels() {
     if (!this.island) {
       console.warn("[World] station labels skipped — island not built yet");
@@ -262,6 +287,8 @@ export class World {
     // Alias damit andere Komponenten konsistent .proximityTrigger ansprechen können
     this.proximityTrigger = this.proximity;
     this.proximity.spawnEggGlows();
+    // Projekthafen-Kisten in dieselbe Click-Pipeline einhängen
+    this.harbor?.registerClickables?.();
 
     // Click-Handler für klickbare Eggs (Router-Pentest, HQ-SQL-Lab)
     import("./EggClickHandler.js")
@@ -294,6 +321,8 @@ export class World {
     if (this.streetLamps?.update) this.streetLamps.update();
     if (this.grass?.update) this.grass.update();
     if (this.nature?.update) this.nature.update();
+    if (this.harbor?.update) this.harbor.update();
+    if (this.lighthouse?.update) this.lighthouse.update();
     if (this.ocean?.update) this.ocean.update();
     if (this.player?.update) this.player.update();
     if (this.tapToMove?.update) this.tapToMove.update();

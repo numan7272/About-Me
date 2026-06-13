@@ -20,8 +20,7 @@ import { ControlModePicker } from "./ControlModePicker.js";
 import { getControlMode, subscribeControlMode } from "./controlMode.js";
 import { haptic } from "./_a11y.js";
 
-// InfoCard ist aktuell deaktiviert — Walkthrough nutzt BottomDrawer.
-// import { InfoCard } from "./InfoCard.js";
+import { InfoCard } from "./InfoCard.js";
 
 export class Ui {
   constructor(game) {
@@ -59,7 +58,10 @@ export class Ui {
     // Apply initial mode + subscribe für Live-Wechsel aus Settings
     this._applyControlMode(getControlMode());
     this._unsubControl = subscribeControlMode((m) => this._applyControlMode(m));
-    // this.infoCard = new InfoCard(game);   // deaktiviert
+
+    // InfoCard: Stationen laufen über den Walkthrough, aber der Projekthafen
+    // nutzt die Karte für Projekt-Details (Klick auf eine Fracht-Kiste).
+    this.infoCard = new InfoCard(game);
 
     // A11y: Tasten 1-5 öffnen die Stationen direkt — ohne Bike fahren
     // zu müssen. Tour-Story-Reihenfolge: 1=Yek 2=THG 3=HAW 4=Designa 5=HQ.
