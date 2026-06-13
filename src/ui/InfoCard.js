@@ -11,6 +11,8 @@
  *   ui.infoCard.hide()
  */
 
+import { t } from "../data/content.js";
+
 export class InfoCard {
   constructor(game) {
     this.game = game;
@@ -134,6 +136,40 @@ export class InfoCard {
     });
     this.root.appendChild(this.skillsEl);
 
+    // Optionaler Repo-Link (Projekthafen-Karten). Mono-Stil wie die Skills,
+    // aber als echter Anchor. Bei privaten Repos stattdessen linkNote (muted).
+    this.linkEl = document.createElement("a");
+    this.linkEl.target = "_blank";
+    this.linkEl.rel = "noopener noreferrer";
+    Object.assign(this.linkEl.style, {
+      display: "none",
+      marginTop: "16px",
+      fontFamily: "var(--font-mono)",
+      fontSize: "12px",
+      color: "var(--signal)",
+      textDecoration: "none",
+      borderBottom: "1px solid transparent",
+      width: "fit-content",
+      transition: "border-color 180ms var(--ease)",
+    });
+    this.linkEl.addEventListener("mouseenter", () => {
+      this.linkEl.style.borderBottomColor = "var(--signal)";
+    });
+    this.linkEl.addEventListener("mouseleave", () => {
+      this.linkEl.style.borderBottomColor = "transparent";
+    });
+    this.root.appendChild(this.linkEl);
+
+    this.linkNoteEl = document.createElement("div");
+    Object.assign(this.linkNoteEl.style, {
+      display: "none",
+      marginTop: "16px",
+      fontFamily: "var(--font-mono)",
+      fontSize: "11px",
+      color: "var(--ink-text-muted)",
+    });
+    this.root.appendChild(this.linkNoteEl);
+
     document.body.appendChild(this.root);
   }
 
@@ -175,6 +211,20 @@ export class InfoCard {
       });
       li.textContent = `> ${s}`;
       this.skillsEl.appendChild(li);
+    }
+
+    if (card.link) {
+      this.linkEl.href = card.link;
+      this.linkEl.textContent = `> ${t("open_repo")} ↗`;
+      this.linkEl.style.display = "block";
+      this.linkNoteEl.style.display = "none";
+    } else if (card.linkNote) {
+      this.linkNoteEl.textContent = `> ${card.linkNote}`;
+      this.linkNoteEl.style.display = "block";
+      this.linkEl.style.display = "none";
+    } else {
+      this.linkEl.style.display = "none";
+      this.linkNoteEl.style.display = "none";
     }
 
     requestAnimationFrame(() => {
