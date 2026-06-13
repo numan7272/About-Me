@@ -20,6 +20,7 @@ const WHITE = 0xf3efe6;        // Turm (Cream, kein Reinweiß — Poly-Look)
 const PETROL = 0x1c2e2b;       // Bänder, Galerie, Kappe (--ink Familie)
 const STONE = 0x4a5751;        // Felssockel
 const WARM = 0xffd28a;         // Laterne / Leuchtfeuer (--signal)
+const RED = 0xc0443a;          // Turm-Streifen (gedämpftes Leuchtturm-Rot)
 
 export class Lighthouse {
   constructor(game, island) {
@@ -94,6 +95,7 @@ export class Lighthouse {
     const matWhite = new THREE.MeshStandardMaterial({ color: WHITE, roughness: 0.8 });
     const matPetrol = new THREE.MeshStandardMaterial({ color: PETROL, roughness: 0.7, metalness: 0.2 });
     const matStone = new THREE.MeshStandardMaterial({ color: STONE, roughness: 0.95 });
+    const matRed = new THREE.MeshStandardMaterial({ color: RED, roughness: 0.75 });
 
     // ── Felssockel ──
     const plinth = new THREE.Mesh(
@@ -115,11 +117,11 @@ export class Lighthouse {
     tower.receiveShadow = true;
     this.group.add(tower);
 
-    // ── Zwei petrolfarbene Bänder ──
+    // ── Zwei rote Bänder ──
     for (const fy of [0.34, 0.64]) {
       const r = 1.45 - (1.45 - 0.95) * fy;   // Turm-Radius an dieser Höhe
       const band = new THREE.Mesh(
-        new THREE.CylinderGeometry(r + 0.04, r + 0.07, 1.0, 20), matPetrol,
+        new THREE.CylinderGeometry(r + 0.04, r + 0.07, 1.0, 20), matRed,
       );
       band.position.y = towerBaseY + TOWER_H * fy;
       band.castShadow = true;
@@ -184,9 +186,18 @@ export class Lighthouse {
     finial.position.y = lampY + 1.95;
     this.group.add(finial);
 
-    // ── Rotierendes Leuchtfeuer (zwei gegenüberliegende Strahlen) ──
+    // ── Leuchtfeuer: EIN Strahl, schwenkt seewärts über die See ──
+    // Basis-Yaw so wählen, dass der Strahl (lokal +X) vom Inselzentrum weg
+    // aufs offene Wasser zeigt; im update() pendelt er nur in diesem
+    // Seeward-Bogen, nie zurück über die Insel.
+    const sea = new THREE.Vector2(spot.x, spot.z);
+    if (sea.lengthSq() < 1e-4) sea.set(0, 1);
+    sea.normalize();
+    this._beamBaseYaw = Math.atan2(-sea.y, sea.x);
+
     this.beamGroup = new THREE.Group();
     this.beamGroup.position.y = lampY;
+    this.beamGroup.rotation.y = this._beamBaseYaw;
     this.beamMat = new THREE.MeshBasicMaterial({
       color: WARM,
       transparent: true,
@@ -196,22 +207,25 @@ export class Lighthouse {
       toneMapped: false,
       fog: false,
     });
-    // Kegel zeigt per Default +Y; wir kippen ihn waagerecht und schieben die
-    // Basis (breites Ende) nach außen, Spitze an der Laterne.
-    const beamGeo = new THREE.ConeGeometry(2.4, 26, 16, 1, true);
-    for (const sign of [1, -1]) {
-      const beam = new THREE.Mesh(beamGeo, this.beamMat);
-      beam.rotation.z = Math.PI / 2;          // Achse entlang X
-      beam.position.x = sign * 13;            // halbe Höhe nach außen
-      beam.rotation.y = sign > 0 ? 0 : Math.PI;
-      this.beamGroup.add(beam);
-    }
-    this.group.add(this.beamGroup);
+    // Kegel zeigt per Default +Y; waagerecht kippen, Basis (breites Ende)
+    // nach außen, Spitze an der Laterne. Leicht nach unten Richtung Wasser.
+    const beam = new THREE.Mesh(
+      new THREE.ConeGeometry(2.2, 30, 16, 1, true), this.beamMat,
+    );
+    beam.rotation.z = Math.PI / 2;            // Achse entlang X (seewärts)
+    beam.position.set(15, -1.6, 0);           // nach außen + leicht abwärts
+    beam.rotation.x = 0.06;
+    this.beamGroup.add(beam);
 
-    // Reales Licht (kein Schatten — Kosten) am Laternenkern
-    this.lampLight = new THREE.PointLight(WARM, 0.0, 38, 2);
-    this.lampLight.position.y = lampY;
-    this.group.add(this.lampLight);
+    // Echtes Spotlight, am Strahl montiert → leuchtet mit nach See und
+    // streicht über das Wasser, trifft nie die Insel hinter dem Turm.
+    this.lampSpot = new THREE.SpotLight(WARM, 0.0, 75, 0.46, 0.5, 1.3);
+    this.lampSpot.position.set(0, 0, 0);
+    this.lampSpot.target.position.set(26, -9, 0);   // +X (seewärts) und abwärts
+    this.beamGroup.add(this.lampSpot);
+    this.beamGroup.add(this.lampSpot.target);
+
+    this.group.add(this.beamGroup);
   }
 
   update() {
@@ -225,14 +239,19 @@ export class Lighthouse {
     // Laterne glüht mit der Nacht auf
     if (this.lampCoreMat) this.lampCoreMat.emissiveIntensity = 0.4 + nf * 3.0;
     if (this.lampGlassMat) this.lampGlassMat.emissiveIntensity = 0.3 + nf * 1.6;
-    if (this.lampLight) this.lampLight.intensity = nf * 6.0;
 
-    // Leuchtfeuer rotiert + wird nur nachts sichtbar; sanfter Puls am Strahl
-    this.beamGroup.rotation.y += dt * 0.55;
-    const pulse = 0.82 + 0.18 * Math.sin(this._t * 2.2);
+    // Strahl pendelt seewärts hin und her (kein Vollkreis über die Insel)
+    const SWEEP = 1.1;          // ±63° um die Seerichtung
+    this.beamGroup.rotation.y =
+      this._beamBaseYaw + Math.sin(this._t * 0.4) * SWEEP;
+
     const vis = nf > 0.04;
-    for (const beam of this.beamGroup.children) beam.visible = vis;
-    if (vis && this.beamMat) this.beamMat.opacity = nf * 0.22 * pulse;
+    const pulse = 0.85 + 0.15 * Math.sin(this._t * 2.2);
+    for (const c of this.beamGroup.children) {
+      if (c.isMesh) c.visible = vis;
+    }
+    if (this.beamMat) this.beamMat.opacity = vis ? nf * 0.2 * pulse : 0;
+    if (this.lampSpot) this.lampSpot.intensity = nf * 7.0;
   }
 
   destroy() {

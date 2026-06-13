@@ -1,5 +1,5 @@
 /**
- * content.js — Werdegang-Texte + Easter-Egg-Texte (DE/EN).
+ * content.js, Werdegang-Texte + Easter-Egg-Texte (DE/EN).
  *
  * Verwendung:
  *   import { getLang, t, LANDMARKS, EGGS } from "./data/content.js";
@@ -203,7 +203,7 @@ export const EGGS = {
 };
 
 /**
- * PROJECTS — kuratierte GitHub-Projekte für den Projekthafen.
+ * PROJECTS, kuratierte GitHub-Projekte für den Projekthafen.
  * Reihenfolge = Reihenfolge der Kisten am Steg (Security-Steg zuerst).
  * `link: null` = Repo (noch) privat → InfoCard zeigt linkNote statt Anchor.
  */
@@ -216,7 +216,7 @@ export const PROJECTS = {
       title: "Contextual Trust Protocol",
       subtitle: "Projekthafen · Security-Steg · Rust",
       timeframe: "2026 · early research",
-      text: "Zero-Trust-Containment für Agenten-Systeme. Grundannahme: ein LLM kann Instruktionen nicht zuverlässig von Daten trennen — also externe Mauern statt Prompt-Engineering. Fünf Rust-Crates: statischer Scanner gegen Encoding-Tricks, ein sandboxed Guard-Modell ohne Exekutionsrechte (eigener Prozess, nur Unix-Socket), Tool-I/O-Vetting in beide Richtungen, fail-closed bei jedem Fehler. Threat Model mit offen dokumentierten Lücken statt Marketing.",
+      text: "Zero-Trust-Containment für Agenten-Systeme. Grundannahme: ein LLM kann Instruktionen nicht zuverlässig von Daten trennen, also externe Mauern statt Prompt-Engineering. Fünf Rust-Crates: statischer Scanner gegen Encoding-Tricks, ein sandboxed Guard-Modell ohne Exekutionsrechte (eigener Prozess, nur Unix-Socket), Tool-I/O-Vetting in beide Richtungen, fail-closed bei jedem Fehler. Threat Model mit offen dokumentierten Lücken statt Marketing.",
       skills: ["Rust", "Zero Trust", "Prompt-Injection-Defense", "gRPC / UDS", "systemd-Sandboxing"],
       link: "https://github.com/numan7272/contextualtrustprotocol",
       color: "#ff8576",
@@ -227,7 +227,7 @@ export const PROJECTS = {
       title: "AI Password Awareness",
       subtitle: "Projekthafen · Security-Steg · Python",
       timeframe: "2026",
-      text: "Offline-Awareness-Demo: wie KI-gestütztes Raten den Passwort-Suchraum schrumpfen lässt — und welche Verteidigung dagegen tatsächlich wirkt. Komplett synthetische Daten, reproduzierbare Läufe, kein einziges echtes Passwort nötig.",
+      text: "Offline-Awareness-Demo: wie KI-gestütztes Raten den Passwort-Suchraum schrumpfen lässt, und welche Verteidigung dagegen tatsächlich wirkt. Komplett synthetische Daten, reproduzierbare Läufe, kein einziges echtes Passwort nötig.",
       skills: ["Python", "Security Awareness", "Synthetische Daten", "Reproduzierbarkeit"],
       link: "https://github.com/numan7272/ai-password-awareness",
       color: "#ffd28a",
@@ -249,7 +249,7 @@ export const PROJECTS = {
       title: "funke",
       subtitle: "Projekthafen · JavaScript",
       timeframe: "2026",
-      text: "Selbst gehostete Discord-Alternative: Echtzeit-Messaging, WebRTC-Voice, Screen-Sharing. Eigene Infrastruktur statt fremder Cloud — deshalb steht die Kiste direkt neben dem Container.",
+      text: "Selbst gehostete Discord-Alternative: Echtzeit-Messaging, WebRTC-Voice, Screen-Sharing. Eigene Infrastruktur statt fremder Cloud, deshalb steht die Kiste direkt neben dem Container.",
       skills: ["Node.js", "WebRTC", "Socket.IO", "Self-Hosted"],
       link: "https://github.com/numan7272/funke",
       color: "#22d3ee",
@@ -260,7 +260,7 @@ export const PROJECTS = {
       title: "Somnoscope",
       subtitle: "Projekthafen · Python · work in progress",
       timeframe: "2026 · WIP",
-      text: "Lokaler Edge-AI-Sleep-Tracker: BLE/MQTT-Sensorfusion, Schlafphasen-Scoring mit YASA, privacy-first — alle Daten bleiben auf eigener Hardware. Ehrlich gelabelt: work in progress.",
+      text: "Lokaler Edge-AI-Sleep-Tracker: BLE/MQTT-Sensorfusion, Schlafphasen-Scoring mit YASA, privacy-first, alle Daten bleiben auf eigener Hardware. Ehrlich gelabelt: work in progress.",
       skills: ["Python", "BLE / MQTT", "YASA", "Edge AI", "Privacy-first"],
       link: "https://github.com/numan7272/Somnoscope",
       color: "#a78bfa",
@@ -273,7 +273,7 @@ export const PROJECTS = {
       title: "Contextual Trust Protocol",
       subtitle: "Project Harbor · Security Pier · Rust",
       timeframe: "2026 · early research",
-      text: "Zero-trust containment for agent systems. Core premise: an LLM cannot reliably separate instructions from data — so build external walls instead of prompt engineering. Five Rust crates: a static scanner for encoding tricks, a sandboxed guard model with zero execution power (separate process, Unix socket only), tool I/O vetting in both directions, fail-closed on every error. A threat model with openly documented gaps instead of marketing.",
+      text: "Zero-trust containment for agent systems. Core premise: an LLM cannot reliably separate instructions from data, so build external walls instead of prompt engineering. Five Rust crates: a static scanner for encoding tricks, a sandboxed guard model with zero execution power (separate process, Unix socket only), tool I/O vetting in both directions, fail-closed on every error. A threat model with openly documented gaps instead of marketing.",
       skills: ["Rust", "Zero Trust", "Prompt Injection Defense", "gRPC / UDS", "systemd Sandboxing"],
       link: "https://github.com/numan7272/contextualtrustprotocol",
       color: "#ff8576",
@@ -284,7 +284,7 @@ export const PROJECTS = {
       title: "AI Password Awareness",
       subtitle: "Project Harbor · Security Pier · Python",
       timeframe: "2026",
-      text: "Offline awareness demo: how AI-assisted guessing shrinks the password search space — and which defenses actually hold up. Fully synthetic data, reproducible runs, not a single real password required.",
+      text: "Offline awareness demo: how AI-assisted guessing shrinks the password search space, and which defenses actually hold up. Fully synthetic data, reproducible runs, not a single real password required.",
       skills: ["Python", "Security Awareness", "Synthetic Data", "Reproducibility"],
       link: "https://github.com/numan7272/ai-password-awareness",
       color: "#ffd28a",
@@ -306,7 +306,7 @@ export const PROJECTS = {
       title: "funke",
       subtitle: "Project Harbor · JavaScript",
       timeframe: "2026",
-      text: "Self-hosted Discord alternative: real-time messaging, WebRTC voice, screen sharing. Own infrastructure instead of someone else's cloud — which is why this crate sits right next to the container.",
+      text: "Self-hosted Discord alternative: real-time messaging, WebRTC voice, screen sharing. Own infrastructure instead of someone else's cloud, which is why this crate sits right next to the container.",
       skills: ["Node.js", "WebRTC", "Socket.IO", "Self-Hosted"],
       link: "https://github.com/numan7272/funke",
       color: "#22d3ee",
@@ -317,7 +317,7 @@ export const PROJECTS = {
       title: "Somnoscope",
       subtitle: "Project Harbor · Python · work in progress",
       timeframe: "2026 · WIP",
-      text: "Local edge-AI sleep tracker: BLE/MQTT sensor fusion, sleep staging with YASA, privacy-first — all data stays on your own hardware. Honestly labeled: work in progress.",
+      text: "Local edge-AI sleep tracker: BLE/MQTT sensor fusion, sleep staging with YASA, privacy-first, all data stays on your own hardware. Honestly labeled: work in progress.",
       skills: ["Python", "BLE / MQTT", "YASA", "Edge AI", "Privacy-first"],
       link: "https://github.com/numan7272/Somnoscope",
       color: "#a78bfa",
