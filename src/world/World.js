@@ -28,6 +28,7 @@ import { SkyDome } from "./SkyDome.js";
 import { Grass } from "./Grass.js";
 import { Nature } from "./Nature.js";
 import { Harbor } from "./Harbor.js";
+import { Lighthouse } from "./Lighthouse.js";
 import { Wind } from "./Wind.js";
 import { ColliderDebug } from "./ColliderDebug.js";
 import { StationLabels3D } from "../ui/walkthrough/StationLabels3D.js";
@@ -84,6 +85,7 @@ export class World {
       this._buildGrass();
       this._buildNature();
       this._buildHarbor();
+      this._buildLighthouse();
       this._buildStationLabels();
       this._buildPlayer();
       this._buildProximity();
@@ -221,6 +223,16 @@ export class World {
     this.harbor = new Harbor(this.game, this.island);
   }
 
+  _buildLighthouse() {
+    if (!this.island) {
+      console.warn("[World] lighthouse skipped — island not built yet");
+      return;
+    }
+    // Leuchtturm auf einer Landzunge — Atmosphäre + Ostsee-Identität,
+    // nachts mit rotierendem Leuchtfeuer. Rein dekorativ (kein Collider).
+    this.lighthouse = new Lighthouse(this.game, this.island);
+  }
+
   _buildStationLabels() {
     if (!this.island) {
       console.warn("[World] station labels skipped — island not built yet");
@@ -310,6 +322,7 @@ export class World {
     if (this.grass?.update) this.grass.update();
     if (this.nature?.update) this.nature.update();
     if (this.harbor?.update) this.harbor.update();
+    if (this.lighthouse?.update) this.lighthouse.update();
     if (this.ocean?.update) this.ocean.update();
     if (this.player?.update) this.player.update();
     if (this.tapToMove?.update) this.tapToMove.update();
