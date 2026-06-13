@@ -29,7 +29,7 @@ export function setControlMode(mode) {
   _mode = mode;
   try { localStorage.setItem(STORAGE_KEY, mode); } catch {}
   for (const fn of _subs) {
-    try { fn(_mode); } catch (err) { console.error(err); }
+    try { fn(_mode); } catch (err) { console.error("[ControlMode] subscriber failed:", err); }
   }
 }
 
