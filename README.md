@@ -12,6 +12,12 @@
 
 **Live:** [numan-yesil.com](https://numan-yesil.com)
 
+<p align="center">
+  <img src="docs/screenshots/island-aerial.jpg" alt="Aerial view of the island: five career-station buildings, the project harbor, and the lighthouse on its headland, ringed by the coast road." width="100%">
+  <br>
+  <sub>The whole island — five career stations, the project harbor, and a lighthouse on a headland the code finds itself.</sub>
+</p>
+
 ---
 
 ## What this is
@@ -49,6 +55,45 @@ The canvas, the game loop, the physics step, and every shader live in plain ES m
 - **Lighthouse.** Sits on a headland the code finds itself (terrain sampling). At night the lamp glows and a beam sweeps out over the water.
 - **Day/night cycle**, procedural grass and ocean, wind-driven trees and falling leaves, street lamps that light up at dusk, and a gentle ambient soundscape.
 - **Two control schemes:** keyboard/joystick, or tap-to-move (LoL-style), switchable on first launch and in Settings.
+
+---
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/spawn-followcam.jpg" alt="Follow-cam behind the bike parked outside the HQ building, mini-map top-right." width="100%">
+      <br><sub><b>Follow-cam.</b> You spawn outside HQ and drive the bike between stations.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/harbor.jpg" alt="Row of coloured project crates on the pier by the water." width="100%">
+      <br><sub><b>Project harbor.</b> One crate per flagship GitHub project — click for the stack and repo link.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/lighthouse-night.jpg" alt="Lighthouse at night with a glowing lamp and a beam sweeping over the water under a starfield." width="100%">
+      <br><sub><b>Lighthouse.</b> At night the lamp glows and a beam sweeps out over the Baltic.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/island-night.jpg" alt="The island after dusk, street lamps lit along the road and the lighthouse beam across the water." width="100%">
+      <br><sub><b>Day/night cycle.</b> Street lamps and the lighthouse beam take over after dusk.</sub>
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/numanos.png" alt="Fake macOS desktop with a Finder menu bar, desktop icons, a dock, and an open Projects window listing GitHub repos." width="100%">
+      <br><sub><b>NumanOS.</b> A fake macOS desktop inside the HQ building — and it hides a SQL-injection lab.</sub>
+    </td>
+    <td width="50%" valign="top">
+      <img src="docs/screenshots/router-lab.png" alt="Kali-style terminal showing nmap output and a curl banner for a Hikvision IP camera, with a CVE-2017-7921 note." width="100%">
+      <br><sub><b>Hidden lab.</b> Audit a fictional Hikvision IP-cam: <code>nmap</code> → <code>curl</code> → <code>telnet</code> (CVE-2017-7921).</sub>
+    </td>
+  </tr>
+</table>
+
+> All shots are from the running app (WebGL renderer). Live version: [numan-yesil.com](https://numan-yesil.com).
 
 ---
 
