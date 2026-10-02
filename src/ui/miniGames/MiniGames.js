@@ -45,7 +45,7 @@ export class MiniGames {
     } catch {}
   }
 
-  async open(eggId) {
+  async open(eggId, { file } = {}) {
     if (this.active || this._opening) {
       // Anderes Spiel läuft oder lädt — re-entrancy verhindern
       return;
@@ -91,6 +91,7 @@ export class MiniGames {
         this.game?.cameraRig?.recenter?.();
       };
       this.active.open();
+      if (file) this.active.openExperience?.(file);
     } catch (err) {
       console.error("[MiniGames] failed to load game", eggId, err);
     } finally {

@@ -150,6 +150,7 @@ export class ProximityTrigger {
       let emissiveIntensity = 0;
       if (isHighlighted) emissiveIntensity = 0.7 + pulse * 0.5;
       else if (isHovered) emissiveIntensity = 0.4 + pulse * 0.3;
+      emissiveIntensity *= mesh.userData.highlightScale ?? 1;
       mesh.traverse((child) => {
         if (child.isMesh && child.material) {
           if (emissiveIntensity > 0) {

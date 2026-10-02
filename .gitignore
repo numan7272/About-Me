@@ -28,4 +28,6 @@ dist-ssr
 public/cv/
 *.pdf
 !public/maps/*.pdf
+# Public participation certificate supplied for the portfolio (no private CV data).
+!public/certificates/agents-of-change-2026.pdf
 

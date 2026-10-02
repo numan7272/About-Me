@@ -17,6 +17,8 @@
  * Initial-Cost niedrig bleibt.
  */
 
+import { experienceFile } from "./ExperienceFile.js";
+
 const NOW_HHMM = () => {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -64,6 +66,8 @@ const DESKTOP_FILES = [
     icon: NOS_ICONS.fileEdit,
     type: "trigger_sqli",
   },
+  { id: "security", label: "H1_BBP.h1", icon: NOS_ICONS.fileText, type: "experience" },
+  { id: "erasmus", label: "Learning_Tour.trip", icon: NOS_ICONS.globe, type: "experience" },
 ];
 
 const README_CONTENT = `# numan-os v1.0
@@ -200,6 +204,10 @@ export class NumanOS {
     this._buildDom();
     document.body.appendChild(this.dom.root);
     this._startBootSequence();
+  }
+
+  openExperience(id) {
+    if (id === "security" || id === "erasmus") this._openFile(id);
   }
 
   _buildDom() {
@@ -680,6 +688,15 @@ export class NumanOS {
       ic.className = "nos-icon";
       ic.dataset.fileId = f.id;
       ic.dataset.type = f.type;
+      ic.tabIndex = 0;
+      ic.setAttribute("role", "button");
+      ic.setAttribute("aria-label", f.label);
+      ic.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        event.stopPropagation();
+        this._openFile(f.id);
+      });
       ic.innerHTML = `
         <div class="nos-icon-glyph">${f.icon}</div>
         <div class="nos-icon-label">${f.label}</div>
@@ -820,6 +837,7 @@ export class NumanOS {
       this._openSqliFromTodo();
       return;
     }
+    if (file.type === "experience") return this._openWindow(file.id, experienceFile(file.id));
     if (file.id === "browser")  return this._openWindow("browser", this._browserContent());
     if (file.id === "projects") return this._openWindow("projects", this._projectsContent());
     if (file.id === "terminal") return this._openWindow("terminal", this._terminalContent());
@@ -845,8 +863,9 @@ export class NumanOS {
     // Offset & size — staggered
     const offsetX = 80 + (this.windowStack.length * 28);
     const offsetY = 60 + (this.windowStack.length * 24);
-    const sizeW = id === "browser" ? 720 : id === "projects" ? 540 : id === "terminal" ? 620 : 480;
-    const sizeH = id === "browser" ? 460 : id === "projects" ? 460 : id === "terminal" ? 360 : 340;
+    const isExperience = id === "security" || id === "erasmus";
+    const sizeW = isExperience ? 600 : id === "browser" ? 720 : id === "projects" ? 540 : id === "terminal" ? 620 : 480;
+    const sizeH = isExperience ? 540 : id === "browser" ? 460 : id === "projects" ? 460 : id === "terminal" ? 360 : 340;
     win.style.cssText += `
       left: ${offsetX}px; top: ${offsetY}px;
       width: ${sizeW}px; height: ${sizeH}px;
@@ -858,6 +877,8 @@ export class NumanOS {
       terminal: "Terminal — numan@dev",
       readme: "README.txt",
       todo: "TODO_fix_sql_injection.txt",
+      security: "H1_BBP.h1 — HackerOne",
+      erasmus: "Learning_Tour.trip — Agents of Change",
     }[id] || id;
 
     win.innerHTML = `

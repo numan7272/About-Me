@@ -1,0 +1,18 @@
+.experience-file { color: rgba(255,255,255,.92); line-height: 1.6; user-select: text; -webkit-user-select: text; }
+.experience-file header { border-bottom: 1px solid rgba(255,255,255,.18); padding-bottom: 14px; }
+.experience-category { font: 11px/1.6 var(--font-mono); color: #ffd28a; margin: 0 0 6px; }
+.experience-status { font: 11px/1.6 var(--font-mono); color: #8fe3c0; }
+.experience-file h2 { font-size: 23px; font-weight: 650; line-height: 1.2; margin: 16px 0 8px; }
+.experience-meta { font-size: 11px; color: rgba(255,255,255,.65); margin: 0; }
+.experience-summary { font-size: 14px; margin: 18px 0; }
+.experience-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; border-block: 1px solid rgba(255,255,255,.18); padding: 16px 0; margin: 20px 0; }
+.experience-facts > div { display: flex; flex-direction: column-reverse; }
+.experience-facts dt { font-size: 11px; color: rgba(255,255,255,.65); }
+.experience-facts dd { font-size: 23px; font-weight: 600; margin: 0 0 4px; color: #ffd28a; }
+.experience-file details { border-bottom: 1px solid rgba(255,255,255,.18); }
+.experience-file summary { min-height: 44px; padding: 12px 0; cursor: pointer; font-size: 13px; font-weight: 600; }
+.experience-file details p { font-size: 13px; margin: 0 0 16px; color: rgba(255,255,255,.75); }
+.experience-skills { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 0; margin: 20px 0 8px; list-style: none; font: 10px/1.8 var(--font-mono); color: rgba(255,255,255,.65); }
+.experience-links { display: flex; flex-wrap: wrap; gap: 0 20px; }
+.experience-links a { display: inline-flex; align-items: center; min-height: 44px; color: #ffd28a; font-size: 12px; text-decoration: underline; text-underline-offset: 4px; }
+.experience-file :is(summary, a):focus-visible { outline: 2px solid #ffd28a; outline-offset: 2px; }

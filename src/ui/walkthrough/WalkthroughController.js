@@ -1,7 +1,7 @@
 /**
  * WalkthroughController — State-Machine für die geführte Tour.
  *
- * Tour-Reihenfolge (HR-empfohlen): yek → thg → haw → designa → hq
+ * Tour-Reihenfolge: yek → thg → haw → erasmus → designa → hq → security
  * (Cybersec-Story-Hook zuerst, nicht chronologisch.)
  *
  * Pro Station hat der Drawer 3 Step-Stufen (Was / Wie / Skills).
@@ -245,13 +245,14 @@ export class WalkthroughController {
     // Drawer zeigen
     this.game?.ui?.drawer?.show?.(station);
     // 3D-Label pulsiert
-    this.game?.world?.stationLabels?.setActiveStation?.(stationId);
+    this.game?.world?.stationLabels?.setActiveStation?.(station.anchorStation || stationId);
 
     // ── Camera-FlyTo: cinematic Pose, die den Eingang zeigt ──
     // Bevorzugt STATION_CAMERAS (explizite camera+lookAt vom User abgelesen),
     // fallback auf TELEPORT_POINTS (nur Look-At, Default-Iso-Camera).
-    const camDef = STATION_CAMERAS[stationId];
-    const tp = TELEPORT_POINTS[stationId];
+    const camDef = this.game?.world?.experiences?.getTourPose(stationId)
+      || STATION_CAMERAS[station.anchorStation || stationId];
+    const tp = TELEPORT_POINTS[station.anchorStation || stationId];
     if (this.game?.cameraRig?.flyTo) {
       if (camDef) {
         this.game.cameraRig.flyTo(camDef.lookAt, {

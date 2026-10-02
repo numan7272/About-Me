@@ -528,6 +528,18 @@ export class BottomDrawer {
       wrap.appendChild(item);
     }
     this.center.appendChild(wrap);
+    if (s.aboutSection) {
+      const button = this._makeSecondaryBtn();
+      const isEn = this._lang() === "en";
+      button.textContent = s.aboutSection === "erasmus"
+        ? (isEn ? "Discover Learning_Tour.trip in HQ ↗" : "Learning_Tour.trip im HQ entdecken ↗")
+        : (isEn ? "Discover H1_BBP.h1 in HQ ↗" : "H1_BBP.h1 im HQ entdecken ↗");
+      button.addEventListener("click", () => {
+        this.game.ui?.walkthrough?.endTour({ completed: false });
+        this.game.ui?.miniGames?.open("hq", { file: s.aboutSection });
+      });
+      this.center.appendChild(button);
+    }
   }
 
   _renderEndCard() {

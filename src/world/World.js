@@ -28,6 +28,7 @@ import { SkyDome } from "./SkyDome.js";
 import { Grass } from "./Grass.js";
 import { Nature } from "./Nature.js";
 import { Harbor } from "./Harbor.js";
+import { ExperienceExhibits } from "./ExperienceExhibits.js";
 import { Lighthouse } from "./Lighthouse.js";
 import { Wind } from "./Wind.js";
 import { ColliderDebug } from "./ColliderDebug.js";
@@ -81,6 +82,7 @@ export class World {
       console.log("[World] resources ready — building world");
       this._buildIsland();
       this._buildRoad();
+      this.experiences = new ExperienceExhibits(this.game, this.island);
       this._buildStreetLamps();
       this._buildGrass();
       this._buildNature();
@@ -196,7 +198,7 @@ export class World {
     this.grass = new Grass(
       this.game,
       this.island.terrainMesh,
-      this.island.buildings,
+      [...this.island.buildings, ...this.experiences.getGrassZones()],
       this.road?.curve,
     );
   }
@@ -289,6 +291,7 @@ export class World {
     this.proximity.spawnEggGlows();
     // Projekthafen-Kisten in dieselbe Click-Pipeline einhängen
     this.harbor?.registerClickables?.();
+    this.experiences?.registerClickables();
 
     // Click-Handler für klickbare Eggs (Router-Pentest, HQ-SQL-Lab)
     import("./EggClickHandler.js")
@@ -332,6 +335,7 @@ export class World {
   }
 
   destroy() {
+    this.experiences?.destroy();
     this.resources?.destroy?.();
     this.road?.destroy?.();
     this.streetLamps?.destroy?.();

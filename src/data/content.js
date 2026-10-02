@@ -29,9 +29,9 @@ export const LANDMARKS = {
     HAW: {
       id: "haw",
       title: "B.Sc. Wirtschaftsinformatik",
-      subtitle: "HAW Kiel · 2. Semester",
+      subtitle: "HAW Kiel",
       timeframe: "seit 09/2025",
-      text: "B.Sc. Wirtschaftsinformatik, 2. Semester. Interessen: Backend, Cloud, Cybersecurity, Log-Analyse. Studium und Werkstudent-Job parallel.",
+      text: "B.Sc. Wirtschaftsinformatik. Interessen: Backend, Cloud, Cybersecurity, Log-Analyse. Studium und Werkstudent-Job parallel. Im September 2026 dabei: die Erasmus+ Learning Tour Agents of Change zu Slow Tourism und internationaler Zusammenarbeit.",
       skills: ["Wirtschaftsinformatik", "Python", "SQL", "Projektmanagement"],
       color: "#22d3ee",
       accent: "#06b6d4",
@@ -81,9 +81,9 @@ export const LANDMARKS = {
     HAW: {
       id: "haw",
       title: "B.Sc. Business Information Systems",
-      subtitle: "HAW Kiel · 2nd Semester",
+      subtitle: "HAW Kiel",
       timeframe: "Since 09/2025",
-      text: "B.Sc. Business Information Systems, 2nd semester. Interests: Backend, Cloud, Cybersecurity, Log analysis. Studying and working part-time in parallel.",
+      text: "B.Sc. Business Information Systems. Interests: Backend, Cloud, Cybersecurity, Log analysis. Studying and working part-time in parallel. In September 2026, I joined the Erasmus+ Agents of Change learning tour on slow tourism and international collaboration.",
       skills: ["Business Informatics", "Python", "SQL", "Project Management"],
       color: "#22d3ee",
       accent: "#06b6d4",
