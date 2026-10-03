@@ -36,7 +36,7 @@ export class HotkeyHelp {
   _buildUI() {
     this.btn = document.createElement("button");
     this.btn.type = "button";
-    this.btn.className = "hud-btn";
+    this.btn.className = "hud-btn hud-help-trigger";
     this.btn.textContent = "[F1] help";
     this.btn.setAttribute("aria-label", "show keyboard shortcuts");
     const isTouch = window.matchMedia?.("(pointer: coarse)")?.matches

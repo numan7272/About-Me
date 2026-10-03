@@ -149,12 +149,11 @@ export class Hud {
     }
 
     // Speed-HUD auto-hide: sichtbar wenn aktuelle Speed > 0.5 oder kürzlich
-    // > 0 (Idle-Delay) oder Tour aktiv (Telemetrie-Kontext soll im Tour-
-    // Modus sichtbar bleiben, auch wenn das Bike gefroren ist).
+    // > 0 (Idle-Delay). Während der Tour ist das Bike gesperrt.
     const now = performance.now();
     if (kmh > 0.5) this._lastNonZeroSpeed = now;
     const recentlyMoved = (now - this._lastNonZeroSpeed) < SPEED_IDLE_HIDE_DELAY;
-    this._setSpeedVisible(tourActive || recentlyMoved);
+    this._setSpeedVisible(!tourActive && recentlyMoved);
 
     // ── Recenter-Button ──
     // Sichtbar wenn followMode=false UND noch nicht user-hidden. Auto-fade
@@ -171,7 +170,7 @@ export class Hud {
       }
       const age = this._recenterShownAt > 0 ? now - this._recenterShownAt : 0;
       const autoHidden = age >= RECENTER_AUTO_HIDE_DELAY;
-      const shouldShow = followOff && !this._recenterUserHidden && !autoHidden;
+      const shouldShow = !tourActive && followOff && !this._recenterUserHidden && !autoHidden;
       this.recenterBtn.style.display = shouldShow ? "inline-block" : "none";
       this.recenterBtn.style.opacity = shouldShow ? "1" : "0";
     }

@@ -139,7 +139,7 @@ export class ContactPanel {
     // ── Close-Button ──
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
-    closeBtn.textContent = "[ esc ] close";
+    closeBtn.textContent = isEn ? "Close ×" : "Schließen ×";
     closeBtn.setAttribute("aria-label", "close contact panel");
     Object.assign(closeBtn.style, {
       position: "absolute",
@@ -152,6 +152,8 @@ export class ContactPanel {
       fontSize: "11px",
       cursor: "pointer",
       padding: "4px 6px",
+      minHeight: "44px",
+      minWidth: "44px",
       transition: "color 180ms var(--ease)",
     });
     closeBtn.addEventListener("mouseenter", () => {

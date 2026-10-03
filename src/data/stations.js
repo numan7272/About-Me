@@ -16,7 +16,9 @@
 
 // Story-Reihenfolge — HR hat empfohlen mit Yek-Pentest zu starten,
 // nicht chronologisch. Origin-Story-Hook ist der Differenzierer.
-export const STORY_ORDER = ["yek", "thg", "haw", "designa", "hq"];
+import { EXPERIENCE_TOUR } from "./about.js";
+
+export const STORY_ORDER = ["yek", "thg", "haw", "erasmus", "designa", "hq", "security"];
 
 // Teleport-Punkte pro Station — vom User per Browser-Console abgelesen.
 // Beim Walkthrough-flyTo() landet das Bike hier (Vorplatz/Eingang).
@@ -105,7 +107,7 @@ export const STATIONS = {
       buildingRoot: "HAW_Root",
       label: "HAW · B.Sc. Wirtschaftsinformatik",
       title: "B.Sc. Wirtschaftsinformatik",
-      subtitle: "HAW Kiel · 2. Semester",
+      subtitle: "HAW Kiel",
       timeframe: "seit 09/2025",
       headline: "Wirtschaftsinformatik. Brücke zwischen Technik und Geschäft.",
       bullets: [
@@ -203,7 +205,7 @@ export const STATIONS = {
       buildingRoot: "HAW_Root",
       label: "HAW · B.Sc. Business Information Systems",
       title: "B.Sc. Business Information Systems",
-      subtitle: "HAW Kiel · 2nd Semester",
+      subtitle: "HAW Kiel",
       timeframe: "since 09/2025",
       headline: "Business Informatics. Bridge between tech and business.",
       bullets: [
@@ -280,7 +282,7 @@ export const WALKTHROUGH_UI = {
     step_stack: "Tech & Skills",
     drawer_hint: "Klick „Weiter\" für die nächste Station",
     intro_title: "Hi, ich bin Numan.",
-    intro_body: "20, aus Kiel, studiere Wirtschaftsinformatik. Ich nehme dich kurz mit durch 5 Stationen: Schule, Familienbetrieb, Studium, Werkstudentenjob, eigene Projekte.",
+    intro_body: "20, aus Kiel, studiere Wirtschaftsinformatik. Entdecke meinen Werdegang in 7 Etappen – mit eigenen Projekten, internationaler Teamarbeit und einem validierten Security-Report.",
   },
   en: {
     start_tour: "Start guided tour",
@@ -294,12 +296,13 @@ export const WALKTHROUGH_UI = {
     step_stack: "Tech & Skills",
     drawer_hint: "Click \"Next\" for the next station",
     intro_title: "Hi, I'm Numan.",
-    intro_body: "20, from Kiel, studying Business Information Systems. Let me take you through 5 quick stops: school, family business, university, working student job, side projects.",
+    intro_body: "20, from Kiel, studying Business Information Systems. Explore my story in 7 stops – including personal projects, international teamwork, and a validated security report.",
   },
 };
 
 export function getStationsForLang(lang) {
-  return STATIONS[lang === "en" ? "en" : "de"];
+  const key = lang === "en" ? "en" : "de";
+  return { ...STATIONS[key], ...EXPERIENCE_TOUR[key] };
 }
 
 export function getWalkthroughStrings(lang) {

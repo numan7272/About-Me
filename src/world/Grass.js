@@ -65,7 +65,7 @@ const VERTEX_SHADER = /* glsl */ `
   uniform float uBladeWidth;
   uniform float uBladeHeight;
 
-  uniform vec3  uBuildings[5];
+  uniform vec3  uBuildings[7];
   uniform vec2  uRoad[64];
   uniform float uRoadRadiusSq;
   uniform float uMapRadius;
@@ -127,7 +127,7 @@ const VERTEX_SHADER = /* glsl */ `
     float edgeN = vnoise(blade * 0.6);
 
     float minB = 1e9;
-    for (int i = 0; i < 5; i++) {
+    for (int i = 0; i < 7; i++) {
       vec2 d = uBuildings[i].xy - blade;
       minB = min(minB, dot(d, d) / max(uBuildings[i].z, 0.001));
     }
@@ -276,10 +276,10 @@ function buildGrassGeometry(grid) {
 function buildBuildingArr(buildings) {
   const RADII = { HQ: 8, HAW: 11, Yek: 8, THG: 15, Designa: 10 };
   const arr = [];
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 7; i++) {
     const b = buildings[i];
     if (b) {
-      const r = RADII[b.id] ?? 7;
+      const r = b.grassClearRadius ?? RADII[b.id] ?? 7;
       arr.push(new THREE.Vector3(b.position[0], b.position[2], r * r));
     } else {
       arr.push(new THREE.Vector3(9999, 9999, 1));
@@ -467,7 +467,7 @@ async function buildGrassMaterialTSL(buildings, roadCurve) {
     const edgeN = vnoise(blade.mul(0.6));
 
     const minB = float(1e9).toVar();
-    Loop({ start: 0, end: 5, type: "int" }, ({ i }) => {
+    Loop({ start: 0, end: 7, type: "int" }, ({ i }) => {
       const b = buildingArr.element(i);
       const d = b.xy.sub(blade);
       minB.assign(min(minB, dot(d, d).div(max(b.z, 0.001))));

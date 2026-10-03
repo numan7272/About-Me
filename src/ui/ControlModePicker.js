@@ -83,6 +83,8 @@ export class ControlModePicker {
       background: var(--ink-solid);
       color: var(--paper);
       padding: 26px 24px 22px;
+      max-height: calc(100dvh - 40px);
+      overflow-y: auto;
     `;
 
     card.innerHTML = `
