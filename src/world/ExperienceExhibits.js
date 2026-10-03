@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { mergeGeometries } from "three/addons/utils/BufferGeometryUtils.js";
 import { TELEPORT_POINTS } from "../data/stations.js";
 
 /** Study and security discoveries placed beside their corresponding island areas. */
@@ -10,6 +11,7 @@ export class ExperienceExhibits {
     this.group.name = "Experience_stations";
     this.exhibits = new Map();
     this.colliders = [];
+    this._boxMaterials = new WeakMap();
     const [hx, , hz] = TELEPORT_POINTS.haw;
     this._build("erasmus", hx + 3.8, hz - 1.5, .45);
     const harbor = island.eggs.find((egg) => String(egg.id).toLowerCase() === "container");
@@ -31,13 +33,42 @@ export class ExperienceExhibits {
   }
 
   _box(group, size, position, color) {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size),
-      new THREE.MeshStandardMaterial({ color, roughness: .78 }));
+    let palette = this._boxMaterials.get(group);
+    if (!palette) this._boxMaterials.set(group, palette = new Map());
+    if (!palette.has(color)) palette.set(color, new THREE.MeshStandardMaterial({ color, roughness: .78 }));
+    const mesh = new THREE.Mesh(new THREE.BoxGeometry(...size), palette.get(color));
     mesh.position.set(...position);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     group.add(mesh);
     return mesh;
+  }
+
+  _batchBoxes(group) {
+    const batches = new Map();
+    for (const child of group.children) {
+      if (!child.isMesh || child.geometry.type !== "BoxGeometry") continue;
+      if (!batches.has(child.material)) batches.set(child.material, []);
+      batches.get(child.material).push(child);
+    }
+    for (const [material, boxes] of batches) {
+      if (boxes.length < 2) continue;
+      const geometries = boxes.map((box) => {
+        box.updateMatrix();
+        return box.geometry.clone().applyMatrix4(box.matrix);
+      });
+      const geometry = mergeGeometries(geometries);
+      geometries.forEach((part) => part.dispose());
+      if (!geometry) continue;
+      for (const box of boxes) {
+        group.remove(box);
+        box.geometry.dispose();
+      }
+      const batch = new THREE.Mesh(geometry, material);
+      batch.castShadow = true;
+      batch.receiveShadow = true;
+      group.add(batch);
+    }
   }
 
   _label(group, lines, position, width, height, background, ink) {
@@ -110,6 +141,7 @@ export class ExperienceExhibits {
         this._box(prop, [.17, .13, .03], [-.5 + i * .2, 1.7, .44], [0x8fe3c0, 0xffd28a, 0xefe7d5][i % 3]);
       }
     }
+    this._batchBoxes(prop);
     this.group.add(prop);
     this.exhibits.set(id, prop);
   }

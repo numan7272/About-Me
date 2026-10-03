@@ -77,7 +77,7 @@ export class SettingsPanel {
       fontSize: "13px",
       color: "var(--paper-muted)",
       padding: "8px 14px",
-      minHeight: "38px",
+      minHeight: "44px",
     });
     this.btn.addEventListener("click", () => this.toggle());
     document.body.appendChild(this.btn);
@@ -98,6 +98,8 @@ export class SettingsPanel {
       display: "none",
       flexDirection: "column",
       gap: "16px",
+      maxHeight: "calc(100dvh - 96px)",
+      overflowY: "auto",
     });
     this.panel.append(this._cornerSpan("tr"), this._cornerSpan("bl"));
 
@@ -304,20 +306,7 @@ export class SettingsPanel {
     }
     this.game?.audio?.refreshVolume?.();
 
-    const renderer = this.game?.renderer?.instance;
-    if (renderer) {
-      try {
-        if (this.settings.graphics === "low") {
-          renderer.setPixelRatio(Math.min(1.0, window.devicePixelRatio || 1));
-          if (renderer.shadowMap) renderer.shadowMap.enabled = false;
-        } else {
-          renderer.setPixelRatio(Math.min(2.0, window.devicePixelRatio || 1));
-          if (renderer.shadowMap) renderer.shadowMap.enabled = true;
-        }
-      } catch (e) {
-        console.warn("[Settings] graphics apply skipped:", e?.message);
-      }
-    }
+    this.game?.renderer?.setQuality(this.settings.graphics);
 
     if (typeof window !== "undefined") {
       const prevLang = window.__lang;

@@ -242,12 +242,12 @@ export class BottomDrawer {
       // Mobile compact: gekürzte Bullets (max 3 single-line) passen jetzt
       // ohne Scroll in den Drawer. Padding-Bottom 64px reicht (in-world
       // Joystick stört nicht). Drawer-Höhe nicht mehr gecappt → kein Scroll.
-      this.root.style.padding = "0 10px 64px 10px";
+      this.root.style.padding = "0 10px max(10px, env(safe-area-inset-bottom, 0px)) 10px";
       this.panel.style.gridTemplateColumns = "1fr";
       this.panel.style.gap = "8px";
       this.panel.style.padding = "10px 14px 10px";
-      this.panel.style.maxHeight = "";
-      this.panel.style.overflowY = "visible";
+      this.panel.style.maxHeight = "min(55dvh, calc(100dvh - 120px))";
+      this.panel.style.overflowY = "auto";
       this.leftCol.style.display = "flex";
       this.leftCol.style.flexDirection = "row";
       this.leftCol.style.flexWrap = "wrap";

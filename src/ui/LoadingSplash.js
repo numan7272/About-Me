@@ -20,6 +20,7 @@ const STRINGS = {
     loading: "Lädt",
     ready: "Bereit",
     clickToStart: "Klick zum Start",
+    tapToStart: "Tippen zum Start",
     hint: "[ mit Sound am besten ]",
     tagline: "Eine Insel. Ein Fahrrad. Mein Werdegang.",
     kicker: "Wirtschaftsinformatik · Kiel",
@@ -28,6 +29,7 @@ const STRINGS = {
     loading: "Loading",
     ready: "Ready",
     clickToStart: "Click to start",
+    tapToStart: "Tap to start",
     hint: "[ best with sound ]",
     tagline: "One island. One bike. My story.",
     kicker: "Business Informatics · Kiel",
@@ -212,7 +214,8 @@ export class LoadingSplash {
     } else {
       const start = document.createElement("div");
       start.className = "splash-start";
-      start.textContent = this._strings().clickToStart;
+      start.textContent = window.matchMedia("(pointer: coarse), (max-width: 600px)").matches
+        ? this._strings().tapToStart : this._strings().clickToStart;
       Object.assign(start.style, {
         fontFamily: "var(--font-display)",
         fontSize: "clamp(36px, 5.5vw, 54px)",

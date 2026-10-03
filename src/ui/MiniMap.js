@@ -90,6 +90,21 @@ export class MiniMap {
     this._mapRight = isMobile ? 12 : 20;
     this._collapsed = false;
     this._buildToggleButton(isMobile);
+    this._onResize = () => {
+      const mobile = window.matchMedia("(max-width: 600px)").matches;
+      this._mapSize = mobile ? 130 : SIZE;
+      this._mapTop = mobile ? 70 : 84;
+      this._mapRight = mobile ? 12 : 20;
+      this.root.style.top = `${this._mapTop}px`;
+      this.root.style.right = `${this._mapRight}px`;
+      this.setCollapsed(this._collapsed);
+    };
+    window.addEventListener("resize", this._onResize);
+    this.root.addEventListener("keydown", (event) => {
+      if (!this._collapsed || (event.key !== "Enter" && event.key !== " ")) return;
+      event.preventDefault();
+      this.setCollapsed(false);
+    });
   }
 
   _buildToggleButton(isMobile) {
@@ -101,8 +116,8 @@ export class MiniMap {
       position: "fixed",
       top: `${this._mapTop + 2}px`,
       right: `${this._mapRight + 2}px`,
-      width: "20px",
-      height: "20px",
+      width: "44px",
+      height: "44px",
       padding: "0",
       border: "0",
       background: "var(--ink-solid)",
@@ -166,6 +181,8 @@ export class MiniMap {
       this._expandHint.style.display = "flex";
       this.root.style.cursor = "pointer";
       this.root.setAttribute("aria-label", "expand map");
+      this.root.setAttribute("role", "button");
+      this.root.tabIndex = 0;
     } else {
       this.root.style.width = `${this._mapSize}px`;
       this.root.style.height = `${this._mapSize}px`;
@@ -177,6 +194,8 @@ export class MiniMap {
       this.toggleBtn.style.right = `${this._mapRight + 2}px`;
       if (this._expandHint) this._expandHint.style.display = "none";
       this.root.removeAttribute("aria-label");
+      this.root.removeAttribute("role");
+      this.root.removeAttribute("tabindex");
     }
   }
 
@@ -397,6 +416,7 @@ export class MiniMap {
   }
 
   destroy() {
+    window.removeEventListener("resize", this._onResize);
     this.canvas?.removeEventListener?.("click", this._onClick);
     this.root?.remove?.();
     this.toggleBtn?.remove?.();

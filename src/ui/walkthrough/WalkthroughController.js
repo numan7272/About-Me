@@ -333,6 +333,8 @@ export class WalkthroughController {
       color: "var(--ink-text)",
       textAlign: "left",
       borderLeft: "3px solid var(--signal)",
+      maxHeight: "calc(100dvh - 32px)",
+      overflowY: "auto",
     });
     card.append(this._cornerSpan("tr"), this._cornerSpan("bl"));
 
@@ -555,6 +557,12 @@ export class WalkthroughController {
     document.body.appendChild(btn);
     this._tourButton = btn;
     this._tourButtonLabel = label;
+    this._onTourResize = () => {
+      const mobile = window.matchMedia("(max-width: 600px)").matches;
+      btn.style.top = mobile ? "62px" : "84px";
+      btn.style.right = mobile ? "154px" : "238px";
+    };
+    window.addEventListener("resize", this._onTourResize);
   }
 
   _updateTourButtonVisibility() {
@@ -599,6 +607,7 @@ export class WalkthroughController {
   }
 
   destroy() {
+    window.removeEventListener("resize", this._onTourResize);
     this._hideStartOverlay();
     this._tourButton?.remove?.();
     this._tourButton = null;

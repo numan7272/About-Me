@@ -38,6 +38,7 @@ export class Renderer {
     this.game = game;
     this.canvas = game.canvas;
     this.preference = loadPreference();
+    this.quality = "high";
     this.mode = "loading";
     this.instance = null;
     this.composer = null;
@@ -90,13 +91,13 @@ export class Renderer {
   }
 
   _configure(r) {
-    r.setPixelRatio(this.game.sizes.pixelRatio);
+    r.setPixelRatio(this._pixelRatio());
     r.setSize(this.game.sizes.width, this.game.sizes.height);
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.toneMappingExposure = 1.05;
     if (r.shadowMap) {
-      r.shadowMap.enabled = true;
+      r.shadowMap.enabled = this.quality !== "low";
       // PCFSoftShadowMap ist seit r184 deprecated (fiel intern eh auf PCF
       // zurück). Standard-PCF ist 4-tap, sieht unter unserer Insel-Iso
       // praktisch identisch aus und ist unter WebGPU deutlich billiger.
@@ -225,7 +226,8 @@ export class Renderer {
 
       this.composer = new EffectComposer(this.instance);
       this.composer.setSize(this.game.sizes.width, this.game.sizes.height);
-      this.composer.setPixelRatio(this.game.sizes.pixelRatio);
+      this._composerPixelRatio = this._pixelRatio();
+      this.composer.setPixelRatio(this._composerPixelRatio);
 
       this.renderPass = new RenderPass(this.game.scene, this.game.cameraRig.camera);
       this.composer.addPass(this.renderPass);
@@ -244,15 +246,27 @@ export class Renderer {
     }
   }
 
+  _pixelRatio() {
+    return Math.min(this.quality === "low" ? 1 : 2, this.game.sizes.pixelRatio);
+  }
+
+  setQuality(quality) {
+    this.quality = quality === "low" ? "low" : "high";
+    const ratio = this._pixelRatio();
+    if (this.instance && this.instance.getPixelRatio() !== ratio) this.instance.setPixelRatio(ratio);
+    if (this.instance?.shadowMap) this.instance.shadowMap.enabled = this.quality !== "low";
+    if (this.composer && this._composerPixelRatio !== ratio) {
+      this.composer.setPixelRatio(ratio);
+      this._composerPixelRatio = ratio;
+    }
+  }
+
   onResize(width, height) {
     if (!this.instance) return;
     this.instance.setSize(width, height);
-    this.instance.setPixelRatio(this.game.sizes.pixelRatio);
+    this.setQuality(this.quality);
     if (this.composer) {
       this.composer.setSize(width, height);
-    }
-    if (this.bloomPass) {
-      this.bloomPass.setSize(width, height);
     }
     // WebGPU-PostProcessing zieht die Größe automatisch aus dem Renderer
     // — kein expliziter setSize-Call nötig.
