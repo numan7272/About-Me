@@ -61,6 +61,7 @@ export class AudioManager {
     this.ambientEl = null;     // HTMLAudioElement
     this.ambientSrc = null;    // MediaElementSourceNode
     this.ambientGain = null;
+    this._ambientRequested = false; // erst true nach "Klick zum Start"
 
     // Prozedurale Zonen-Ambience (Wellen/Möwen/Wind/Grillen)
     this.ambienceBus = null;   // ein Bus → masterGain, vereinfacht destroy()
@@ -96,12 +97,27 @@ export class AudioManager {
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this._volume();
       this.masterGain.connect(this.ctx.destination);
-      this._initAmbient();
+      // ambient.mp3 NICHT hier: _init feuert beim ersten pointerup — das
+      // kann ein Klick während des Ladescreens sein, und dann würden 3,5 MB
+      // Musik mit den GLBs um Bandbreite konkurrieren. Der Loop startet
+      // erst via startAmbient() beim "Klick zum Start".
+      if (this._ambientRequested) this._initAmbient();
       this._initAmbience();
       console.log("[Audio] initialized");
     } catch (e) {
       console.warn("[Audio] init failed:", e);
     }
+  }
+
+  /**
+   * Ambient-Musik anfordern + starten. Muss synchron aus einer echten
+   * User-Geste aufgerufen werden (LoadingSplash.onStartGesture), damit
+   * play() nicht von der Autoplay-Policy geblockt wird. Idempotent.
+   */
+  startAmbient() {
+    this._ambientRequested = true;
+    this._init();
+    if (this.ctx && !this.ambientEl) this._initAmbient();
   }
 
   _initAmbient() {

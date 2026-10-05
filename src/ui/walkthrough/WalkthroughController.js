@@ -567,6 +567,7 @@ export class WalkthroughController {
 
   _updateTourButtonVisibility() {
     if (!this._tourButton) return;
+    this._tourButton.title = this._lang() === "en" ? "start guided tour" : "geführte tour starten";
     // Button ist sichtbar wenn der User den Pageload-Overlay-Pfad durch ist
     // (also entweder Tour gesehen oder "Free Roam" gewählt).
     const seen = this._hasSeenTour();

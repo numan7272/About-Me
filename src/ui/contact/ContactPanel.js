@@ -109,6 +109,8 @@ export class ContactPanel {
     this.panel.setAttribute("role", "dialog");
     this.panel.setAttribute("aria-modal", "true");
     this.panel.setAttribute("aria-label", "contact");
+    this.panel.inert = true;
+    this.panel.setAttribute("aria-hidden", "true");
     Object.assign(this.panel.style, {
       position: "fixed",
       top: "0",
@@ -411,19 +413,40 @@ export class ContactPanel {
         e.preventDefault();
         this.close();
       }
+      if (e.key === "Tab" && this.isOpen) {
+        const targets = [...this.panel.querySelectorAll("button, a[href]")];
+        const first = targets[0];
+        const last = targets.at(-1);
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
     };
     window.addEventListener("keydown", this._onKey);
   }
 
   open() {
+    if (this.isOpen) return;
+    this._previousFocus = document.activeElement;
     this.isOpen = true;
+    this.panel.inert = false;
+    this.panel.setAttribute("aria-hidden", "false");
     this.panel.style.transform = "translateX(0%)";
     this.backdrop.style.opacity = "1";
     this.backdrop.style.pointerEvents = "auto";
+    this.panel.querySelector("button")?.focus();
   }
 
   close() {
+    if (!this.isOpen) return;
     this.isOpen = false;
+    (this._previousFocus?.isConnected ? this._previousFocus : this.btn)?.focus();
+    this.panel.inert = true;
+    this.panel.setAttribute("aria-hidden", "true");
     this.panel.style.transform = "translateX(100%)";
     this.backdrop.style.opacity = "0";
     this.backdrop.style.pointerEvents = "none";

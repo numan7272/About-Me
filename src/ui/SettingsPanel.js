@@ -10,8 +10,16 @@
  */
 
 import { getControlMode, setControlMode } from "./controlMode.js";
+import { applyLangToDocument, getUrlLang } from "../core/i18nHead.js";
 
 const STORAGE_KEY = "numan-portfolio-settings-v1";
+const SECTION_LABELS = {
+  language: { de: "Sprache", en: "Language" },
+  volume: { de: "Lautstärke", en: "Volume" },
+  graphics: { de: "Grafik", en: "Graphics" },
+  renderer: { de: "Renderer", en: "Renderer" },
+  control: { de: "Steuerung", en: "Bike control" },
+};
 
 const DEFAULTS = {
   lang: "de",
@@ -49,9 +57,16 @@ export class SettingsPanel {
   _loadSettings() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+      if (raw) return this._withUrlLang({ ...DEFAULTS, ...JSON.parse(raw) });
     } catch (e) {}
-    return { ...DEFAULTS };
+    return this._withUrlLang({ ...DEFAULTS });
+  }
+
+  /** ?lang= (hreflang-URL) hat Vorrang vor localStorage/Default. */
+  _withUrlLang(settings) {
+    const urlLang = getUrlLang();
+    if (urlLang) settings.lang = urlLang;
+    return settings;
   }
 
   _saveSettings() {
@@ -129,17 +144,18 @@ export class SettingsPanel {
     return hr;
   }
 
-  _sectionLabel(text) {
+  _sectionLabel(key) {
     const lbl = document.createElement("div");
     lbl.className = "hud-kicker";
-    lbl.textContent = text;
+    lbl.dataset.settingLabel = key;
+    lbl.textContent = SECTION_LABELS[key][this.settings.lang === "en" ? "en" : "de"];
     lbl.style.marginBottom = "8px";
     return lbl;
   }
 
   _buildControlModeRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._sectionLabel(this.settings.lang === "en" ? "Bike control" : "Steuerung"));
+    wrap.appendChild(this._sectionLabel("control"));
     wrap.appendChild(this._textToggleGroup(
       [
         { value: "joystick", label: "Joystick" },
@@ -190,7 +206,7 @@ export class SettingsPanel {
 
   _buildLanguageRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._sectionLabel(this.settings.lang === "en" ? "Language" : "Sprache"));
+    wrap.appendChild(this._sectionLabel("language"));
     wrap.appendChild(this._textToggleGroup(
       [
         { label: "DE", value: "de" },
@@ -208,7 +224,7 @@ export class SettingsPanel {
 
   _buildVolumeRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._sectionLabel(this.settings.lang === "en" ? "Volume" : "Lautstärke"));
+    wrap.appendChild(this._sectionLabel("volume"));
 
     const row = document.createElement("div");
     Object.assign(row.style, {
@@ -253,7 +269,7 @@ export class SettingsPanel {
 
   _buildGraphicsRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._sectionLabel(this.settings.lang === "en" ? "Graphics" : "Grafik"));
+    wrap.appendChild(this._sectionLabel("graphics"));
     wrap.appendChild(this._textToggleGroup(
       [
         { label: "Low", value: "low" },
@@ -271,7 +287,7 @@ export class SettingsPanel {
 
   _buildRendererRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._sectionLabel("Renderer"));
+    wrap.appendChild(this._sectionLabel("renderer"));
     wrap.appendChild(this._textToggleGroup(
       [
         { label: "WebGL", value: "webgl" },
@@ -301,6 +317,9 @@ export class SettingsPanel {
   }
 
   _applySettings() {
+    for (const label of this.panel.querySelectorAll("[data-setting-label]")) {
+      label.textContent = SECTION_LABELS[label.dataset.settingLabel][this.settings.lang === "en" ? "en" : "de"];
+    }
     if (typeof window !== "undefined") {
       window.__masterVolume = this.settings.volume;
     }
@@ -311,6 +330,7 @@ export class SettingsPanel {
     if (typeof window !== "undefined") {
       const prevLang = window.__lang;
       window.__lang = this.settings.lang;
+      applyLangToDocument(this.settings.lang);
       if (prevLang && prevLang !== this.settings.lang) {
         this.game?.ui?.refreshLang?.();
       }

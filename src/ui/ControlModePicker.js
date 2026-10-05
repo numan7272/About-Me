@@ -11,18 +11,19 @@
 
 import { setControlMode, markPickerSeen, hasPickerBeenSeen } from "./controlMode.js";
 
-const SHOW_DELAY_MS = 900;
-
 export class ControlModePicker {
   constructor(game) {
     this.game = game;
     this.dom = null;
-    this._timer = null;
+  }
 
-    if (hasPickerBeenSeen()) return;
-    if (!this._isTouchDevice()) return;
-
-    this._timer = setTimeout(() => this._show(), SHOW_DELAY_MS);
+  show(onDone) {
+    if (hasPickerBeenSeen() || !this._isTouchDevice()) {
+      onDone?.();
+      return;
+    }
+    this._onDone = onDone;
+    this._show();
   }
 
   _isTouchDevice() {
@@ -159,6 +160,9 @@ export class ControlModePicker {
         setControlMode(mode);
         markPickerSeen();
         this._close();
+        const done = this._onDone;
+        this._onDone = null;
+        done?.();
       });
     });
   }
@@ -189,7 +193,7 @@ export class ControlModePicker {
   }
 
   destroy() {
-    clearTimeout(this._timer);
+    this._onDone = null;
     this._close();
   }
 }

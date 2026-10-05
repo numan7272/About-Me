@@ -53,6 +53,8 @@ export class BottomDrawer {
 
   _buildUI() {
     this.root = document.createElement("div");
+    this.root.inert = true;
+    this.root.setAttribute("aria-hidden", "true");
     Object.assign(this.root.style, {
       position: "fixed",
       left: "0",
@@ -278,6 +280,8 @@ export class BottomDrawer {
   }
 
   show(station) {
+    this.root.inert = false;
+    this.root.setAttribute("aria-hidden", "false");
     this.station = station;
     this.step = 0;
     this._endCardMode = false;
@@ -296,6 +300,8 @@ export class BottomDrawer {
    * @param {{ onContact: fn, onRestart: fn, onClose: fn }} handlers
    */
   showEndCard(handlers = {}) {
+    this.root.inert = false;
+    this.root.setAttribute("aria-hidden", "false");
     this.station = null;
     this.step = 0;
     this._endCardMode = true;
@@ -309,6 +315,9 @@ export class BottomDrawer {
   }
 
   hide() {
+    if (this.root.contains(document.activeElement)) document.activeElement.blur();
+    this.root.inert = true;
+    this.root.setAttribute("aria-hidden", "true");
     this.root.style.transform = "translateY(110%)";
     this.root.style.opacity = "0";
     this.visible = false;

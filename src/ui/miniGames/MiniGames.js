@@ -11,6 +11,8 @@
  *   miniGames.isComplete(eggId)     — query
  */
 
+import { prefersReducedMotion } from "../_a11y.js";
+
 const GAME_MAP = {
   // Egg-Klicks
   router:    () => import("./RouterPentest.js").then((m) => m.RouterPentest),
@@ -32,6 +34,7 @@ export class MiniGames {
   constructor(game) {
     this.game = game;
     this.active = null;
+    this._openGeneration = 0;
     this.completed = new Set();
     // Persist completion über page-reload via localStorage
     try {
@@ -46,11 +49,13 @@ export class MiniGames {
   }
 
   async open(eggId, { file } = {}) {
+    if (this._destroyed) return;
     if (this.active || this._opening) {
       // Anderes Spiel läuft oder lädt — re-entrancy verhindern
       return;
     }
     this._opening = true;
+    const generation = ++this._openGeneration;
     // Bevor wir das Mini-Game öffnen: alle pointer-blockierenden States
     // aus dem 3D-View entspannen. Sonst bleibt OrbitControls stuck wenn
     // der TouchJoystick einen pointerdown gesehen hat, aber pointerup
@@ -72,8 +77,7 @@ export class MiniGames {
         this._flyIntro(eggId),
       ]);
       // Falls inzwischen ein anderes Mini-Game offen ist, abbrechen
-      if (this.active) {
-        this._opening = false;
+      if (this.active || this._destroyed || generation !== this._openGeneration) {
         return;
       }
       this.active = new GameClass(this.game);
@@ -94,8 +98,13 @@ export class MiniGames {
       if (file) this.active.openExperience?.(file);
     } catch (err) {
       console.error("[MiniGames] failed to load game", eggId, err);
+      if (generation === this._openGeneration) {
+        try { this.active?.close?.(); } catch {}
+        this.active = null;
+        this._unlockBodyScroll();
+      }
     } finally {
-      this._opening = false;
+      if (generation === this._openGeneration) this._opening = false;
     }
   }
 
@@ -157,7 +166,7 @@ export class MiniGames {
         cameraPos: [bx + fx * anchor.dist, by + anchor.height, bz + fz * anchor.dist],
         lookAt: [bx, by + anchor.lookY, bz],
       });
-      setTimeout(resolve, duration * 1000 + 120);
+      setTimeout(resolve, prefersReducedMotion() ? 0 : duration * 1000 + 120);
     });
   }
 
@@ -180,6 +189,8 @@ export class MiniGames {
   }
 
   close() {
+    this._openGeneration++;
+    this._opening = false;
     if (this.active?.close) {
       try { this.active.close(); } catch {}
     }
@@ -315,6 +326,7 @@ export class MiniGames {
   }
 
   destroy() {
+    this._destroyed = true;
     this.close();
   }
 }

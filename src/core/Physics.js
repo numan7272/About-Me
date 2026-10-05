@@ -21,7 +21,13 @@ export class Physics extends EventEmitter {
     // nach dem "ready"-Event darauf zu.
     this.RAPIER = null;
 
-    this._init();
+    this.initialization = this._init();
+    // Keep the failure observable by Game's loading gate without an
+    // unhandled rejection while the model downloads are still pending.
+    this.initialization.catch((error) => {
+      this.error = error;
+      this.trigger("error", [error]);
+    });
   }
 
   async _init() {

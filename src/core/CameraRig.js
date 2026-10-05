@@ -8,6 +8,7 @@
 import * as THREE from "three";
 import { OrbitControls } from "three/examples/jsm/controls/OrbitControls.js";
 import { BIKE_SPAWN } from "../world/spawn.js";
+import { prefersReducedMotion } from "../ui/_a11y.js";
 
 /**
  * CameraRig — entweder OrbitControls (frei) oder Follow-Cam.
@@ -204,6 +205,19 @@ export class CameraRig {
           target[2] + FOLLOW_OFFSET.z,
         ];
     this._flyToPos.set(cam[0], cam[1], cam[2]);
+
+    // Reduced Motion: kein Tween, sondern sofortiger Schnitt aufs Ziel
+    // (Nausea-Prävention). Ergebnis + Callback-Semantik bleiben gleich.
+    if (prefersReducedMotion()) {
+      this._flyActive = false;
+      this._flyOnComplete = null;
+      this.followMode = false;
+      this.camera.position.copy(this._flyToPos);
+      this.controls.target.copy(this._flyToTarget);
+      this.controls.update();
+      opts.onComplete?.();
+      return;
+    }
 
     // Aktuelle Position als Startpunkt einfrieren
     this._flyFromPos.copy(this.camera.position);

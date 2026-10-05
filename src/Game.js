@@ -23,6 +23,7 @@ import { AudioManager } from "./core/AudioManager.js";
 import { Debug } from "./core/Debug.js";
 import { LoadingSplash } from "./ui/LoadingSplash.js";
 import { BootReveal } from "./world/BootReveal.js";
+import { prefersReducedMotion } from "./ui/_a11y.js";
 
 export class Game {
   // Singleton-Helper
@@ -73,8 +74,7 @@ export class Game {
     // Intro-Inszenierung: enge Kamera-Kreisfahrt um den Spawn-Kreis —
     // der Ladescreen ist eine Bühne, kein Formular. Bei reduced-motion
     // bleibt alles statisch.
-    this._reducedMotion = typeof window !== "undefined"
-      && window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches;
+    this._reducedMotion = prefersReducedMotion();
     if (!this._reducedMotion) {
       this.cameraRig.startIntroOrbit();
     }
@@ -125,8 +125,16 @@ export class Game {
           this.ui.settings._rendererHint.textContent =
             "Active: " + this.renderer.mode;
         }
+      }).catch((error) => {
+        console.warn("[Game] renderer initialization failed:", error);
+        this.splash?.showError?.();
       });
     }
+  }
+
+  /** Kurzer Zugriff auf den Asset-Loader: game.resources.loaded / .total */
+  get resources() {
+    return this.world?.resources ?? null;
   }
 
   onResize() {
@@ -136,33 +144,42 @@ export class Game {
 
   _wireSplashToResources() {
     if (!this.splash) return;
-    const res = this.world?.resources;
+    const res = this.resources;
     if (!res) return;
 
-    // Übersetzung der Resource-Namen ins Deutsche damit der Loading-Text
-    // nicht "Lädt island" sondern "Lädt Insel" zeigt.
-    const RES_NAME_DE = {
-      island: "Insel",
-      bike:   "Fahrrad",
-      ocean:  "Ozean",
-      grass:  "Gras",
-      sky:    "Himmel",
-      world:  "Welt",
-    };
-
-    res.on?.("progress", (name, ratio) => {
+    // Byte-genauer Fortschritt (GLTFLoader onProgress, aggregiert in
+    // Resources) + Zähler game.resources.loaded / game.resources.total.
+    // Vorher gab's nur ein Event pro FERTIGEM Asset — bei 2 GLBs sprang
+    // der Balken 0 % → 50 % → 100 % und stand beim 13-MB-Bike lange still.
+    const label = () => {
       const lang = (typeof window !== "undefined" && window.__lang) || "de";
-      const displayName = lang === "en" ? name : (RES_NAME_DE[name] || name);
-      const msg = lang === "en" ? `Loading ${displayName}` : `Lädt ${displayName}`;
-      this.splash.setProgress(ratio, msg);
+      return lang === "en" ? "Loading 3D world" : "Lädt 3D-Welt";
+    };
+    let lastInfo = null;
+    const push = (ratio, info) => {
+      if (info) lastInfo = info;
+      this.splash?.setProgress(ratio, label(), {
+        loaded: res.loaded,
+        total: res.total,
+        bytesLoaded: lastInfo?.bytesLoaded ?? 0,
+        bytesTotal: lastInfo?.bytesTotal ?? 0,
+      });
       this.bootReveal?.setProgress?.(ratio);
-    });
+    };
+    push(0);
+    res.on?.("loading", (ratio, info) => push(ratio, info));
 
-    res.on?.("ready", () => {
-      this.splash.setProgress(1, this.splash._strings?.()?.ready || "Ready");
-      this.bootReveal?.setProgress?.(1);
-      this.splash.markReady();
-    });
+    res.on?.("error", () => this.splash?.showError?.());
+    this.physics.initialization.catch(() => this.splash?.showError?.());
+    res.on?.("ready", () => this._finishLoading(res, lastInfo));
+
+    // Synchron im Start-Klick (echte User-Geste): erst JETZT Audio laden.
+    // So konkurriert ambient.mp3 nie mit den GLBs und play() wird nicht
+    // von der Autoplay-Policy geblockt.
+    this.splash.onStartGesture = () => {
+      res.loadDeferred?.();
+      this.audio?.startAmbient?.();
+    };
 
     // Splash hat eigene Start-Button-Logik — onStart wird gefeuert wenn User
     // klickt. Choreografie: Bike fällt aus 5m auf die Insel, die Kamera
@@ -174,7 +191,8 @@ export class Game {
       }
 
       const showOverlay = () => {
-        this.ui?.walkthrough?.showStartOverlayAfterSplash?.();
+        const welcome = () => this.ui?.walkthrough?.showStartOverlayAfterSplash?.();
+        this.ui?.controlPicker?.show(welcome);
       };
 
       if (this._reducedMotion) {
@@ -202,6 +220,26 @@ export class Game {
       // weil der User entweder Tour-Overlay liest oder fährt.
       this._preloadMiniGames();
     };
+  }
+
+  async _finishLoading(res, info) {
+    if (res.errors?.length) return;
+    try {
+      await Promise.all([this.renderer.ready, this.physics.initialization]);
+      if (this._destroyed) return;
+      if (!this.world?.island || !this.world?.player?.body) {
+        throw new Error("The world or player could not be initialized");
+      }
+      this.splash?.setProgress(1, this.splash._strings?.()?.ready || "Ready", {
+        loaded: res.loaded, total: res.total,
+        bytesLoaded: info?.bytesLoaded ?? 0, bytesTotal: info?.bytesTotal ?? 0,
+      });
+      this.bootReveal?.setProgress?.(1);
+      this.splash?.markReady();
+    } catch (error) {
+      console.warn("[Game] world initialization failed:", error);
+      this.splash?.showError?.();
+    }
   }
 
   _preloadMiniGames() {
@@ -294,6 +332,7 @@ export class Game {
   }
 
   destroy() {
+    this._destroyed = true;
     this.time?.destroy?.();
     this.sizes?.destroy?.();
     this.inputs?.destroy?.();

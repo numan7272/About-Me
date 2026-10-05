@@ -35,6 +35,7 @@ import { ColliderDebug } from "./ColliderDebug.js";
 import { StationLabels3D } from "../ui/walkthrough/StationLabels3D.js";
 import { getControlMode } from "../ui/controlMode.js";
 import { BIKE_SPAWN } from "./spawn.js";
+import { MODEL_ASSETS } from "../data/modelAssets.js";
 
 export class World {
   constructor(game) {
@@ -69,10 +70,7 @@ export class World {
     this.colliderDebug = new ColliderDebug(game);
 
     // Resources laden — Island + Bike
-    this.resources = new Resources({
-      island: "/maps/island.glb",
-      bike:   "/vanmoof-transformed.glb",
-    });
+    this.resources = new Resources(MODEL_ASSETS);
 
     this.resources.on("progress", (name, ratio) => {
       console.log(`[World] loading ${name}: ${Math.round(ratio * 100)}%`);
