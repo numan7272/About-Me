@@ -618,8 +618,8 @@ export class Grass {
     this.buildings = buildings || [];
     this.roadCurve = roadCurve || null;
 
-    // Dichte hängt am Graphics-Setting (greift beim nächsten Load —
-    // Pixel-Ratio/Schatten schalten live, die Halm-Zahl nicht).
+    // Low hides the decorative blades immediately; the island terrain
+    // remains visible. High restores the same geometry without a reload.
     this.geometry = buildGrassGeometry(pickGrid());
 
     this._raycaster = new THREE.Raycaster();
@@ -690,6 +690,7 @@ export class Grass {
     this.mesh.frustumCulled = false;
     this.mesh.castShadow = false;
     this.mesh.receiveShadow = false;
+    this.setQuality(this.game.renderer?.quality || "high");
     this.scene.add(this.mesh);
 
     console.log(`[Grass] triangle blades (${mode}), tile follows camera`);
@@ -724,7 +725,13 @@ export class Grass {
       });
   }
 
+  setQuality(quality) {
+    this._quality = quality;
+    if (this.mesh) this.mesh.visible = quality !== "low";
+  }
+
   update() {
+    if (this._quality === "low") return;
     if (!this.material) return;
     const a = this.material.userData.adapter;
     if (!a) return;

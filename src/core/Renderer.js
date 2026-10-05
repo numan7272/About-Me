@@ -247,7 +247,12 @@ export class Renderer {
   }
 
   _pixelRatio() {
-    return Math.min(this.quality === "low" ? 1 : 2, this.game.sizes.pixelRatio);
+    const { width = 1, height = 1, pixelRatio } = this.game.sizes;
+    // Bound physical pixels as well as DPR: a 4K/HiDPI display must not
+    // silently multiply the scene and bloom passes' fill cost.
+    const budget = this.quality === "low" ? 1280 * 720 : 1920 * 1080;
+    return Math.min(this.quality === "low" ? 1 : 2, pixelRatio,
+      Math.sqrt(budget / Math.max(1, width * height)));
   }
 
   setQuality(quality) {
@@ -259,6 +264,7 @@ export class Renderer {
       this.composer.setPixelRatio(ratio);
       this._composerPixelRatio = ratio;
     }
+    this.game.world?.grass?.setQuality(this.quality);
   }
 
   onResize(width, height) {
@@ -302,7 +308,7 @@ export class Renderer {
     this._updateBloomForDayCycle();
 
     // WebGL + EffectComposer-Pfad
-    if (this.composer && this.mode === "webgl") {
+    if (this.composer && this.mode === "webgl" && this.quality !== "low") {
       if (this.renderPass) {
         this.renderPass.scene = scene;
         this.renderPass.camera = camera;
@@ -314,7 +320,7 @@ export class Renderer {
     // WebGPU + PostProcessing-Pfad
     if (this.mode === "webgpu") {
       try {
-        if (this.postProcessing) {
+        if (this.postProcessing && this.quality !== "low") {
           // ScenePass-Scene/Camera werden beim Bloom-Setup einmalig gesetzt —
           // KEIN Re-Assign pro Frame, das könnte sonst die WebGPU-Pipeline
           // dirty-flaggen und neu kompilieren.
