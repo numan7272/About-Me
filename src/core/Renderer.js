@@ -92,7 +92,7 @@ export class Renderer {
 
   _configure(r) {
     r.setPixelRatio(this._pixelRatio());
-    r.setSize(this.game.sizes.width, this.game.sizes.height);
+    r.setSize(this.game.sizes.width, this.game.sizes.height, false);
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.toneMappingExposure = 1.05;
@@ -269,7 +269,8 @@ export class Renderer {
 
   onResize(width, height) {
     if (!this.instance) return;
-    this.instance.setSize(width, height);
+    // CSS owns the dynamic viewport size; only resize the drawing buffer.
+    this.instance.setSize(width, height, false);
     this.setQuality(this.quality);
     if (this.composer) {
       this.composer.setSize(width, height);
