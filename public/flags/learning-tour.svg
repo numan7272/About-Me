@@ -1,0 +1,46 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1320" height="576" viewBox="0 0 660 288">
+  <title>Learning tour route: Finland, Estonia, Latvia, Poland, Austria and Slovenia</title>
+  <!-- Original vector artwork. Each flag retains its national aspect ratio. -->
+  <svg x="11" y="11.5" width="198" height="121" viewBox="0 0 18 11">
+    <title>Finland</title>
+    <path fill="#fff" d="M0 0h18v11H0z"/>
+    <path fill="#002f6c" d="M5 0h3v11H5zM0 4h18v3H0z"/>
+  </svg>
+  <svg x="231" y="9" width="198" height="126" viewBox="0 0 33 21">
+    <title>Estonia</title>
+    <path fill="#4891d9" d="M0 0h33v7H0z"/>
+    <path fill="#101010" d="M0 7h33v7H0z"/>
+    <path fill="#fff" d="M0 14h33v7H0z"/>
+  </svg>
+  <svg x="446" y="20" width="208" height="104" viewBox="0 0 10 5">
+    <title>Latvia</title>
+    <path fill="#9e1b34" d="M0 0h10v5H0z"/>
+    <path fill="#fff" d="M0 2h10v1H0z"/>
+  </svg>
+  <svg x="10" y="153.5" width="200" height="125" viewBox="0 0 8 5">
+    <title>Poland</title>
+    <path fill="#fff" d="M0 0h8v2.5H0z"/>
+    <path fill="#dc143c" d="M0 2.5h8V5H0z"/>
+  </svg>
+  <svg x="237" y="154" width="186" height="124" viewBox="0 0 3 2">
+    <title>Austria</title>
+    <path fill="#ed2939" d="M0 0h3v2H0z"/>
+    <path fill="#fff" d="M0 .666667h3v.666666H0z"/>
+  </svg>
+  <svg x="446" y="164" width="208" height="104" viewBox="0 0 240 120">
+    <title>Slovenia</title>
+    <path fill="#fff" d="M0 0h240v40H0z"/>
+    <path fill="#003da5" d="M0 40h240v40H0z"/>
+    <path fill="#ed1c24" d="M0 80h240v40H0z"/>
+    <!-- Simplified shield for the small in-world badge: Triglav, waves, three six-pointed stars. -->
+    <path fill="#003da5" stroke="#ed1c24" stroke-width="1.8" d="M42 18h36l-2 25Q72 56 60 62 48 56 44 43Z"/>
+    <path fill="#fff" d="M45 44l6-10 5 5 4-9 4 9 5-5 6 10Q71 54 60 59 49 54 45 44Z"/>
+    <path fill="none" stroke="#003da5" stroke-width="2" d="M48 48q3-3 6 0t6 0 6 0 6 0M52 53q3-3 6 0t6 0 6 0"/>
+    <defs>
+      <path id="star" fill="#ffdd00" d="M0-3 .9-1.5 2.6-1.5 1.7 0 2.6 1.5 .9 1.5 0 3-.9 1.5-2.6 1.5-1.7 0-2.6-1.5-.9-1.5Z"/>
+    </defs>
+    <use href="#star" x="53" y="25"/>
+    <use href="#star" x="67" y="25"/>
+    <use href="#star" x="60" y="32"/>
+  </svg>
+</svg>

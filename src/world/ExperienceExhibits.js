@@ -92,7 +92,7 @@ export class ExperienceExhibits {
         fontSize *= availableWidth / textWidth;
         ctx.font = `${weight} ${fontSize}px Arial, sans-serif`;
       }
-      ctx.fillText(line, canvas.width / 2, canvas.height * (.35 + i * .38));
+      ctx.fillText(line, canvas.width / 2, canvas.height * (lines.length === 1 ? .5 : .35 + i * .38));
     });
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -102,11 +102,11 @@ export class ExperienceExhibits {
     group.add(label);
   }
 
-  _brandImage(group, path, position, width, height) {
+  _brandImage(group, path, position, width, height, color = 0xffffff) {
     const texture = new THREE.TextureLoader().load(path);
     texture.colorSpace = THREE.SRGBColorSpace;
     const mark = new THREE.Mesh(new THREE.PlaneGeometry(width, height),
-      new THREE.MeshBasicMaterial({ map: texture, transparent: true, toneMapped: false }));
+      new THREE.MeshBasicMaterial({ map: texture, color, transparent: true, toneMapped: false }));
     mark.position.set(...position);
     group.add(mark);
   }
@@ -137,18 +137,18 @@ export class ExperienceExhibits {
       }
       this._brandImage(prop, "/brands/hackerone/hackerone_logo_white.png", [0, .53, .556], 1.24, .28);
     } else {
-      // A travel case, route board and six country markers for the learning tour.
+      // A travel case with the six countries visited during the learning tour.
       this._box(prop, [2.1, 1.65, .85], [0, 1.05, 0], 0xd39753);
       for (const side of [-.65, .65]) {
         this._box(prop, [.15, 1.75, .91], [side, 1.05, 0], 0x5e4733);
       }
       this._box(prop, [.9, .12, .18], [0, 2.08, 0], 0x5e4733);
       for (const side of [-.4, .4]) this._box(prop, [.12, .25, .18], [side, 1.97, 0], 0x5e4733);
-      this._label(prop, ["AGENTS OF", "CHANGE"], [0, 1.17, .43], 1.1, .65, "#efe7d5", "#263f3b");
-      this._label(prop, ["SLOW TOURISM", "FI EE SI"], [0, .45, .432], 1.1, .4, "#5e4733", "#efe7d5");
-      for (let i = 0; i < 6; i++) {
-        this._box(prop, [.17, .13, .03], [-.5 + i * .2, 1.7, .44], [0x8fe3c0, 0xffd28a, 0xefe7d5][i % 3]);
-      }
+      // Preserve the supplied logo's proportions as a centered travel sticker.
+      this._brandImage(prop, "/brands/agents-of-change/logo.jpg", [0, 1.08, .432], .82 * 1080 / 1221, .82, 0xd6d6d6);
+      this._label(prop, ["SLOW TOURISM"], [0, .45, .432], 1.1, .4, "#5e4733", "#efe7d5");
+      // Keep printed whites below the bloom threshold, including at night.
+      this._brandImage(prop, "/flags/learning-tour.svg", [0, 1.69, .432], .825, .36, 0xd6d6d6);
     }
     this._batchBoxes(prop);
     this.group.add(prop);
