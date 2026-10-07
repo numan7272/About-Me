@@ -73,17 +73,26 @@ export class ExperienceExhibits {
 
   _label(group, lines, position, width, height, background, ink) {
     const canvas = document.createElement("canvas");
-    canvas.width = 512;
-    canvas.height = 256;
+    // Match the plane's proportions so lettering keeps its natural shape.
+    canvas.width = 1024;
+    canvas.height = Math.round(canvas.width * height / width);
     const ctx = canvas.getContext("2d");
     ctx.fillStyle = background;
-    ctx.fillRect(0, 0, 512, 256);
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.fillStyle = ink;
     ctx.textAlign = "center";
     ctx.textBaseline = "middle";
     lines.forEach((line, i) => {
-      ctx.font = `${i === 0 ? "bold 44" : "28"}px monospace`;
-      ctx.fillText(line, 256, 76 + i * 65, 470);
+      const weight = i === 0 ? 700 : 600;
+      let fontSize = canvas.height * (i === 0 ? .34 : .2);
+      ctx.font = `${weight} ${fontSize}px Arial, sans-serif`;
+      const textWidth = ctx.measureText(line).width;
+      const availableWidth = canvas.width * .9;
+      if (textWidth > availableWidth) {
+        fontSize *= availableWidth / textWidth;
+        ctx.font = `${weight} ${fontSize}px Arial, sans-serif`;
+      }
+      ctx.fillText(line, canvas.width / 2, canvas.height * (.35 + i * .38));
     });
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -136,7 +145,7 @@ export class ExperienceExhibits {
       this._box(prop, [.9, .12, .18], [0, 2.08, 0], 0x5e4733);
       for (const side of [-.4, .4]) this._box(prop, [.12, .25, .18], [side, 1.97, 0], 0x5e4733);
       this._label(prop, ["AGENTS OF", "CHANGE"], [0, 1.17, .43], 1.1, .65, "#efe7d5", "#263f3b");
-      this._label(prop, ["SLOW TOURISM", "FI EE SI"], [0, .45, .432], 1.72, .4, "#5e4733", "#efe7d5");
+      this._label(prop, ["SLOW TOURISM", "FI EE SI"], [0, .45, .432], 1.1, .4, "#5e4733", "#efe7d5");
       for (let i = 0; i < 6; i++) {
         this._box(prop, [.17, .13, .03], [-.5 + i * .2, 1.7, .44], [0x8fe3c0, 0xffd28a, 0xefe7d5][i % 3]);
       }
