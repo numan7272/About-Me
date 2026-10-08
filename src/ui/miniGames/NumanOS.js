@@ -17,6 +17,8 @@
  * Initial-Cost niedrig bleibt.
  */
 
+import { experienceFile } from "./ExperienceFile.js";
+
 const NOW_HHMM = () => {
   const d = new Date();
   return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
@@ -64,6 +66,8 @@ const DESKTOP_FILES = [
     icon: NOS_ICONS.fileEdit,
     type: "trigger_sqli",
   },
+  { id: "security", label: "H1_BBP.h1", icon: NOS_ICONS.fileText, type: "experience" },
+  { id: "erasmus", label: "Learning_Tour.trip", icon: NOS_ICONS.globe, type: "experience" },
 ];
 
 const README_CONTENT = `# numan-os v1.0
@@ -73,12 +77,12 @@ This is a simulated desktop. Real one is back on my actual machine.
 What you can do here:
   · Open Browser → my live portfolio (you're already there, kinda)
   · Open Projects/ → my actual repos (Funke, Synapser, etc.)
-  · Open Terminal → a real shell sandbox (try \`uname -a\`)
+  · Open Terminal → a simulated shell (try \`uname -a\`)
   · Read this file
   · ...and maybe one more thing if you read carefully
 
-I'm Numan, Wirtschaftsinformatik student at HAW Kiel.
-Practice > theory. Always.
+I'm Numan, a Business Information Systems student at HAW Kiel.
+I use personal projects to put what I learn into practice.
 
 — n
 `;
@@ -202,6 +206,10 @@ export class NumanOS {
     this._startBootSequence();
   }
 
+  openExperience(id) {
+    if (id === "security" || id === "erasmus") this._openFile(id);
+  }
+
   _buildDom() {
     const root = document.createElement("div");
     root.className = "nos-root";
@@ -278,6 +286,8 @@ export class NumanOS {
       .nos-menu-item { opacity: 0.8; font-weight: 400; }
       .nos-menubar-right .nos-menu-item { font-size: 12px; }
       .nos-close-os {
+        border: 0;
+        font: inherit;
         cursor: pointer;
         background: rgba(255,90,90,0.25);
         border: 1px solid rgba(255,90,90,0.4);
@@ -353,6 +363,9 @@ export class NumanOS {
         z-index: 800;
       }
       .nos-dock-icon {
+        border: 0;
+        padding: 0;
+        background: transparent;
         font-size: 32px;
         cursor: pointer;
         transition: transform 180ms ease;
@@ -581,13 +594,13 @@ export class NumanOS {
       }
 
       /* ── Mobile (≤ 640px) ── */
-      @media (max-width: 640px) {
-        .nos-menubar { padding: 0 10px; height: 32px; font-size: 12px; }
+      @media (max-width: 640px), (max-width: 960px) and (max-height: 500px) {
+        .nos-menubar { padding: env(safe-area-inset-top, 0px) 10px 0; height: calc(48px + env(safe-area-inset-top, 0px)); font-size: 12px; }
         .nos-menubar-left { gap: 10px; }
         .nos-menubar-left .nos-menu-item { display: none; }
         .nos-menubar-left .nos-menu-app { display: inline; }
         .nos-menubar-right .nos-clock { display: none; }
-        .nos-close-os { padding: 4px 10px; font-size: 12px; }
+        .nos-close-os { min-height: 44px; min-width: 80px; padding: 8px 12px; font-size: 13px; }
 
         .nos-desktop-area { padding: 20px 16px; }
         .nos-icons {
@@ -596,31 +609,37 @@ export class NumanOS {
         }
         .nos-icon { padding: 10px 4px; }
         .nos-icon-glyph { font-size: 36px; }
-        .nos-icon-label { font-size: 11px; }
+        .nos-icon-label { font-size: 12px; overflow-wrap: anywhere; }
 
         .nos-dock {
           padding: 6px 10px;
           bottom: 10px;
           gap: 8px;
         }
-        .nos-dock-icon { font-size: 28px; }
+        .nos-dock-icon { font-size: 28px; min-width: 44px; min-height: 44px; display: inline-flex; align-items: center; justify-content: center; }
+        .nos-desktop.has-window .nos-dock { display: none; }
 
         /* Fenster werden fullscreen statt draggable */
         .nos-window {
           position: fixed !important;
           left: 0 !important;
-          top: 32px !important;
+          top: calc(48px + env(safe-area-inset-top, 0px)) !important;
           width: 100% !important;
-          height: calc(100vh - 32px) !important;
+          height: calc(100dvh - 48px - env(safe-area-inset-top, 0px)) !important;
           min-width: 0;
           min-height: 0;
           border-radius: 0;
           border: 0;
         }
-        .nos-win-titlebar { cursor: default; }
+        .nos-win-titlebar { cursor: default; height: 48px; }
+        .nos-traffic-btn { width: 44px; height: 44px; font-size: 22px; color: rgba(255,255,255,.92); background: transparent; border: 0; border-radius: 6px; padding: 0; }
+        .nos-traffic-btn:not(.nos-traffic-close) { display: none; }
+        .nos-win-titlebar > div:last-child { display: none; }
+        .nos-win-title { min-width: 0; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .nos-resize-handle { display: none; }
 
         /* Projects + Browser füllen den Viewport */
-        .nos-win-body { padding: 14px 14px; }
+        .nos-win-body { padding: 14px 16px max(20px, env(safe-area-inset-bottom, 0px)); -webkit-overflow-scrolling: touch; }
         .nos-browser-bar { padding: 6px 10px; gap: 6px; flex-wrap: wrap; }
         .nos-browser-url { font-size: 11px; padding: 4px 8px; }
         .nos-browser-content { padding: 16px 14px; }
@@ -664,7 +683,7 @@ export class NumanOS {
       <div class="nos-menubar-right">
         <span class="nos-menu-item">numan</span>
         <span class="nos-menu-item nos-clock">${NOW_HHMM()}</span>
-        <span class="nos-close-os" data-action="close-os">✕ Close</span>
+        <button type="button" class="nos-close-os" data-action="close-os" aria-label="Close HQ">✕ Close</button>
       </div>
     `;
     desktop.appendChild(menubar);
@@ -680,6 +699,15 @@ export class NumanOS {
       ic.className = "nos-icon";
       ic.dataset.fileId = f.id;
       ic.dataset.type = f.type;
+      ic.tabIndex = 0;
+      ic.setAttribute("role", "button");
+      ic.setAttribute("aria-label", f.label);
+      ic.addEventListener("keydown", (event) => {
+        if (event.key !== "Enter" && event.key !== " ") return;
+        event.preventDefault();
+        event.stopPropagation();
+        this._openFile(f.id);
+      });
       ic.innerHTML = `
         <div class="nos-icon-glyph">${f.icon}</div>
         <div class="nos-icon-label">${f.label}</div>
@@ -692,10 +720,10 @@ export class NumanOS {
     const dock = document.createElement("div");
     dock.className = "nos-dock";
     dock.innerHTML = `
-      <div class="nos-dock-icon" data-file-id="browser" title="Browser" aria-label="Browser">${NOS_ICONS.globe}</div>
-      <div class="nos-dock-icon" data-file-id="terminal" title="Terminal" aria-label="Terminal">${NOS_ICONS.terminal}</div>
-      <div class="nos-dock-icon" data-file-id="projects" title="Projects" aria-label="Projects">${NOS_ICONS.folder}</div>
-      <div class="nos-dock-icon" data-file-id="readme" title="README" aria-label="README">${NOS_ICONS.fileText}</div>
+      <button type="button" class="nos-dock-icon" data-file-id="browser" title="Browser" aria-label="Browser">${NOS_ICONS.globe}</button>
+      <button type="button" class="nos-dock-icon" data-file-id="terminal" title="Terminal" aria-label="Terminal">${NOS_ICONS.terminal}</button>
+      <button type="button" class="nos-dock-icon" data-file-id="projects" title="Projects" aria-label="Projects">${NOS_ICONS.folder}</button>
+      <button type="button" class="nos-dock-icon" data-file-id="readme" title="README" aria-label="README">${NOS_ICONS.fileText}</button>
     `;
     area.appendChild(dock);
 
@@ -727,6 +755,10 @@ export class NumanOS {
     let lastClickTime = 0;
     let lastClickFile = null;
     const handleClick = (fileId) => {
+      if (window.matchMedia("(pointer: coarse), (max-width: 640px), (max-width: 960px) and (max-height: 500px)").matches) {
+        this._openFile(fileId);
+        return;
+      }
       const now = Date.now();
       const isDouble = (fileId === lastClickFile) && (now - lastClickTime < 380);
       lastClickTime = now;
@@ -820,6 +852,7 @@ export class NumanOS {
       this._openSqliFromTodo();
       return;
     }
+    if (file.type === "experience") return this._openWindow(file.id, experienceFile(file.id));
     if (file.id === "browser")  return this._openWindow("browser", this._browserContent());
     if (file.id === "projects") return this._openWindow("projects", this._projectsContent());
     if (file.id === "terminal") return this._openWindow("terminal", this._terminalContent());
@@ -845,8 +878,9 @@ export class NumanOS {
     // Offset & size — staggered
     const offsetX = 80 + (this.windowStack.length * 28);
     const offsetY = 60 + (this.windowStack.length * 24);
-    const sizeW = id === "browser" ? 720 : id === "projects" ? 540 : id === "terminal" ? 620 : 480;
-    const sizeH = id === "browser" ? 460 : id === "projects" ? 460 : id === "terminal" ? 360 : 340;
+    const isExperience = id === "security" || id === "erasmus";
+    const sizeW = isExperience ? 600 : id === "browser" ? 720 : id === "projects" ? 540 : id === "terminal" ? 620 : 480;
+    const sizeH = isExperience ? 540 : id === "browser" ? 460 : id === "projects" ? 460 : id === "terminal" ? 360 : 340;
     win.style.cssText += `
       left: ${offsetX}px; top: ${offsetY}px;
       width: ${sizeW}px; height: ${sizeH}px;
@@ -858,14 +892,16 @@ export class NumanOS {
       terminal: "Terminal — numan@dev",
       readme: "README.txt",
       todo: "TODO_fix_sql_injection.txt",
+      security: "H1_BBP.h1 — HackerOne",
+      erasmus: "Learning_Tour.trip — Agents of Change",
     }[id] || id;
 
     win.innerHTML = `
       <div class="nos-win-titlebar">
         <div class="nos-traffic">
-          <div class="nos-traffic-btn nos-traffic-close" data-action="close" title="Close">×</div>
-          <div class="nos-traffic-btn nos-traffic-min" data-action="minimize" title="Minimize">−</div>
-          <div class="nos-traffic-btn nos-traffic-max" data-action="maximize" title="Maximize">+</div>
+          <button type="button" class="nos-traffic-btn nos-traffic-close" data-action="close" title="Close" aria-label="Close window">×</button>
+          <button type="button" class="nos-traffic-btn nos-traffic-min" data-action="minimize" title="Minimize" aria-label="Minimize window">−</button>
+          <button type="button" class="nos-traffic-btn nos-traffic-max" data-action="maximize" title="Maximize" aria-label="Maximize window">+</button>
         </div>
         <div class="nos-win-title">${title}</div>
         <div style="width:54px;"></div>
@@ -924,6 +960,7 @@ export class NumanOS {
     this.dom.area.appendChild(win);
     requestAnimationFrame(() => win.classList.add("shown"));
     this.windowStack.push(winRef);
+    this.dom.desktop.classList.add("has-window");
   }
 
   _minimizeWindow(winRef) {
@@ -1011,6 +1048,7 @@ export class NumanOS {
     el.classList.remove("shown");
     setTimeout(() => el.remove(), 200);
     this.windowStack.splice(idx, 1);
+    this.dom.desktop.classList.toggle("has-window", this.windowStack.length > 0);
   }
 
   _makeDraggable(win, handle) {

@@ -83,13 +83,15 @@ export class Ui {
       Numpad5: "hq",
     };
     this._onShortcut = (e) => {
+      if (this.game?.splash && !this.game.splash.destroyed) return;
+      if (this.controlPicker?.dom || this.walkthrough?._overlay || this.contact?.isOpen) return;
       // Skip wenn User in Input/Textarea tippt oder Modifier gedrückt sind
       if (e.ctrlKey || e.metaKey || e.altKey) return;
       const tag = e.target?.tagName;
       if (tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT") return;
       if (e.target?.isContentEditable) return;
       // Nicht während aktivem Mini-Game (würde das offene Game stören)
-      if (this.miniGames?.active) return;
+      if (this.miniGames?.active || this.miniGames?._opening) return;
       const stationId = STATION_KEYS[e.code];
       if (!stationId) return;
       e.preventDefault();
@@ -125,6 +127,7 @@ export class Ui {
   /** Sprachwechsel → alle Sprach-abhängigen UI-Bestandteile refreshen */
   refreshLang() {
     this.contact?.refresh?.();
+    this.hotkeyHelp?.refresh?.();
     this.game?.world?.stationLabels?.refresh?.();
     this.walkthrough?.refreshLang?.();
     // Drawer wird bei show() neu gerendert

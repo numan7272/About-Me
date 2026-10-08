@@ -10,8 +10,16 @@
  */
 
 import { getControlMode, setControlMode } from "./controlMode.js";
+import { applyLangToDocument, getUrlLang } from "../core/i18nHead.js";
 
 const STORAGE_KEY = "numan-portfolio-settings-v1";
+const SECTION_LABELS = {
+  language: { de: "Sprache", en: "Language" },
+  volume: { de: "Lautstärke", en: "Volume" },
+  graphics: { de: "Grafik", en: "Graphics" },
+  renderer: { de: "3D-Darstellung", en: "3D rendering" },
+  control: { de: "Steuerung", en: "Bike control" },
+};
 
 const DEFAULTS = {
   lang: "de",
@@ -28,20 +36,21 @@ export class SettingsPanel {
 
     this._buildUI();
     this._applySettings();
+    this._onKey = (event) => {
+      if (event.key === "Escape" && this.isOpen) {
+        this.toggle();
+        this.btn.focus();
+      }
+    };
+    window.addEventListener("keydown", this._onKey);
 
     if (this.game?.renderer?.ready?.then) {
       this.game.renderer.ready.then(() => {
         this._applySettings();
-        if (this._rendererHint) {
-          this._rendererHint.textContent =
-            "active: " + (this.game?.renderer?.mode || "unknown");
-        }
+        this._updateRendererHint();
       }).catch((err) => {
         console.warn("[Settings] renderer.ready failed:", err?.message);
-        if (this._rendererHint) {
-          this._rendererHint.textContent =
-            "renderer init failed. using webgl fallback";
-        }
+        this._updateRendererHint();
       });
     }
   }
@@ -49,9 +58,16 @@ export class SettingsPanel {
   _loadSettings() {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) return { ...DEFAULTS, ...JSON.parse(raw) };
+      if (raw) return this._withUrlLang({ ...DEFAULTS, ...JSON.parse(raw) });
     } catch (e) {}
-    return { ...DEFAULTS };
+    return this._withUrlLang({ ...DEFAULTS });
+  }
+
+  /** ?lang= (hreflang-URL) hat Vorrang vor localStorage/Default. */
+  _withUrlLang(settings) {
+    const urlLang = getUrlLang();
+    if (urlLang) settings.lang = urlLang;
+    return settings;
   }
 
   _saveSettings() {
@@ -77,7 +93,7 @@ export class SettingsPanel {
       fontSize: "13px",
       color: "var(--paper-muted)",
       padding: "8px 14px",
-      minHeight: "38px",
+      minHeight: "44px",
     });
     this.btn.addEventListener("click", () => this.toggle());
     document.body.appendChild(this.btn);
@@ -98,6 +114,8 @@ export class SettingsPanel {
       display: "none",
       flexDirection: "column",
       gap: "16px",
+      maxHeight: "calc(100dvh - 96px)",
+      overflowY: "auto",
     });
     this.panel.append(this._cornerSpan("tr"), this._cornerSpan("bl"));
 
@@ -127,21 +145,22 @@ export class SettingsPanel {
     return hr;
   }
 
-  _sectionLabel(text) {
+  _sectionLabel(key) {
     const lbl = document.createElement("div");
     lbl.className = "hud-kicker";
-    lbl.textContent = text;
+    lbl.dataset.settingLabel = key;
+    lbl.textContent = SECTION_LABELS[key][this.settings.lang === "en" ? "en" : "de"];
     lbl.style.marginBottom = "8px";
     return lbl;
   }
 
   _buildControlModeRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._sectionLabel(this.settings.lang === "en" ? "Bike control" : "Steuerung"));
+    wrap.appendChild(this._sectionLabel("control"));
     wrap.appendChild(this._textToggleGroup(
       [
         { value: "joystick", label: "Joystick" },
-        { value: "tap",      label: "Tap-to-move" },
+        { value: "tap",      label: { de: "Antippen", en: "Tap to move" } },
       ],
       getControlMode(),
       (val) => setControlMode(val),
@@ -168,7 +187,11 @@ export class SettingsPanel {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "hud-btn";
-      b.textContent = opt.label;
+      if (typeof opt.label === "object") {
+        b.dataset.labelDe = opt.label.de;
+        b.dataset.labelEn = opt.label.en;
+        b.textContent = opt.label[this.settings.lang === "en" ? "en" : "de"];
+      } else b.textContent = opt.label;
       b.setAttribute("role", "radio");
       Object.assign(b.style, {
         flex: "1",
@@ -188,7 +211,7 @@ export class SettingsPanel {
 
   _buildLanguageRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._sectionLabel(this.settings.lang === "en" ? "Language" : "Sprache"));
+    wrap.appendChild(this._sectionLabel("language"));
     wrap.appendChild(this._textToggleGroup(
       [
         { label: "DE", value: "de" },
@@ -206,7 +229,7 @@ export class SettingsPanel {
 
   _buildVolumeRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._sectionLabel(this.settings.lang === "en" ? "Volume" : "Lautstärke"));
+    wrap.appendChild(this._sectionLabel("volume"));
 
     const row = document.createElement("div");
     Object.assign(row.style, {
@@ -221,6 +244,7 @@ export class SettingsPanel {
     slider.max = "100";
     slider.value = String(this.settings.volume * 100);
     slider.setAttribute("aria-label", "volume");
+    this._volumeSlider = slider;
     Object.assign(slider.style, {
       flex: "1",
       accentColor: "var(--signal)",
@@ -251,11 +275,11 @@ export class SettingsPanel {
 
   _buildGraphicsRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._sectionLabel(this.settings.lang === "en" ? "Graphics" : "Grafik"));
+    wrap.appendChild(this._sectionLabel("graphics"));
     wrap.appendChild(this._textToggleGroup(
       [
-        { label: "Low", value: "low" },
-        { label: "High", value: "high" },
+        { label: { de: "Niedrig", en: "Low" }, value: "low" },
+        { label: { de: "Hoch", en: "High" }, value: "high" },
       ],
       this.settings.graphics,
       (val) => {
@@ -269,7 +293,7 @@ export class SettingsPanel {
 
   _buildRendererRow() {
     const wrap = document.createElement("div");
-    wrap.appendChild(this._sectionLabel("Renderer"));
+    wrap.appendChild(this._sectionLabel("renderer"));
     wrap.appendChild(this._textToggleGroup(
       [
         { label: "WebGL", value: "webgl" },
@@ -281,7 +305,7 @@ export class SettingsPanel {
         this.settings.renderer = val;
         this._saveSettings();
         if (this._rendererHint) {
-          this._rendererHint.textContent = `reloading. ${val}`;
+          this._rendererHint.textContent = this.settings.lang === "en" ? "Reloading…" : "Wird neu geladen…";
           setTimeout(() => location.reload(), 500);
         }
       },
@@ -292,36 +316,43 @@ export class SettingsPanel {
       fontSize: "10px",
       color: "var(--paper-dim)",
     });
-    hint.textContent = "Active: " + (this.game?.renderer?.mode || "loading");
     wrap.appendChild(hint);
     this._rendererHint = hint;
+    this._updateRendererHint();
     return wrap;
   }
 
+  _updateRendererHint() {
+    if (!this._rendererHint) return;
+    const en = this.settings.lang === "en";
+    const mode = this.game?.renderer?.mode;
+    this._rendererHint.textContent = mode
+      ? `${en ? "Active" : "Aktiv"}: ${mode === "webgpu" ? "WebGPU" : "WebGL"}`
+      : (en ? "Loading 3D rendering…" : "3D-Darstellung wird geladen…");
+  }
+
   _applySettings() {
+    const en = this.settings.lang === "en";
+    this.btn.textContent = en ? "Settings" : "Einstellungen";
+    this._volumeSlider?.setAttribute("aria-label", en ? "Volume" : "Lautstärke");
+    for (const option of this.panel.querySelectorAll("[data-label-de]")) {
+      option.textContent = en ? option.dataset.labelEn : option.dataset.labelDe;
+    }
+    this._updateRendererHint();
+    for (const label of this.panel.querySelectorAll("[data-setting-label]")) {
+      label.textContent = SECTION_LABELS[label.dataset.settingLabel][this.settings.lang === "en" ? "en" : "de"];
+    }
     if (typeof window !== "undefined") {
       window.__masterVolume = this.settings.volume;
     }
     this.game?.audio?.refreshVolume?.();
 
-    const renderer = this.game?.renderer?.instance;
-    if (renderer) {
-      try {
-        if (this.settings.graphics === "low") {
-          renderer.setPixelRatio(Math.min(1.0, window.devicePixelRatio || 1));
-          if (renderer.shadowMap) renderer.shadowMap.enabled = false;
-        } else {
-          renderer.setPixelRatio(Math.min(2.0, window.devicePixelRatio || 1));
-          if (renderer.shadowMap) renderer.shadowMap.enabled = true;
-        }
-      } catch (e) {
-        console.warn("[Settings] graphics apply skipped:", e?.message);
-      }
-    }
+    this.game?.renderer?.setQuality(this.settings.graphics);
 
     if (typeof window !== "undefined") {
       const prevLang = window.__lang;
       window.__lang = this.settings.lang;
+      applyLangToDocument(this.settings.lang);
       if (prevLang && prevLang !== this.settings.lang) {
         this.game?.ui?.refreshLang?.();
       }
@@ -336,6 +367,7 @@ export class SettingsPanel {
   }
 
   destroy() {
+    window.removeEventListener("keydown", this._onKey);
     this.btn?.remove?.();
     this.panel?.remove?.();
   }

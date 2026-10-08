@@ -38,6 +38,7 @@ export class Renderer {
     this.game = game;
     this.canvas = game.canvas;
     this.preference = loadPreference();
+    this.quality = "high";
     this.mode = "loading";
     this.instance = null;
     this.composer = null;
@@ -90,13 +91,13 @@ export class Renderer {
   }
 
   _configure(r) {
-    r.setPixelRatio(this.game.sizes.pixelRatio);
-    r.setSize(this.game.sizes.width, this.game.sizes.height);
+    r.setPixelRatio(this._pixelRatio());
+    r.setSize(this.game.sizes.width, this.game.sizes.height, false);
     r.outputColorSpace = THREE.SRGBColorSpace;
     r.toneMapping = THREE.ACESFilmicToneMapping;
     r.toneMappingExposure = 1.05;
     if (r.shadowMap) {
-      r.shadowMap.enabled = true;
+      r.shadowMap.enabled = this.quality !== "low";
       // PCFSoftShadowMap ist seit r184 deprecated (fiel intern eh auf PCF
       // zurück). Standard-PCF ist 4-tap, sieht unter unserer Insel-Iso
       // praktisch identisch aus und ist unter WebGPU deutlich billiger.
@@ -225,7 +226,8 @@ export class Renderer {
 
       this.composer = new EffectComposer(this.instance);
       this.composer.setSize(this.game.sizes.width, this.game.sizes.height);
-      this.composer.setPixelRatio(this.game.sizes.pixelRatio);
+      this._composerPixelRatio = this._pixelRatio();
+      this.composer.setPixelRatio(this._composerPixelRatio);
 
       this.renderPass = new RenderPass(this.game.scene, this.game.cameraRig.camera);
       this.composer.addPass(this.renderPass);
@@ -244,15 +246,34 @@ export class Renderer {
     }
   }
 
+  _pixelRatio() {
+    const { width = 1, height = 1, pixelRatio } = this.game.sizes;
+    // Bound physical pixels as well as DPR: a 4K/HiDPI display must not
+    // silently multiply the scene and bloom passes' fill cost.
+    const budget = this.quality === "low" ? 1280 * 720 : 1920 * 1080;
+    return Math.min(this.quality === "low" ? 1 : 2, pixelRatio,
+      Math.sqrt(budget / Math.max(1, width * height)));
+  }
+
+  setQuality(quality) {
+    this.quality = quality === "low" ? "low" : "high";
+    const ratio = this._pixelRatio();
+    if (this.instance && this.instance.getPixelRatio() !== ratio) this.instance.setPixelRatio(ratio);
+    if (this.instance?.shadowMap) this.instance.shadowMap.enabled = this.quality !== "low";
+    if (this.composer && this._composerPixelRatio !== ratio) {
+      this.composer.setPixelRatio(ratio);
+      this._composerPixelRatio = ratio;
+    }
+    this.game.world?.grass?.setQuality(this.quality);
+  }
+
   onResize(width, height) {
     if (!this.instance) return;
-    this.instance.setSize(width, height);
-    this.instance.setPixelRatio(this.game.sizes.pixelRatio);
+    // CSS owns the dynamic viewport size; only resize the drawing buffer.
+    this.instance.setSize(width, height, false);
+    this.setQuality(this.quality);
     if (this.composer) {
       this.composer.setSize(width, height);
-    }
-    if (this.bloomPass) {
-      this.bloomPass.setSize(width, height);
     }
     // WebGPU-PostProcessing zieht die Größe automatisch aus dem Renderer
     // — kein expliziter setSize-Call nötig.
@@ -288,7 +309,7 @@ export class Renderer {
     this._updateBloomForDayCycle();
 
     // WebGL + EffectComposer-Pfad
-    if (this.composer && this.mode === "webgl") {
+    if (this.composer && this.mode === "webgl" && this.quality !== "low") {
       if (this.renderPass) {
         this.renderPass.scene = scene;
         this.renderPass.camera = camera;
@@ -300,7 +321,7 @@ export class Renderer {
     // WebGPU + PostProcessing-Pfad
     if (this.mode === "webgpu") {
       try {
-        if (this.postProcessing) {
+        if (this.postProcessing && this.quality !== "low") {
           // ScenePass-Scene/Camera werden beim Bloom-Setup einmalig gesetzt —
           // KEIN Re-Assign pro Frame, das könnte sonst die WebGPU-Pipeline
           // dirty-flaggen und neu kompilieren.

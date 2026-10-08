@@ -25,6 +25,10 @@ export class ProximityTrigger {
 
     // Egg-Visuals (kleine Glow-Sphere am Spawn-Punkt jedes Eggs)
     this.eggMeshes = new Map();   // id → THREE.Mesh
+    this._glowMaterials = new WeakMap();
+    this._glowOriginals = new WeakMap();
+    this._glowTargets = new Map();
+    this._glowingMaterials = new Set();
 
     // Time für Pulse-Animation
     this._t = 0;
@@ -141,33 +145,7 @@ export class ProximityTrigger {
     // soll dort sitzen wo er platziert wurde). Stattdessen subtiles Emissive-
     // Pulsing bei Hover oder Highlight (Walkthrough-Killer-Moment). Bei
     // prefers-reduced-motion: statt Puls einfach steady-glow.
-    const reduced = this._prefersReducedMotion();
-    for (const [id, mesh] of this.eggMeshes) {
-      if (!mesh.visible) continue;
-      const isHighlighted = id === this._highlightedEggId;
-      const isHovered = !!mesh.userData?.hovered;
-      const pulse = reduced ? 0.5 : (Math.sin(this._t * 4.0) + 1) * 0.5;
-      let emissiveIntensity = 0;
-      if (isHighlighted) emissiveIntensity = 0.7 + pulse * 0.5;
-      else if (isHovered) emissiveIntensity = 0.4 + pulse * 0.3;
-      mesh.traverse((child) => {
-        if (child.isMesh && child.material) {
-          if (emissiveIntensity > 0) {
-            child.material.emissive?.setHex?.(0xffeebb);
-            child.material.emissiveIntensity = emissiveIntensity;
-          } else {
-            // Zurück auf Original
-            const orig = child.userData._origEmissive;
-            if (orig && child.material.emissive) {
-              child.material.emissive.copy(orig);
-            }
-            child.material.emissiveIntensity =
-              child.userData._origEmissiveIntensity ?? 0;
-          }
-          child.material.needsUpdate = true;
-        }
-      });
-    }
+    this._updateEggGlows();
 
     const t = player.body.translation();
     const px = t.x;
@@ -214,6 +192,61 @@ export class ProximityTrigger {
     }
   }
 
+  _getGlowMaterials(mesh) {
+    let materials = this._glowMaterials.get(mesh);
+    if (materials) return materials;
+    const unique = new Set();
+    mesh.traverse((child) => {
+      if (!child.isMesh) return;
+      const list = Array.isArray(child.material) ? child.material : [child.material];
+      for (const material of list) {
+        if (!material?.emissive) continue;
+        unique.add(material);
+        if (!this._glowOriginals.has(material)) {
+          this._glowOriginals.set(material, {
+            color: material.emissive.clone(), intensity: material.emissiveIntensity,
+          });
+        }
+      }
+    });
+    materials = [...unique];
+    this._glowMaterials.set(mesh, materials);
+    return materials;
+  }
+
+  _updateEggGlows() {
+    const pulse = this._prefersReducedMotion() ? .5 : (Math.sin(this._t * 4) + 1) * .5;
+    this._glowTargets.clear();
+    for (const [id, mesh] of this.eggMeshes) {
+      if (!mesh.visible) continue;
+      const highlighted = id === this._highlightedEggId;
+      const hovered = !!mesh.userData.hovered;
+      if (!highlighted && !hovered) continue;
+      const intensity = (highlighted ? .7 + pulse * .5 : .4 + pulse * .3)
+        * (mesh.userData.highlightScale ?? 1);
+      for (const material of this._getGlowMaterials(mesh)) {
+        // Shared GLB materials may belong to several clickable roots.
+        this._glowTargets.set(material, Math.max(intensity, this._glowTargets.get(material) ?? 0));
+      }
+    }
+    for (const material of this._glowingMaterials) {
+      if (this._glowTargets.has(material)) continue;
+      const original = this._glowOriginals.get(material);
+      material.emissive.copy(original.color);
+      material.emissiveIntensity = original.intensity;
+      this._glowingMaterials.delete(material);
+    }
+    for (const [material, intensity] of this._glowTargets) {
+      if (!this._glowingMaterials.has(material)) {
+        material.emissive.setHex(0xffeebb);
+        this._glowingMaterials.add(material);
+      }
+      // Emissive values are uniforms. needsUpdate would invalidate material
+      // programs every frame, including WebGPU's cached render pipelines.
+      if (material.emissiveIntensity !== intensity) material.emissiveIntensity = intensity;
+    }
+  }
+
   _openCard(trig) {
     // Keine automatische InfoCard mehr — Walkthrough wird das später
     // übernehmen. Hier nur Discovery-Mark für Eggs.
@@ -236,5 +269,7 @@ export class ProximityTrigger {
       mesh.material?.dispose?.();
     }
     this.eggMeshes.clear();
+    this._glowTargets.clear();
+    this._glowingMaterials.clear();
   }
 }

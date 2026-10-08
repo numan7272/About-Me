@@ -9,6 +9,18 @@
  * Toggle: F1, ? oder /. Schließt mit Esc / Click outside.
  */
 
+import { getLang } from "../data/content.js";
+
+const DE_LABELS = {
+  forward: "Vorwärts", backward: "Rückwärts", "turn left": "Nach links lenken",
+  "turn right": "Nach rechts lenken", brake: "Bremsen",
+  "toggle headlight": "Scheinwerfer ein/aus", "toggle collider debug": "Kollisionsflächen anzeigen",
+  "pause day/night cycle": "Tag-Nacht-Wechsel pausieren", "snap to day": "Tag einstellen",
+  "snap to night": "Nacht einstellen", "resume auto-cycle": "Tag-Nacht-Wechsel fortsetzen",
+  "toggle debug gui": "Entwickleransicht ein/aus", "show this help": "Diese Hilfe öffnen",
+  "open station": "Station öffnen (Yek, THG, HAW, Designa, HQ)",
+};
+
 const HOTKEYS = [
   { keys: ["W", "↑"],   label: "forward" },
   { keys: ["S", "↓"],   label: "backward" },
@@ -23,6 +35,7 @@ const HOTKEYS = [
   { keys: ["B"],         label: "resume auto-cycle" },
   { keys: ["H"],         label: "toggle debug gui" },
   { keys: ["F1", "?"],   label: "show this help" },
+  { keys: ["1–5"],       label: "open station" },
 ];
 
 export class HotkeyHelp {
@@ -30,13 +43,14 @@ export class HotkeyHelp {
     this.game = game;
     this.isOpen = false;
     this._buildUI();
+    this.refresh();
     this._bindKeys();
   }
 
   _buildUI() {
     this.btn = document.createElement("button");
     this.btn.type = "button";
-    this.btn.className = "hud-btn";
+    this.btn.className = "hud-btn hud-help-trigger";
     this.btn.textContent = "[F1] help";
     this.btn.setAttribute("aria-label", "show keyboard shortcuts");
     const isTouch = window.matchMedia?.("(pointer: coarse)")?.matches
@@ -78,8 +92,10 @@ export class HotkeyHelp {
     panel.setAttribute("aria-modal", "true");
     panel.setAttribute("aria-label", "keyboard shortcuts");
     Object.assign(panel.style, {
-      minWidth: "320px",
-      maxWidth: "min(440px, calc(100vw - 32px))",
+      width: "min(440px, calc(100vw - 32px))",
+      minWidth: "0",
+      maxHeight: "calc(100dvh - 32px)",
+      overflowY: "auto",
       padding: "22px 24px 20px",
       background: "var(--ink-solid)",
       color: "var(--paper)",
@@ -88,6 +104,9 @@ export class HotkeyHelp {
     panel.append(this._cornerSpan("tr"), this._cornerSpan("bl"));
 
     const title = document.createElement("div");
+    this._title = title;
+    this._panel = panel;
+    this._labels = [];
     title.className = "hud-kicker";
     title.textContent = "> shortcuts";
     title.style.marginBottom = "14px";
@@ -120,6 +139,7 @@ export class HotkeyHelp {
         keysCell.appendChild(kbd);
       }
       const labelCell = document.createElement("div");
+      this._labels.push({ element: labelCell, key: row.label });
       labelCell.textContent = row.label;
       labelCell.style.color = "var(--paper)";
       labelCell.style.fontFamily = "var(--font-ui)";
@@ -130,6 +150,7 @@ export class HotkeyHelp {
     panel.appendChild(list);
 
     const hint = document.createElement("div");
+    this._hint = hint;
     hint.textContent = "[esc] close";
     Object.assign(hint.style, {
       marginTop: "16px",
@@ -141,6 +162,18 @@ export class HotkeyHelp {
 
     this.overlay.appendChild(panel);
     document.body.appendChild(this.overlay);
+  }
+
+  refresh() {
+    const de = getLang() === "de";
+    this.btn.textContent = de ? "[F1] Hilfe" : "[F1] Help";
+    this.btn.setAttribute("aria-label", de ? "Tastaturbefehle anzeigen" : "Show keyboard shortcuts");
+    this._panel.setAttribute("aria-label", de ? "Tastaturbefehle" : "Keyboard shortcuts");
+    this._title.textContent = de ? "> tastaturbefehle" : "> keyboard shortcuts";
+    this._hint.textContent = de ? "[esc] schließen" : "[esc] close";
+    for (const { element, key } of this._labels) {
+      element.textContent = de ? DE_LABELS[key] : key === "open station" ? "Open station (Yek, THG, HAW, Designa, HQ)" : key;
+    }
   }
 
   _cornerSpan(corner) {

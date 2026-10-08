@@ -151,6 +151,10 @@ export class EggClickHandler {
     }
 
     const miniGames = this.game.ui?.miniGames;
+    if (String(eggId).startsWith("Experience_")) {
+      miniGames?.open("hq", { file: String(eggId).slice("Experience_".length) });
+      return;
+    }
     if (miniGames?.open) {
       miniGames.open(eggId);
     } else {

@@ -109,6 +109,8 @@ export class ContactPanel {
     this.panel.setAttribute("role", "dialog");
     this.panel.setAttribute("aria-modal", "true");
     this.panel.setAttribute("aria-label", "contact");
+    this.panel.inert = true;
+    this.panel.setAttribute("aria-hidden", "true");
     Object.assign(this.panel.style, {
       position: "fixed",
       top: "0",
@@ -139,7 +141,7 @@ export class ContactPanel {
     // ── Close-Button ──
     const closeBtn = document.createElement("button");
     closeBtn.type = "button";
-    closeBtn.textContent = "[ esc ] close";
+    closeBtn.textContent = isEn ? "Close ×" : "Schließen ×";
     closeBtn.setAttribute("aria-label", "close contact panel");
     Object.assign(closeBtn.style, {
       position: "absolute",
@@ -152,6 +154,8 @@ export class ContactPanel {
       fontSize: "11px",
       cursor: "pointer",
       padding: "4px 6px",
+      minHeight: "44px",
+      minWidth: "44px",
       transition: "color 180ms var(--ease)",
     });
     closeBtn.addEventListener("mouseenter", () => {
@@ -235,8 +239,8 @@ export class ContactPanel {
     // ── Footer-Hint ──
     const footer = document.createElement("div");
     footer.textContent = isEn
-      ? "[ esc ] close · reply usually within a day."
-      : "[ esc ] schließen · antwort meist innerhalb eines tages.";
+      ? "[ esc ] close · Questions about my work? Get in touch."
+      : "[ esc ] schließen · Fragen zu meiner Arbeit? Schreib mir gern.";
     Object.assign(footer.style, {
       marginTop: "auto",
       paddingTop: "20px",
@@ -409,19 +413,40 @@ export class ContactPanel {
         e.preventDefault();
         this.close();
       }
+      if (e.key === "Tab" && this.isOpen) {
+        const targets = [...this.panel.querySelectorAll("button, a[href]")];
+        const first = targets[0];
+        const last = targets.at(-1);
+        if (e.shiftKey && document.activeElement === first) {
+          e.preventDefault();
+          last?.focus();
+        } else if (!e.shiftKey && document.activeElement === last) {
+          e.preventDefault();
+          first?.focus();
+        }
+      }
     };
     window.addEventListener("keydown", this._onKey);
   }
 
   open() {
+    if (this.isOpen) return;
+    this._previousFocus = document.activeElement;
     this.isOpen = true;
+    this.panel.inert = false;
+    this.panel.setAttribute("aria-hidden", "false");
     this.panel.style.transform = "translateX(0%)";
     this.backdrop.style.opacity = "1";
     this.backdrop.style.pointerEvents = "auto";
+    this.panel.querySelector("button")?.focus();
   }
 
   close() {
+    if (!this.isOpen) return;
     this.isOpen = false;
+    (this._previousFocus?.isConnected ? this._previousFocus : this.btn)?.focus();
+    this.panel.inert = true;
+    this.panel.setAttribute("aria-hidden", "true");
     this.panel.style.transform = "translateX(100%)";
     this.backdrop.style.opacity = "0";
     this.backdrop.style.pointerEvents = "none";

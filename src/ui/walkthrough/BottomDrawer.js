@@ -53,6 +53,8 @@ export class BottomDrawer {
 
   _buildUI() {
     this.root = document.createElement("div");
+    this.root.inert = true;
+    this.root.setAttribute("aria-hidden", "true");
     Object.assign(this.root.style, {
       position: "fixed",
       left: "0",
@@ -242,12 +244,12 @@ export class BottomDrawer {
       // Mobile compact: gekürzte Bullets (max 3 single-line) passen jetzt
       // ohne Scroll in den Drawer. Padding-Bottom 64px reicht (in-world
       // Joystick stört nicht). Drawer-Höhe nicht mehr gecappt → kein Scroll.
-      this.root.style.padding = "0 10px 64px 10px";
+      this.root.style.padding = "0 10px max(10px, env(safe-area-inset-bottom, 0px)) 10px";
       this.panel.style.gridTemplateColumns = "1fr";
       this.panel.style.gap = "8px";
       this.panel.style.padding = "10px 14px 10px";
-      this.panel.style.maxHeight = "";
-      this.panel.style.overflowY = "visible";
+      this.panel.style.maxHeight = "min(55dvh, calc(100dvh - 120px))";
+      this.panel.style.overflowY = "auto";
       this.leftCol.style.display = "flex";
       this.leftCol.style.flexDirection = "row";
       this.leftCol.style.flexWrap = "wrap";
@@ -278,6 +280,8 @@ export class BottomDrawer {
   }
 
   show(station) {
+    this.root.inert = false;
+    this.root.setAttribute("aria-hidden", "false");
     this.station = station;
     this.step = 0;
     this._endCardMode = false;
@@ -296,6 +300,8 @@ export class BottomDrawer {
    * @param {{ onContact: fn, onRestart: fn, onClose: fn }} handlers
    */
   showEndCard(handlers = {}) {
+    this.root.inert = false;
+    this.root.setAttribute("aria-hidden", "false");
     this.station = null;
     this.step = 0;
     this._endCardMode = true;
@@ -309,6 +315,9 @@ export class BottomDrawer {
   }
 
   hide() {
+    if (this.root.contains(document.activeElement)) document.activeElement.blur();
+    this.root.inert = true;
+    this.root.setAttribute("aria-hidden", "true");
     this.root.style.transform = "translateY(110%)";
     this.root.style.opacity = "0";
     this.visible = false;
@@ -528,6 +537,18 @@ export class BottomDrawer {
       wrap.appendChild(item);
     }
     this.center.appendChild(wrap);
+    if (s.aboutSection) {
+      const button = this._makeSecondaryBtn();
+      const isEn = this._lang() === "en";
+      button.textContent = s.aboutSection === "erasmus"
+        ? (isEn ? "Discover Learning_Tour.trip in HQ ↗" : "Learning_Tour.trip im HQ entdecken ↗")
+        : (isEn ? "Discover H1_BBP.h1 in HQ ↗" : "H1_BBP.h1 im HQ entdecken ↗");
+      button.addEventListener("click", () => {
+        this.game.ui?.walkthrough?.endTour({ completed: false });
+        this.game.ui?.miniGames?.open("hq", { file: s.aboutSection });
+      });
+      this.center.appendChild(button);
+    }
   }
 
   _renderEndCard() {
@@ -571,8 +592,8 @@ export class BottomDrawer {
     // Body. Generischer Ton, nicht auf einen Job-Typ festgelegt.
     const body = document.createElement("div");
     body.textContent = isEn
-      ? "thanks for taking the tour. if you think i'd fit your team, drop me a line. usually within a day."
-      : "danke fürs durchklicken. wenn du denkst ich passe in dein team, schreib mir. meist innerhalb eines tages.";
+      ? "Thanks for taking the tour. Have a question about my work or an idea for a project? Get in touch."
+      : "Danke, dass du dir meine Tour angesehen hast. Du hast Fragen zu meiner Arbeit oder eine Projektidee? Schreib mir gern.";
     Object.assign(body.style, {
       fontSize: "13px",
       lineHeight: "1.55",
