@@ -592,8 +592,8 @@ export class BottomDrawer {
     // Body. Generischer Ton, nicht auf einen Job-Typ festgelegt.
     const body = document.createElement("div");
     body.textContent = isEn
-      ? "thanks for taking the tour. if you think i'd fit your team, drop me a line. usually within a day."
-      : "danke fürs durchklicken. wenn du denkst ich passe in dein team, schreib mir. meist innerhalb eines tages.";
+      ? "Thanks for taking the tour. Have a question about my work or an idea for a project? Get in touch."
+      : "Danke, dass du dir meine Tour angesehen hast. Du hast Fragen zu meiner Arbeit oder eine Projektidee? Schreib mir gern.";
     Object.assign(body.style, {
       fontSize: "13px",
       lineHeight: "1.55",

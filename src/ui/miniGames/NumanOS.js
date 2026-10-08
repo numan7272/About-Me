@@ -77,12 +77,12 @@ This is a simulated desktop. Real one is back on my actual machine.
 What you can do here:
   · Open Browser → my live portfolio (you're already there, kinda)
   · Open Projects/ → my actual repos (Funke, Synapser, etc.)
-  · Open Terminal → a real shell sandbox (try \`uname -a\`)
+  · Open Terminal → a simulated shell (try \`uname -a\`)
   · Read this file
   · ...and maybe one more thing if you read carefully
 
-I'm Numan, Wirtschaftsinformatik student at HAW Kiel.
-Practice > theory. Always.
+I'm Numan, a Business Information Systems student at HAW Kiel.
+I use personal projects to put what I learn into practice.
 
 — n
 `;

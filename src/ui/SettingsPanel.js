@@ -17,7 +17,7 @@ const SECTION_LABELS = {
   language: { de: "Sprache", en: "Language" },
   volume: { de: "Lautstärke", en: "Volume" },
   graphics: { de: "Grafik", en: "Graphics" },
-  renderer: { de: "Renderer", en: "Renderer" },
+  renderer: { de: "3D-Darstellung", en: "3D rendering" },
   control: { de: "Steuerung", en: "Bike control" },
 };
 
@@ -36,20 +36,21 @@ export class SettingsPanel {
 
     this._buildUI();
     this._applySettings();
+    this._onKey = (event) => {
+      if (event.key === "Escape" && this.isOpen) {
+        this.toggle();
+        this.btn.focus();
+      }
+    };
+    window.addEventListener("keydown", this._onKey);
 
     if (this.game?.renderer?.ready?.then) {
       this.game.renderer.ready.then(() => {
         this._applySettings();
-        if (this._rendererHint) {
-          this._rendererHint.textContent =
-            "active: " + (this.game?.renderer?.mode || "unknown");
-        }
+        this._updateRendererHint();
       }).catch((err) => {
         console.warn("[Settings] renderer.ready failed:", err?.message);
-        if (this._rendererHint) {
-          this._rendererHint.textContent =
-            "renderer init failed. using webgl fallback";
-        }
+        this._updateRendererHint();
       });
     }
   }
@@ -159,7 +160,7 @@ export class SettingsPanel {
     wrap.appendChild(this._textToggleGroup(
       [
         { value: "joystick", label: "Joystick" },
-        { value: "tap",      label: "Tap-to-move" },
+        { value: "tap",      label: { de: "Antippen", en: "Tap to move" } },
       ],
       getControlMode(),
       (val) => setControlMode(val),
@@ -186,7 +187,11 @@ export class SettingsPanel {
       const b = document.createElement("button");
       b.type = "button";
       b.className = "hud-btn";
-      b.textContent = opt.label;
+      if (typeof opt.label === "object") {
+        b.dataset.labelDe = opt.label.de;
+        b.dataset.labelEn = opt.label.en;
+        b.textContent = opt.label[this.settings.lang === "en" ? "en" : "de"];
+      } else b.textContent = opt.label;
       b.setAttribute("role", "radio");
       Object.assign(b.style, {
         flex: "1",
@@ -239,6 +244,7 @@ export class SettingsPanel {
     slider.max = "100";
     slider.value = String(this.settings.volume * 100);
     slider.setAttribute("aria-label", "volume");
+    this._volumeSlider = slider;
     Object.assign(slider.style, {
       flex: "1",
       accentColor: "var(--signal)",
@@ -272,8 +278,8 @@ export class SettingsPanel {
     wrap.appendChild(this._sectionLabel("graphics"));
     wrap.appendChild(this._textToggleGroup(
       [
-        { label: "Low", value: "low" },
-        { label: "High", value: "high" },
+        { label: { de: "Niedrig", en: "Low" }, value: "low" },
+        { label: { de: "Hoch", en: "High" }, value: "high" },
       ],
       this.settings.graphics,
       (val) => {
@@ -299,7 +305,7 @@ export class SettingsPanel {
         this.settings.renderer = val;
         this._saveSettings();
         if (this._rendererHint) {
-          this._rendererHint.textContent = `reloading. ${val}`;
+          this._rendererHint.textContent = this.settings.lang === "en" ? "Reloading…" : "Wird neu geladen…";
           setTimeout(() => location.reload(), 500);
         }
       },
@@ -310,13 +316,29 @@ export class SettingsPanel {
       fontSize: "10px",
       color: "var(--paper-dim)",
     });
-    hint.textContent = "Active: " + (this.game?.renderer?.mode || "loading");
     wrap.appendChild(hint);
     this._rendererHint = hint;
+    this._updateRendererHint();
     return wrap;
   }
 
+  _updateRendererHint() {
+    if (!this._rendererHint) return;
+    const en = this.settings.lang === "en";
+    const mode = this.game?.renderer?.mode;
+    this._rendererHint.textContent = mode
+      ? `${en ? "Active" : "Aktiv"}: ${mode === "webgpu" ? "WebGPU" : "WebGL"}`
+      : (en ? "Loading 3D rendering…" : "3D-Darstellung wird geladen…");
+  }
+
   _applySettings() {
+    const en = this.settings.lang === "en";
+    this.btn.textContent = en ? "Settings" : "Einstellungen";
+    this._volumeSlider?.setAttribute("aria-label", en ? "Volume" : "Lautstärke");
+    for (const option of this.panel.querySelectorAll("[data-label-de]")) {
+      option.textContent = en ? option.dataset.labelEn : option.dataset.labelDe;
+    }
+    this._updateRendererHint();
     for (const label of this.panel.querySelectorAll("[data-setting-label]")) {
       label.textContent = SECTION_LABELS[label.dataset.settingLabel][this.settings.lang === "en" ? "en" : "de"];
     }
@@ -345,6 +367,7 @@ export class SettingsPanel {
   }
 
   destroy() {
+    window.removeEventListener("keydown", this._onKey);
     this.btn?.remove?.();
     this.panel?.remove?.();
   }

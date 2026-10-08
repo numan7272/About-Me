@@ -239,8 +239,8 @@ export class ContactPanel {
     // ── Footer-Hint ──
     const footer = document.createElement("div");
     footer.textContent = isEn
-      ? "[ esc ] close · reply usually within a day."
-      : "[ esc ] schließen · antwort meist innerhalb eines tages.";
+      ? "[ esc ] close · Questions about my work? Get in touch."
+      : "[ esc ] schließen · Fragen zu meiner Arbeit? Schreib mir gern.";
     Object.assign(footer.style, {
       marginTop: "auto",
       paddingTop: "20px",

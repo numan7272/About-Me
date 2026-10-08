@@ -27,7 +27,7 @@ export const ABOUT = {
         details: [
           ["Nachhaltig reisen", "Slow Tourism als Alternative zu Massen- und Übertourismus kennenlernen: bewusst reisen, lokale Gemeinschaften einbeziehen und Umwelt sowie Klima berücksichtigen."],
           ["Gemeinsam Lösungen entwickeln", "In internationalen Teams und Innovationsworkshops arbeiteten wir mit lokalen Unternehmen und Gemeinschaften an Ideen für nachhaltige Angebote und Dienstleistungen."],
-          ["Was ich mitnehme", "Interkulturelle Zusammenarbeit, Problemlösung und neue Perspektiven auf Innovation, Unternehmertum und die Entwicklung nachhaltiger Reiseziele."],
+          ["Was ich mitnehme", "Als Wirtschaftsinformatikstudent habe ich mit Menschen aus Tourismus, Hospitality und verwandten Studiengängen zusammengearbeitet. Dabei habe ich gelernt, mich schnell in ein internationales Team einzubringen und bewusster zu reisen."],
         ],
         skills: ["Interkulturelle Teamarbeit", "Problemlösung", "Präsentation", "Nachhaltiger Tourismus"],
         links: [
@@ -62,7 +62,7 @@ export const ABOUT = {
         details: [
           ["Travelling sustainably", "Explored slow tourism as an alternative to mass tourism and overtourism: travelling mindfully, engaging local communities, and considering the environment and climate."],
           ["Developing solutions together", "In international teams and innovation workshops, we worked with local businesses and communities on ideas for sustainable services and experiences."],
-          ["What I take away", "Intercultural collaboration, problem solving, and new perspectives on innovation, entrepreneurship, and sustainable destination development."],
+          ["What I take away", "As a Business Information Systems student, I worked with people studying tourism, hospitality and related subjects. I learned to find my place in an international team quickly and to think more carefully about how I travel."],
         ],
         skills: ["Intercultural teamwork", "Problem solving", "Presentation", "Sustainable tourism"],
         links: [

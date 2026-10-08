@@ -127,6 +127,7 @@ export class Ui {
   /** Sprachwechsel → alle Sprach-abhängigen UI-Bestandteile refreshen */
   refreshLang() {
     this.contact?.refresh?.();
+    this.hotkeyHelp?.refresh?.();
     this.game?.world?.stationLabels?.refresh?.();
     this.walkthrough?.refreshLang?.();
     // Drawer wird bei show() neu gerendert

@@ -121,10 +121,7 @@ export class Game {
       this.renderer.ready.then(() => {
         this.onResize();
         // SettingsPanel-Hint updaten falls vorhanden
-        if (this.ui?.settings?._rendererHint) {
-          this.ui.settings._rendererHint.textContent =
-            "Active: " + this.renderer.mode;
-        }
+        this.ui?.settings?._updateRendererHint?.();
       }).catch((error) => {
         console.warn("[Game] renderer initialization failed:", error);
         this.splash?.showError?.();
